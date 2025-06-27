@@ -2,6 +2,7 @@
 #include <boost/interprocess/exceptions.hpp>
 #include <regex>
 #include <cstring>
+#include <iostream>  // For debug
 
 namespace psyne {
 namespace detail {
@@ -103,6 +104,8 @@ void IPCChannel::commit_message(void* handle) {
     auto* msg = reinterpret_cast<IPCMessage*>(data_ptr - sizeof(IPCMessage));
     size_t total_size = align_up(sizeof(IPCMessage) + msg->size);
     
+    std::cerr << "[IPC] Committing message, size=" << msg->size << ", total=" << total_size << "\n";
+    
     bip::scoped_lock<bip::named_mutex> lock(*mutex_);
     
     // Wait for space if needed
@@ -118,6 +121,7 @@ void IPCChannel::commit_message(void* handle) {
                 // Copy message to shared memory
                 std::memcpy(buffer_ + write_offset, msg, sizeof(IPCMessage) + msg->size);
                 shared_data_->write_pos = write_pos + total_size;
+                std::cerr << "[IPC] Message committed at offset " << write_offset << "\n";
                 not_empty_->notify_one();
                 break;
             }
@@ -133,6 +137,8 @@ void* IPCChannel::receive_message(size_t& size, uint32_t& type) {
     
     size_t read_pos = shared_data_->read_pos.load();
     size_t write_pos = shared_data_->write_pos.load();
+    
+    std::cerr << "[IPC] Receive: read_pos=" << read_pos << ", write_pos=" << write_pos << "\n";
     
     if (read_pos == write_pos) {
         return nullptr;  // Empty

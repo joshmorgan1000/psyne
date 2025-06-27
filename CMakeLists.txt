@@ -76,6 +76,8 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"
     "${CMAKE_SOURCE_DIR}/src/channel/ipc_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/ipc_channel.hpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/tcp_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/tcp_channel.hpp"
     "${CMAKE_SOURCE_DIR}/src/core/message.cpp"
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer.cpp"
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer_impl.hpp"

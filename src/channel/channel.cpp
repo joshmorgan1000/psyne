@@ -2,6 +2,7 @@
 #include "channel_impl.hpp"
 #include "../memory/ring_buffer_impl.hpp"
 #include "ipc_channel.hpp"
+#include "tcp_channel.hpp"
 #include <stdexcept>
 #include <regex>
 
@@ -95,8 +96,8 @@ std::unique_ptr<Channel> Channel::create(
         // Create IPC channel
         impl = std::make_unique<detail::IPCChannel>(uri, buffer_size, mode, type);
     } else if (scheme == "tcp") {
-        // TCP implementation would go here
-        throw std::runtime_error("TCP channels not yet implemented in refactored code");
+        // Create TCP channel
+        impl = detail::create_tcp_channel(uri, buffer_size, mode, type);
     } else {
         throw std::invalid_argument("Unknown URI scheme: " + scheme);
     }

@@ -24,7 +24,9 @@
       "Bash(mv:*)",
       "Bash(./build/examples/simple_messaging 2>&1)",
       "Bash(./build/examples/simple_messaging)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(./build/examples/ipc_test)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

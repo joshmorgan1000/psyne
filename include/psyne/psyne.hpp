@@ -234,6 +234,11 @@ protected:
 // ============================================================================
 
 // Factory function for creating channels from URIs
+// Supported URI schemes:
+//   - memory://name     : In-process memory channels
+//   - ipc://name        : Inter-process communication via shared memory
+//   - tcp://host:port   : TCP client (connects to host:port)
+//   - tcp://:port       : TCP server (listens on port)
 inline std::unique_ptr<Channel> create_channel(
     const std::string& uri,
     size_t buffer_size = 1024 * 1024,
