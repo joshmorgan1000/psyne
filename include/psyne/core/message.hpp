@@ -3,13 +3,12 @@
 #include "variant.hpp"
 #include "variant_view.hpp"
 #include "../memory/ring_buffer.hpp"
+#include "../memory/slab_allocator.hpp"
 #include <memory>
 #include <span>
 #include <initializer_list>
 #include <cstring>
-#include <any>
 #include <cmath>
-#include <functional>
 #include <Eigen/Core>
 
 namespace psyne {
@@ -30,9 +29,10 @@ public:
         if (rb) {
             auto write_handle = rb->reserve(required_size);
             if (write_handle) {
-                // Store both the handle and a commit function
-                handle_ = *write_handle;
-                commit_fn_ = [h = *write_handle]() mutable { h.commit(); };
+                // Store handle data directly (no std::any)
+                handle_header_ = write_handle->header;
+                handle_data_ = write_handle->data;
+                handle_size_ = write_handle->size;
                 data_ = static_cast<uint8_t*>(write_handle->data);
                 size_ = required_size;
                 // Don't call virtual functions from constructor!
@@ -62,10 +62,12 @@ public:
     bool is_valid() const { return data_ != nullptr; }
     
     void send() {
-        if (mode_ == Mode::Outgoing && commit_fn_) {
+        if (mode_ == Mode::Outgoing && handle_header_) {
             // Allow derived classes to finalize before sending
             static_cast<Derived*>(this)->before_send();
-            commit_fn_();
+            // Commit the write handle
+            handle_header_->len = static_cast<uint32_t>(handle_size_);
+            std::atomic_thread_fence(std::memory_order_release);
         }
     }
     
@@ -90,8 +92,12 @@ protected:
     uint8_t* data_ = nullptr;
     size_t size_ = 0;
     void* channel_ = nullptr;
-    std::any handle_;
-    std::function<void()> commit_fn_;
+    
+    // Direct storage instead of std::any and std::function
+    using Header = SlabAllocator::SlabHeader;
+    Header* handle_header_ = nullptr;
+    void* handle_data_ = nullptr;
+    size_t handle_size_ = 0;
     
     template<typename T>
     T* write_at(size_t offset, T value) {

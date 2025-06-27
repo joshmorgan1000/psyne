@@ -10,6 +10,8 @@
 // Memory management
 #include "memory/slab_allocator.hpp"
 #include "memory/ring_buffer.hpp"
+#include "memory/dynamic_slab_allocator.hpp"
+#include "memory/dynamic_ring_buffer.hpp"
 
 // Channels
 #include "channel/channel.hpp"

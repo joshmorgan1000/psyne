@@ -141,29 +141,28 @@ public:
     
     std::optional<WriteHandle> reserve(size_t size) {
         const size_t total_size = align_up(sizeof(Header) + size);
-        size_t current_write = write_pos_.load(std::memory_order_relaxed);
-        size_t next_write;
         
-        do {
-            size_t current_read = read_pos_;
-            if (buffer_size_ - (current_write - current_read) < total_size) {
-                return std::nullopt;
-            }
-            next_write = current_write + total_size;
-        } while (!write_pos_.compare_exchange_weak(
-            current_write, next_write,
-            std::memory_order_relaxed,
-            std::memory_order_relaxed));
+        // SPSC: No atomics needed for single producer
+        size_t current_write = write_pos_;
+        size_t current_read = read_pos_;
+        
+        if (buffer_size_ - (current_write - current_read) < total_size) {
+            return std::nullopt;
+        }
         
         auto* header = reinterpret_cast<Header*>(buffer_ + (current_write & mask_));
         header->len = 0;  // Mark as not ready
+        
+        write_pos_ = current_write + total_size;
         
         return WriteHandle(header, size);
     }
     
     std::optional<ReadHandle> read() {
+        // SPSC: No atomics needed for single consumer
         size_t current_read = read_pos_;
-        size_t current_write = write_pos_.load(std::memory_order_acquire);
+        std::atomic_thread_fence(std::memory_order_acquire); // Ensure we see writes
+        size_t current_write = write_pos_;
         
         if (current_read == current_write) {
             return std::nullopt;
@@ -181,7 +180,8 @@ public:
     }
     
     bool empty() const { 
-        return read_pos_ == write_pos_.load(std::memory_order_acquire);
+        std::atomic_thread_fence(std::memory_order_acquire);
+        return read_pos_ == write_pos_;
     }
     
     void* base() { return buffer_; }
@@ -203,8 +203,13 @@ private:
     const size_t mask_;
     uint8_t* buffer_;
     
-    alignas(64) std::atomic<size_t> write_pos_;
+    // Cache line padding to prevent false sharing
+    // SPSC doesn't need atomics - just proper memory ordering
+    alignas(64) size_t write_pos_;
+    char padding1_[64 - sizeof(size_t)];
+    
     alignas(64) size_t read_pos_;
+    char padding2_[64 - sizeof(size_t)];
 };
 
 // SPMC - Single Producer, Multiple Consumer
@@ -311,8 +316,12 @@ private:
     const size_t mask_;
     uint8_t* buffer_;
     
+    // Cache line padding to prevent false sharing
     alignas(64) size_t write_pos_;
+    char padding1_[64 - sizeof(size_t)];
+    
     alignas(64) std::atomic<size_t> read_pos_;
+    char padding2_[64 - sizeof(std::atomic<size_t>)];
 };
 
 // MPMC - Multiple Producer, Multiple Consumer
@@ -441,9 +450,15 @@ private:
     const size_t mask_;
     uint8_t* buffer_;
     
+    // Cache line padding to prevent false sharing
     alignas(64) std::atomic<size_t> write_pos_;
+    char padding1_[64 - sizeof(std::atomic<size_t>)];
+    
     alignas(64) std::atomic<size_t> read_pos_;
+    char padding2_[64 - sizeof(std::atomic<size_t>)];
+    
     alignas(64) std::atomic<size_t> commit_pos_;
+    char padding3_[64 - sizeof(std::atomic<size_t>)];
 };
 
 using SPSCRingBuffer = RingBuffer<SingleProducer, SingleConsumer>;

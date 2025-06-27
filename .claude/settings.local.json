@@ -14,7 +14,8 @@
       "Bash(./tests/basic_test)",
       "Bash(./tests/simple_test)",
       "Bash(./build/tests/simple_test)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

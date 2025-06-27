@@ -43,6 +43,7 @@ add_psyne_example(tcp_echo_server)
 add_psyne_example(tcp_echo_client)
 add_psyne_example(coroutine_example)
 add_psyne_example(channel_factory_demo)
+add_psyne_example(dynamic_allocation_demo)
 
 # ----------------------------------------------------------------------------------------
 # Tests (commented out for now)
