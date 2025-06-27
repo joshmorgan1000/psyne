@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(psyne VERSION 0.1.1 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "-fsanitize=address -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS "-fsanitize=address -fno-omit-frame-pointer -Wno-missing-template-arg-list-after-template-kw")
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 # ----------------------------------------------------------------------------------------
 # CMake configuration for the Psyne messaging library
@@ -67,20 +67,22 @@ endif()
 # ----------------------------------------------------------------------------------------
 # Main Psyne library
 add_library(psyne SHARED
-    "${CMAKE_SOURCE_DIR}/include/psyne/channel/channel.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/channel/ipc_channel.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/channel/tcp_protocol.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/core/message_builder.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/core/message.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/core/variant_view.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/core/variant.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/memory/ring_buffer.hpp"
-    "${CMAKE_SOURCE_DIR}/include/psyne/memory/slab_allocator.hpp"
+    # Public header
     "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
+    
+    # Implementation files
+    "${CMAKE_SOURCE_DIR}/src/channel/channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/channel_templates.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/ipc_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/ipc_channel.hpp"
+    "${CMAKE_SOURCE_DIR}/src/core/message.cpp"
+    "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer_impl.hpp"
     "${CMAKE_SOURCE_DIR}/src/utils/utils.hpp"
     "${CMAKE_SOURCE_DIR}/src/utils/xxhash32.h"
     "${CMAKE_SOURCE_DIR}/src/psyne.cpp"
-    "${CMAKE_SOURCE_DIR}/src/tcp_protocol.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/tcp/tcp_protocol.cpp"
 )
 target_link_libraries(
     psyne

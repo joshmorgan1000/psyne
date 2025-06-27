@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cassert>
-#include "include/psyne/core/message.hpp"
-#include "include/psyne/channel/channel.hpp"
+#include <psyne/psyne.hpp>
 
 using namespace psyne;
 
