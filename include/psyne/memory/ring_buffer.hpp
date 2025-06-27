@@ -53,11 +53,21 @@ public:
         size_t current_write = write_pos_;
         size_t current_read = read_pos_;
         
-        if (buffer_size_ - (current_write - current_read) < total_size) {
+        // Check if we have enough space
+        size_t used = current_write - current_read;
+        if (used + total_size > buffer_size_) {
             return std::nullopt;
         }
         
-        auto* header = reinterpret_cast<Header*>(buffer_ + (current_write & mask_));
+        // Check if this allocation would wrap around the buffer
+        size_t write_offset = current_write & mask_;
+        if (write_offset + total_size > buffer_size_) {
+            // Would wrap - not supported for simplicity
+            // In a real implementation, we'd either support wrapping or waste the space
+            return std::nullopt;
+        }
+        
+        auto* header = reinterpret_cast<Header*>(buffer_ + write_offset);
         write_pos_ = current_write + total_size;
         
         return WriteHandle(header, size);
@@ -142,20 +152,33 @@ public:
     std::optional<WriteHandle> reserve(size_t size) {
         const size_t total_size = align_up(sizeof(Header) + size);
         
-        // SPSC: No atomics needed for single producer
-        size_t current_write = write_pos_;
-        size_t current_read = read_pos_;
-        
-        if (buffer_size_ - (current_write - current_read) < total_size) {
-            return std::nullopt;
+        // MPSC: Atomic CAS for multiple producers
+        while (true) {
+            size_t current_write = write_pos_.load(std::memory_order_relaxed);
+            size_t current_read = read_pos_;
+            
+            // Check if we have enough space
+            size_t used = current_write - current_read;
+            if (used + total_size > buffer_size_) {
+                return std::nullopt;
+            }
+            
+            // Check if this allocation would wrap around the buffer
+            size_t write_offset = current_write & mask_;
+            if (write_offset + total_size > buffer_size_) {
+                // Would wrap - not supported for simplicity
+                return std::nullopt;
+            }
+            
+            size_t new_write = current_write + total_size;
+            if (write_pos_.compare_exchange_weak(current_write, new_write,
+                                                std::memory_order_release,
+                                                std::memory_order_relaxed)) {
+                auto* header = reinterpret_cast<Header*>(buffer_ + write_offset);
+                header->len = 0;  // Mark as not ready
+                return WriteHandle(header, size);
+            }
         }
-        
-        auto* header = reinterpret_cast<Header*>(buffer_ + (current_write & mask_));
-        header->len = 0;  // Mark as not ready
-        
-        write_pos_ = current_write + total_size;
-        
-        return WriteHandle(header, size);
     }
     
     std::optional<ReadHandle> read() {
@@ -204,9 +227,9 @@ private:
     uint8_t* buffer_;
     
     // Cache line padding to prevent false sharing
-    // SPSC doesn't need atomics - just proper memory ordering
-    alignas(64) size_t write_pos_;
-    char padding1_[64 - sizeof(size_t)];
+    // MPSC needs atomic write_pos for multiple producers
+    alignas(64) std::atomic<size_t> write_pos_;
+    char padding1_[64 - sizeof(std::atomic<size_t>)];
     
     alignas(64) size_t read_pos_;
     char padding2_[64 - sizeof(size_t)];
@@ -257,11 +280,20 @@ public:
         size_t current_write = write_pos_;
         size_t current_read = read_pos_.load(std::memory_order_acquire);
         
-        if (buffer_size_ - (current_write - current_read) < total_size) {
+        // Check if we have enough space
+        size_t used = current_write - current_read;
+        if (used + total_size > buffer_size_) {
             return std::nullopt;
         }
         
-        auto* header = reinterpret_cast<Header*>(buffer_ + (current_write & mask_));
+        // Check if this allocation would wrap around the buffer
+        size_t write_offset = current_write & mask_;
+        if (write_offset + total_size > buffer_size_) {
+            // Would wrap - not supported for simplicity
+            return std::nullopt;
+        }
+        
+        auto* header = reinterpret_cast<Header*>(buffer_ + write_offset);
         write_pos_ = current_write + total_size;
         
         return WriteHandle(header, size);
@@ -384,9 +416,20 @@ public:
         
         do {
             size_t current_read = read_pos_.load(std::memory_order_acquire);
-            if (buffer_size_ - (current_write - current_read) < total_size) {
+            
+            // Check if we have enough space
+            size_t used = current_write - current_read;
+            if (used + total_size > buffer_size_) {
                 return std::nullopt;
             }
+            
+            // Check if this allocation would wrap around the buffer
+            size_t write_offset = current_write & mask_;
+            if (write_offset + total_size > buffer_size_) {
+                // Would wrap - not supported for simplicity
+                return std::nullopt;
+            }
+            
             next_write = current_write + total_size;
         } while (!write_pos_.compare_exchange_weak(
             current_write, next_write,

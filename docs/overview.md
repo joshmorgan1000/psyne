@@ -28,6 +28,9 @@ Psyne is a zero-copy, event-driven message pipeline designed for high-performanc
 - **Slab Allocator**: Pre-allocated contiguous memory blocks
 - **Ring Buffers**: Lock-free circular buffers with atomic operations
 - **Memory Views**: Zero-copy access to typed data
+- **Dynamic Allocation**: Automatic growth/shrink based on usage patterns
+  - DynamicSlabAllocator: Manages multiple slabs with automatic cleanup
+  - DynamicRingBuffer: Resizes buffer capacity based on load
 
 ### Message System
 - **VariantHdr**: 8-byte header for runtime type information

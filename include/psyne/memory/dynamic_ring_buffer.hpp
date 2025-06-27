@@ -84,7 +84,9 @@ public:
         stats_.failed_reserves++;
         
         // Check if we should resize
-        if (should_resize_up()) {
+        // Force resize if we have many failed reserves, regardless of time
+        bool force_resize = stats_.failed_reserves > 5;
+        if (force_resize || should_resize_up()) {
             resize_up();
             // Try once more with new buffer
             handle = buffer_->reserve(size);

@@ -15,7 +15,11 @@
       "Bash(./tests/simple_test)",
       "Bash(./build/tests/simple_test)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(./dynamic_allocation_demo)",
+      "Bash(./build/examples/dynamic_allocation_demo 2 >& 1)",
+      "Bash(find:*)",
+      "Bash(./examples/dynamic_allocation_demo 2 >& 1)"
     ],
     "deny": []
   }

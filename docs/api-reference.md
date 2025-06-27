@@ -142,6 +142,80 @@ public:
 };
 ```
 
+### Dynamic Memory Management
+
+#### DynamicSlabAllocator
+
+Automatically grows memory slabs based on usage patterns.
+
+```cpp
+class DynamicSlabAllocator {
+public:
+    struct Config {
+        size_t initial_slab_size = 1024 * 1024;      // 1MB initial
+        size_t max_slab_size = 128 * 1024 * 1024;    // 128MB max per slab
+        size_t growth_factor = 2;                     // Double size on growth
+        double growth_threshold = 0.75;               // Grow when 75% full
+        double shrink_threshold = 0.25;               // Shrink when <25% used
+        std::chrono::seconds cleanup_interval = 60s;  // Cleanup check interval
+    };
+    
+    explicit DynamicSlabAllocator(const Config& config = {});
+    
+    // Allocate memory, growing if necessary
+    void* allocate(size_t size);
+    
+    // Get current statistics
+    Stats get_stats() const;
+    
+    // Force a cleanup check
+    void cleanup();
+    
+    // Get recommended ring buffer size based on usage
+    size_t get_recommended_buffer_size() const;
+};
+```
+
+#### DynamicRingBuffer<ProducerType, ConsumerType>
+
+Ring buffer that automatically resizes based on usage patterns.
+
+```cpp
+template<typename ProducerType, typename ConsumerType>
+class DynamicRingBuffer {
+public:
+    struct Config {
+        size_t initial_size = 64 * 1024;             // 64KB initial
+        size_t min_size = 4 * 1024;                  // 4KB minimum
+        size_t max_size = 128 * 1024 * 1024;         // 128MB maximum
+        double resize_up_threshold = 0.9;            // Resize up when 90% full
+        double resize_down_threshold = 0.1;          // Resize down when <10% used
+        size_t resize_factor = 2;                    // Double/halve on resize
+        std::chrono::seconds resize_check_interval = 5s; // Check interval
+        size_t high_water_mark_window = 1000;        // Usage history window
+    };
+    
+    explicit DynamicRingBuffer(const Config& config = {});
+    
+    // Same interface as RingBuffer
+    std::optional<WriteHandle> reserve(size_t size);
+    std::optional<ReadHandle> read();
+    bool empty() const;
+    
+    // Get current statistics
+    Stats get_stats() const;
+    
+    // Force a resize check
+    void check_resize();
+};
+
+// Pre-defined dynamic buffer types
+using DynamicSPSCRingBuffer = DynamicRingBuffer<SingleProducer, SingleConsumer>;
+using DynamicSPMCRingBuffer = DynamicRingBuffer<SingleProducer, MultiConsumer>;
+using DynamicMPSCRingBuffer = DynamicRingBuffer<MultiProducer, SingleConsumer>;
+using DynamicMPMCRingBuffer = DynamicRingBuffer<MultiProducer, MultiConsumer>;
+```
+
 ### VariantView<T>
 
 Zero-copy view of typed data within a message.

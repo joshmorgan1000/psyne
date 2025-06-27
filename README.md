@@ -60,3 +60,57 @@ Since the types are defined by the `VariantHdr`, we can use a memory‑view API 
 
 The project currently uses Boost.Asio for networking.
 
+---
+
+## Building
+
+```bash
+mkdir build && cd build
+cmake ..
+make -j
+```
+
+### Requirements
+
+- C++20 compiler (tested with Clang 14+, GCC 11+)
+- CMake 3.20+
+- Boost 1.75+ (for Asio)
+- Eigen3 (for linear algebra)
+
+### Running Tests
+
+```bash
+make test
+```
+
+---
+
+## Examples
+
+The `examples/` directory contains working demonstrations:
+
+- **simple_messaging** - Basic zero-copy messaging
+- **producer_consumer** - Event-driven producer/consumer pattern
+- **multi_type_channel** - Channels with multiple message types
+- **fixed_size_demo** - Fixed-size messages for maximum performance
+- **tcp_echo_server/client** - Network communication examples
+- **dynamic_allocation_demo** - Auto-resizing buffers for variable workloads
+- **channel_factory_demo** - Creating channels from URIs
+- **coroutine_example** - Using C++20 coroutines with async operations
+
+Run an example:
+```bash
+./examples/simple_messaging
+```
+
+---
+
+## Documentation
+
+See the `docs/` directory for detailed documentation:
+
+- [Getting Started Guide](docs/getting-started.md)
+- [API Reference](docs/api-reference.md)
+- [Performance Guidelines](docs/performance.md)
+- [IPC and TCP Channels](docs/channels.md)
+

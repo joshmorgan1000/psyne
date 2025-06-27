@@ -214,6 +214,47 @@ int main() {
 }
 ```
 
+## Dynamic Allocation
+
+For workloads with variable message rates or sizes, Psyne provides dynamic allocation:
+
+```cpp
+#include <psyne/psyne.hpp>
+#include <iostream>
+
+using namespace psyne;
+
+int main() {
+    // Create a dynamic ring buffer that auto-resizes
+    DynamicSPSCRingBuffer::Config config;
+    config.initial_size = 1024;           // Start small
+    config.max_size = 1024 * 1024;        // Max 1MB
+    config.resize_up_threshold = 0.8;     // Grow at 80% full
+    
+    DynamicSPSCRingBuffer buffer(config);
+    
+    // Use it like a regular ring buffer
+    auto handle = buffer.reserve(256);
+    if (handle) {
+        // Write data...
+        handle->commit();
+    }
+    
+    // Check statistics
+    auto stats = buffer.get_stats();
+    std::cout << "Buffer size: " << stats.current_size 
+              << ", Usage: " << (stats.average_usage * 100) << "%" 
+              << std::endl;
+    
+    return 0;
+}
+```
+
+The dynamic allocator will:
+- Automatically grow when usage exceeds the threshold
+- Shrink back when usage is low to save memory
+- Track statistics for performance monitoring
+
 ## Next Steps
 
 - [API Reference](api-reference.md) - Detailed API documentation
