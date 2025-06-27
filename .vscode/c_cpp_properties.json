@@ -1,0 +1,27 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "macos-clang-arm64",
+      "compilerPath": "/usr/bin/clang",
+      "cStandard": "c17",
+      "cppStandard": "c++20",
+      "intelliSenseMode": "macos-clang-arm64",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/include/psyne",
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/src/gpu",
+        "${workspaceFolder}/src/utils",
+        "${workspaceFolder}/src/arena",
+        "${workspaceFolder}/src/cortex",
+        "${workspaceFolder}/src/encryption",
+        "/usr/lib",
+        "/opt/homebrew/Cellar/openssl@3/3.5.0/include",
+        "/opt/homebrew/lib",
+        "/opt/homebrew/include"
+      ]
+    }
+  ]
+}
