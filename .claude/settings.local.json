@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk:*)",
+      "Bash(make:*)",
+      "Bash(rg:*)",
+      "Bash(./examples/simple_messaging)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(cmake:*)"
+    ],
+    "deny": []
+  }
+}

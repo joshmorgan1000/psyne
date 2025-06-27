@@ -12,15 +12,12 @@
         "${workspaceFolder}/include",
         "${workspaceFolder}/include/psyne",
         "${workspaceFolder}/src",
-        "${workspaceFolder}/src/gpu",
         "${workspaceFolder}/src/utils",
-        "${workspaceFolder}/src/arena",
-        "${workspaceFolder}/src/cortex",
-        "${workspaceFolder}/src/encryption",
         "/usr/lib",
         "/opt/homebrew/Cellar/openssl@3/3.5.0/include",
         "/opt/homebrew/lib",
-        "/opt/homebrew/include"
+        "/opt/homebrew/include",
+        "${HOME}/boost"
       ]
     }
   ]

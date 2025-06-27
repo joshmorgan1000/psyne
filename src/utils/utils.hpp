@@ -27,10 +27,16 @@
 #include <unistd.h>
 #include <future>
 
-namespace psyne {
-
 struct GlobalContext;
 inline GlobalContext& getGlobalContext();
+
+static void psyne_banner() {
+    std::cout << "  _____  ______ __    _ ____   _  ______  \n";
+    std::cout << " |     ||   ___|\\ \\  //|    \\ | ||   ___| \n";
+    std::cout << " |    _| `-.`-.  \\ \\// |     \\| ||   ___| \n";
+    std::cout << " |___|  |______| /__/  |__/\\____||______| \n";
+    std::cout << " Psyne - a high-performance C++ library for AI\n";
+}
 
 /**
  * @brief Converts a byte vector to a hex string.
@@ -557,5 +563,3 @@ static void log_debug(T first, Args... args) {
     stdout_unlock();
     RedrawAllProgressBars();
 }
-
-} // namespace psyne

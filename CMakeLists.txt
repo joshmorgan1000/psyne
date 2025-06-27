@@ -65,30 +65,20 @@ if(NOT Threads_FOUND)
 endif()
 
 # ----------------------------------------------------------------------------------------
-# BLAKE3 - a fast cryptographic hash function
-# ----------------------------------------------------------------------------------------
-add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/BLAKE3/c")
-
-# ----------------------------------------------------------------------------------------
-# Zstandard (Zstd) - a fast lossless compression algorithm
-# ----------------------------------------------------------------------------------------
-find_package(zstd REQUIRED)
-
-# ----------------------------------------------------------------------------------------
 # Main Psyne library
-add_library(psyne STATIC
-    src/arena/vectorslab.hpp
-    src/arena/slab.hpp
-    src/arena/variant.hpp
-    src/arena/variantbuilder.hpp
-    src/arena/byteslab.hpp
-    src/utils/utils.hpp
-    src/utils/vthread.hpp
-    src/utils/nlohmann/json.hpp
-    src/encryption/encryption.hpp
-    src/encryption/obfuscate.hpp
-    src/encryption/openssl_raii.hpp
-    src/cortex/psyne.cpp
+add_library(psyne SHARED
+    "${CMAKE_SOURCE_DIR}/include/psyne/channel/channel.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/channel/ipc_channel.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/core/message_builder.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/core/message.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/core/variant_view.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/core/variant.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/memory/ring_buffer.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/memory/slab_allocator.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
+    "${CMAKE_SOURCE_DIR}/src/utils/utils.hpp"
+    "${CMAKE_SOURCE_DIR}/src/utils/xxhash32.h"
+    "${CMAKE_SOURCE_DIR}/src/psyne.cpp"
 )
 target_link_libraries(
     psyne
@@ -98,27 +88,21 @@ target_link_libraries(
     OpenSSL::Crypto
     Vulkan::Vulkan
     Threads::Threads
-    zstd::libzstd_static
 )
 target_include_directories(psyne
     PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/include/psyne
-    ${CMAKE_SOURCE_DIR}/src/arena
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/gpu
-    ${CMAKE_SOURCE_DIR}/src/cortex
-    ${CMAKE_SOURCE_DIR}/src/net
-    ${CMAKE_SOURCE_DIR}/src/dispatch
-    ${CMAKE_SOURCE_DIR}/src/encryption
+    ${CMAKE_SOURCE_DIR}/src/utils
     ${Vulkan_INCLUDE_DIRS}
-    /Users/joshmorgan/boost
+    ${EIGEN3_INCLUDE_DIR}
+    $ENV{HOME}/boost
 )
 
 # ------------------------------------------------------------------------------
-# Tests
+# Examples
 # ------------------------------------------------------------------------------
-add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
+add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
 
 # ------------------------------------------------------------------------------
 # Status
@@ -127,7 +111,7 @@ message(STATUS "  _____  ______ __    _ ____   _  ______  ")
 message(STATUS " |  .  ||   ___|\\ \\  //|    \\ | ||   ___| ")
 message(STATUS " |    _| `-.`-.  \\ \\// |     \\| ||   ___| ")
 message(STATUS " |___|  |______| /__/  |__/\\____||______| ")
-message(STATUS " Ahigh-performance C++ RPC library for AI")
+message(STATUS " Zero-copy RPC library optimized for AI/ML")
 message(STATUS "===================================================")
 message(STATUS "CMake Project Configured!")
 message(STATUS "Build Type:          ${CMAKE_BUILD_TYPE}")
