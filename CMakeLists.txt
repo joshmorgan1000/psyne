@@ -70,9 +70,8 @@ endif()
 add_subdirectory("${CMAKE_SOURCE_DIR}/third_party/BLAKE3/c")
 
 # ----------------------------------------------------------------------------------------
-# Boost - Asio for networking
+# Zstandard (Zstd) - a fast lossless compression algorithm
 # ----------------------------------------------------------------------------------------
-find_package(Boost REQUIRED COMPONENTS system thread)   # Asio lives here
 find_package(zstd REQUIRED)
 
 # ----------------------------------------------------------------------------------------
@@ -100,8 +99,6 @@ target_link_libraries(
     Vulkan::Vulkan
     Threads::Threads
     zstd::libzstd_static
-    Boost::system
-    Boost::thread
 )
 target_include_directories(psyne
     PRIVATE
@@ -115,7 +112,6 @@ target_include_directories(psyne
     ${CMAKE_SOURCE_DIR}/src/dispatch
     ${CMAKE_SOURCE_DIR}/src/encryption
     ${Vulkan_INCLUDE_DIRS}
-    ${Boost_INCLUDE_DIRS}
     /Users/joshmorgan/boost
 )
 
