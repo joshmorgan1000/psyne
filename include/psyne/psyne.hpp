@@ -13,9 +13,7 @@
 
 // Channels
 #include "channel/channel.hpp"
-// TODO: Fix IPC channel for macOS semaphore support
-// #include "channel/ipc_channel.hpp"
-// TODO: Add tcp_channel.hpp when TCP implementation is complete
+#include "channel/ipc_channel.hpp"
 
 // Version information
 #define PSYNE_VERSION_MAJOR 0

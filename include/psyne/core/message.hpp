@@ -22,6 +22,8 @@ public:
     template<typename Channel>
     explicit Message(Channel& channel) 
         : mode_(Mode::Outgoing)
+        , data_(nullptr)
+        , size_(0)
         , channel_(&channel) {
         size_t required_size = Derived::calculate_size();
         auto* rb = channel.ring_buffer();
@@ -32,14 +34,10 @@ public:
                 handle_ = *write_handle;
                 commit_fn_ = [h = *write_handle]() mutable { h.commit(); };
                 data_ = static_cast<uint8_t*>(write_handle->data);
-                static_cast<Derived*>(this)->initialize_storage(data_);
-            } else {
-                // Allocation failed
-                data_ = nullptr;
+                size_ = required_size;
+                // Don't call virtual functions from constructor!
+                // Derived class must call initialize_storage() itself
             }
-        } else {
-            // No ring buffer
-            data_ = nullptr;
         }
     }
     
@@ -47,8 +45,10 @@ public:
     explicit Message(const void* data, size_t size)
         : mode_(Mode::Incoming)
         , data_(const_cast<uint8_t*>(static_cast<const uint8_t*>(data)))
-        , size_(size) {
-        static_cast<Derived*>(this)->initialize_view(data_);
+        , size_(size)
+        , channel_(nullptr) {
+        // Don't call virtual functions from constructor!
+        // Derived class must call initialize_view() itself
     }
     
     ~Message() = default;
@@ -75,6 +75,7 @@ public:
     void before_send() {}
     
     // Copy message data to a destination buffer
+    [[deprecated("Violates zero-copy principle. Use direct buffer access instead.")]]
     void copy_to(void* dest) const {
         // This is a simplified version - derived classes should implement proper serialization
         if (data_ && size_ > 0) {
@@ -113,10 +114,63 @@ public:
     static constexpr uint32_t message_type = 1;
     static constexpr size_t max_elements = 1024;  // Default max 1024 floats
     
-    using Message::Message;
     using EigenVector = Eigen::VectorXf;
     using EigenMap = Eigen::Map<EigenVector>;
     using ConstEigenMap = Eigen::Map<const EigenVector>;
+    
+    // Constructor for creating messages in a channel
+    template<typename Channel>
+    explicit FloatVector(Channel& channel) 
+        : Message<FloatVector>(channel)
+        , data_span_()
+        , current_size_(0)
+        , capacity_(0)
+        , size_ptr_(nullptr) {
+        // Initialize after construction to avoid virtual call in base constructor
+        if (this->data_) {
+            initialize_storage(this->data_);
+        }
+    }
+    
+    // Constructor for incoming messages
+    explicit FloatVector(const void* data, size_t size)
+        : Message<FloatVector>(data, size)
+        , data_span_()
+        , current_size_(0)
+        , capacity_(0)
+        , size_ptr_(nullptr) {
+        // Initialize after construction to avoid virtual call in base constructor
+        if (this->data_) {
+            initialize_view(this->data_);
+        }
+    }
+    
+    // Move constructor
+    FloatVector(FloatVector&& other) noexcept
+        : Message<FloatVector>(std::move(other))
+        , data_span_(std::move(other.data_span_))
+        , current_size_(other.current_size_)
+        , capacity_(other.capacity_)
+        , size_ptr_(other.size_ptr_) {
+        other.current_size_ = 0;
+        other.capacity_ = 0;
+        other.size_ptr_ = nullptr;
+    }
+    
+    // Move assignment
+    FloatVector& operator=(FloatVector&& other) noexcept {
+        if (this != &other) {
+            Message<FloatVector>::operator=(std::move(other));
+            data_span_ = std::move(other.data_span_);
+            current_size_ = other.current_size_;
+            capacity_ = other.capacity_;
+            size_ptr_ = other.size_ptr_;
+            other.current_size_ = 0;
+            other.capacity_ = 0;
+            other.size_ptr_ = nullptr;
+        }
+        return *this;
+    }
     
     // Assignment from initializer list
     FloatVector& operator=(std::initializer_list<float> values) {
@@ -179,6 +233,7 @@ public:
     }
     
     // Override copy_to to include size information
+    [[deprecated("Violates zero-copy principle. Use direct buffer access instead.")]]
     void copy_to(void* dest) const {
         if (!data_ || current_size_ == 0) return;
         
@@ -204,6 +259,7 @@ private:
             data_span_ = std::span<float>();
             current_size_ = 0;
             capacity_ = 0;
+            size_ptr_ = nullptr;
             return;
         }
         
@@ -216,6 +272,7 @@ private:
         capacity_ = (calculate_size() - sizeof(size_t)) / sizeof(float);
         data_span_ = std::span<float>(data_ptr, capacity_);
         current_size_ = 0;
+        
     }
     
     void initialize_view(void* ptr) {

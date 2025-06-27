@@ -7,7 +7,14 @@
       "Bash(./examples/simple_messaging)",
       "Bash(rm:*)",
       "Bash(mkdir:*)",
-      "Bash(cmake:*)"
+      "Bash(cmake:*)",
+      "Bash(ctest:*)",
+      "Bash(./build/tests/tcp_test)",
+      "Bash(./build/tests/basic_test)",
+      "Bash(./tests/basic_test)",
+      "Bash(./tests/simple_test)",
+      "Bash(./build/tests/simple_test)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

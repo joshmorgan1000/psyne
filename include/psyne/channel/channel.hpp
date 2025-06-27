@@ -11,6 +11,9 @@
 #include <variant>
 #include <unordered_map>
 #include <optional>
+#include <boost/asio/awaitable.hpp>
+#include <boost/asio/co_spawn.hpp>
+#include <boost/asio/use_awaitable.hpp>
 
 namespace psyne {
 
@@ -45,6 +48,8 @@ public:
         , channel_type_(type)
         , ring_buffer_(buffer_size > 0 ? buffer_size : 1024) {}
     
+    virtual ~Channel() = default;
+    
     // For single-type channels - create message directly
     template<typename MessageType>
     MessageType create_message() {
@@ -77,6 +82,7 @@ public:
     
     // Direct send (copies data - avoid when possible)
     template<typename MessageType>
+    [[deprecated("Violates zero-copy principle. Create messages directly in channel instead.")]]
     bool send_copy(const MessageType& msg) {
         size_t required_size = channel_type_ == ChannelType::SingleType 
             ? MessageType::calculate_size()
@@ -186,6 +192,46 @@ public:
     const std::string& uri() const { return uri_; }
     ChannelType type() const { return channel_type_; }
     
+    // Coroutine support for async operations
+    template<typename MessageType>
+    boost::asio::awaitable<std::optional<MessageType>> async_receive_single() {
+        // This is a simplified version - in a real implementation you'd want to
+        // integrate with the io_context properly
+        while (true) {
+            auto msg = receive_single<MessageType>(std::chrono::milliseconds(10));
+            if (msg) {
+                co_return msg;
+            }
+            // Yield to allow other coroutines to run
+            co_await boost::asio::this_coro::executor;
+        }
+    }
+    
+    // Async receive for multi-type channels
+    boost::asio::awaitable<std::optional<std::pair<uint32_t, const void*>>> async_receive_multi() {
+        while (true) {
+            auto result = receive_multi(std::chrono::milliseconds(10));
+            if (result) {
+                co_return result;
+            }
+            // Yield to allow other coroutines to run
+            co_await boost::asio::this_coro::executor;
+        }
+    }
+    
+    // Type-safe async receive
+    template<typename MessageType>
+    boost::asio::awaitable<std::optional<MessageType>> async_receive_as() {
+        while (true) {
+            auto msg = receive_as<MessageType>(std::chrono::milliseconds(10));
+            if (msg) {
+                co_return msg;
+            }
+            // Yield to allow other coroutines to run
+            co_await boost::asio::this_coro::executor;
+        }
+    }
+    
     virtual void notify() {
         // Subclasses override for IPC signaling
     }
@@ -219,6 +265,10 @@ using SPMCChannel = Channel<SPMCRingBuffer>;
 using MPSCChannel = Channel<MPSCRingBuffer>;
 using MPMCChannel = Channel<MPMCRingBuffer>;
 
+// Forward declarations for IPC and TCP channels
+template<typename RingBufferType> class IPCChannel;
+template<typename RingBufferType> class TCPChannel;
+
 // Channel factory for URI-based creation
 class ChannelFactory {
 public:
@@ -228,6 +278,10 @@ public:
     
     static bool is_tcp_uri(const std::string& uri) {
         return uri.find("tcp://") == 0;
+    }
+    
+    static bool is_memory_uri(const std::string& uri) {
+        return uri.find("memory://") == 0;
     }
     
     static std::string extract_ipc_name(const std::string& uri) {
@@ -249,6 +303,31 @@ public:
         uint16_t port = static_cast<uint16_t>(std::stoi(endpoint.substr(colon_pos + 1)));
         
         return {host, port};
+    }
+    
+    // Create channel from URI
+    template<typename RingBufferType>
+    static std::unique_ptr<Channel<RingBufferType>> create(
+        const std::string& uri, 
+        size_t buffer_size,
+        ChannelType type = ChannelType::MultiType,
+        bool create_new = true) {
+        
+        if (is_ipc_uri(uri)) {
+            // Need to include IPC channel header
+            auto name = extract_ipc_name(uri);
+            return std::make_unique<IPCChannel<RingBufferType>>(name, buffer_size, create_new);
+        } else if (is_tcp_uri(uri)) {
+            // Need to include TCP channel header
+            auto [host, port] = extract_tcp_endpoint(uri);
+            bool is_server = (host == "0.0.0.0" || host == "::" || host == "*");
+            return std::make_unique<TCPChannel<RingBufferType>>(host, port, buffer_size, is_server);
+        } else if (is_memory_uri(uri)) {
+            // In-memory channel
+            return std::make_unique<Channel<RingBufferType>>(uri, buffer_size, type);
+        } else {
+            throw std::invalid_argument("Unknown channel URI scheme: " + uri);
+        }
     }
 };
 

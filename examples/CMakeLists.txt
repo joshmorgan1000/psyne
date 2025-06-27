@@ -39,6 +39,10 @@ add_psyne_example(simple_messaging)
 add_psyne_example(producer_consumer)
 add_psyne_example(multi_type_channel)
 add_psyne_example(fixed_size_demo)
+add_psyne_example(tcp_echo_server)
+add_psyne_example(tcp_echo_client)
+add_psyne_example(coroutine_example)
+add_psyne_example(channel_factory_demo)
 
 # ----------------------------------------------------------------------------------------
 # Tests (commented out for now)

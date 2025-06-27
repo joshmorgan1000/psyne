@@ -117,6 +117,7 @@ public:
     }
     
     // Fill from Eigen matrix
+    [[deprecated("Violates zero-copy principle. Use as_eigen() to get a mutable Eigen::Map instead.")]]
     void from_eigen(const EigenMatrix& mat) {
         std::memcpy(data_, mat.data(), sizeof(double) * Rows * Cols);
     }

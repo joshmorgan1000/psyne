@@ -69,6 +69,7 @@ endif()
 add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/include/psyne/channel/channel.hpp"
     "${CMAKE_SOURCE_DIR}/include/psyne/channel/ipc_channel.hpp"
+    "${CMAKE_SOURCE_DIR}/include/psyne/channel/tcp_protocol.hpp"
     "${CMAKE_SOURCE_DIR}/include/psyne/core/message_builder.hpp"
     "${CMAKE_SOURCE_DIR}/include/psyne/core/message.hpp"
     "${CMAKE_SOURCE_DIR}/include/psyne/core/variant_view.hpp"
@@ -79,6 +80,7 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/utils/utils.hpp"
     "${CMAKE_SOURCE_DIR}/src/utils/xxhash32.h"
     "${CMAKE_SOURCE_DIR}/src/psyne.cpp"
+    "${CMAKE_SOURCE_DIR}/src/tcp_protocol.cpp"
 )
 target_link_libraries(
     psyne
@@ -103,6 +105,12 @@ target_include_directories(psyne
 # Examples
 # ------------------------------------------------------------------------------
 add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
+
+# ------------------------------------------------------------------------------
+# Tests
+# ------------------------------------------------------------------------------
+enable_testing()
+add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
 
 # ------------------------------------------------------------------------------
 # Status
