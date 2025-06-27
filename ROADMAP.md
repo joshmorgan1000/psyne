@@ -6,8 +6,8 @@ their expected timeline.  Details originate from the
 
 ## 0‑3 months — MVP hardening
 
-- [ ] Finish SPSC API and polish `VariantBuilder`.
-- [ ] Broker batching for copy‑less scatter into shard rings.
+- [x] Finish SPSC API and polish `VariantBuilder` (vector helper added).
+- [x] Broker batching for copy‑less scatter into shard rings (basic pump helper).
 - [ ] Back‑pressure telemetry via Prom‑style counters.
 - [ ] Unit & soak tests to push ≥ 10 M msg/s under ASan.
 
@@ -28,6 +28,6 @@ their expected timeline.  Details originate from the
 
 ## In Progress
 
-- [ ] Add `OP_PUT` and `OP_GET` operations to push tensors into the GPU ring.
+- [x] Add `OP_PUT` and `OP_GET` operations to push tensors into the GPU ring (dispatcher stub).
 - [ ] TLS support for the network layer.
 - [ ] Multi‑backend GPU support (e.g., Metal on macOS).

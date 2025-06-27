@@ -4,6 +4,7 @@
 #include "slab.hpp"
 #include "variant.hpp"
 #include <cstring>
+#include <span>
 #include <tuple>
 
 namespace psyne {
@@ -17,6 +18,14 @@ public:
     writeHdr(sizeof(T), 0, sizeof(T));
     std::memcpy(cursor_, &v, sizeof(T));
     cursor_ += sizeof(T);
+  }
+
+  template <class T>
+  void addVector(std::span<const T> v) {
+    static_assert(std::is_trivially_copyable_v<T>);
+    writeHdr(v.size() * sizeof(T), 1, sizeof(T));
+    std::memcpy(cursor_, v.data(), v.size() * sizeof(T));
+    cursor_ += v.size() * sizeof(T);
   }
 
   void addBytes(const void *src, std::size_t n) {
@@ -64,7 +73,7 @@ template <class... Fields> struct Schema {
       if constexpr (F::rank == 0)
         vb_.addScalar<U>(value);
       else
-        vb_.addBytes(value.data(), value.size() * sizeof(typename F::type));
+        vb_.addVector(std::span<const typename F::type>(value.data(), value.size()));
     }
     Block finish() { return blk_; }
 
