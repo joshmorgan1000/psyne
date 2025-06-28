@@ -7,6 +7,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <filesystem>
+#include <unordered_map>
 
 namespace psyne {
 namespace detail {
@@ -61,6 +62,10 @@ private:
     bool is_server_;
     std::atomic<bool> connected_;
     std::atomic<bool> stopping_;
+    
+    // Handle mapping for reserve_space/commit_message
+    std::mutex handle_mutex_;
+    std::unordered_map<void*, std::vector<uint8_t>*> user_data_to_buffer_;
     std::string socket_path_;
     
     // Async operations

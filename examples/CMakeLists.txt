@@ -56,6 +56,8 @@ add_psyne_example(compression_demo)
 add_psyne_example(simple_compression_demo)
 add_psyne_example(debug_demo)
 add_psyne_example(udp_multicast_demo)
+add_psyne_example(simple_enhanced_types_test)
+add_psyne_example(rdma_demo)
 
 # GPU examples (optional)
 if(PSYNE_GPU_SUPPORT)

@@ -36,7 +36,8 @@
       "Bash(./examples/compression_demo)",
       "Bash(./examples/simple_compression_demo)",
       "Bash(./examples/debug_demo)",
-      "Bash(./examples/udp_multicast_demo:*)"
+      "Bash(./examples/udp_multicast_demo:*)",
+      "Bash(./examples/rdma_demo)"
     ],
     "deny": []
   }

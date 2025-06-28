@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <atomic>
+#include <complex>
 
 // Version information
 #define PSYNE_VERSION_MAJOR 0
@@ -520,6 +521,10 @@ public:
     virtual bool has_metrics() const = 0;
     virtual debug::ChannelMetrics get_metrics() const = 0;
     virtual void reset_metrics() = 0;
+    
+    // Implementation access for Python bindings
+    detail::ChannelImpl* get_impl() { return impl(); }
+    const detail::ChannelImpl* get_impl() const { return impl(); }
     
 protected:
     Channel() = default;
@@ -1070,6 +1075,517 @@ std::unique_ptr<Channel> create_multicast_channel(
     const std::string& interface_address = "");
 
 } // namespace multicast
+
+// ============================================================================
+// RDMA/InfiniBand Support  
+// ============================================================================
+
+namespace rdma {
+
+// Forward declarations for RDMA types (defined in detail namespace)
+// Note: RDMA types are actually in psyne::detail namespace
+
+/**
+ * @brief Create an RDMA server channel for high-performance computing
+ * @param port Port to listen on
+ * @param buffer_size Buffer size for RDMA operations (default: 1MB)
+ * @return Unique pointer to the RDMA channel
+ */
+std::unique_ptr<Channel> create_server(uint16_t port, 
+                                      size_t buffer_size = 1024 * 1024);
+
+/**
+ * @brief Create an RDMA client channel
+ * @param host Remote host address
+ * @param port Remote port
+ * @param buffer_size Buffer size for operations (default: 1MB)
+ * @return Unique pointer to the RDMA channel
+ */
+std::unique_ptr<Channel> create_client(const std::string& host, uint16_t port,
+                                      size_t buffer_size = 1024 * 1024);
+
+} // namespace rdma
+
+// ============================================================================
+// Enhanced Message Types
+// ============================================================================
+
+namespace types {
+
+// Forward declarations
+class Matrix4x4f;
+class Matrix3x3f;
+class Vector3f;
+class Vector4f;
+class Int8Vector;
+class UInt8Vector;
+class ComplexVectorF;
+class MLTensorF;
+class SparseMatrixF;
+
+// Type aliases for convenience
+using Matrix4f = Matrix4x4f;
+using Matrix3f = Matrix3x3f;
+using Vec3f = Vector3f;
+using Vec4f = Vector4f;
+using ComplexF = ComplexVectorF;
+using MLTensor = MLTensorF;
+using SparseMatrix = SparseMatrixF;
+using QInt8 = Int8Vector;
+using QUInt8 = UInt8Vector;
+
+// ============================================================================
+// Matrix4x4f Implementation
+// ============================================================================
+
+/**
+ * @class Matrix4x4f
+ * @brief 4x4 single-precision float matrix for 3D transformations
+ */
+class Matrix4x4f : public Message<Matrix4x4f> {
+public:
+    static constexpr uint32_t message_type = 101;
+    static constexpr size_t ROWS = 4;
+    static constexpr size_t COLS = 4;
+    static constexpr size_t SIZE = ROWS * COLS;
+    
+    using Message<Matrix4x4f>::Message;
+    
+    static size_t calculate_size() {
+        return SIZE * sizeof(float);
+    }
+    
+    void initialize() {
+        // Initialize as identity matrix
+        std::fill(data(), data() + SIZE, 0.0f);
+        for (size_t i = 0; i < 4; ++i) {
+            (*this)(i, i) = 1.0f;
+        }
+    }
+    
+    // Element access
+    float& operator()(size_t row, size_t col) {
+        return data()[row * COLS + col];
+    }
+    
+    const float& operator()(size_t row, size_t col) const {
+        return data()[row * COLS + col];
+    }
+    
+    // Matrix operations
+    float determinant() const {
+        const float* m = data();
+        return 
+            m[0] * (m[5] * (m[10] * m[15] - m[11] * m[14]) - 
+                   m[6] * (m[9] * m[15] - m[11] * m[13]) + 
+                   m[7] * (m[9] * m[14] - m[10] * m[13])) -
+            m[1] * (m[4] * (m[10] * m[15] - m[11] * m[14]) - 
+                   m[6] * (m[8] * m[15] - m[11] * m[12]) + 
+                   m[7] * (m[8] * m[14] - m[10] * m[12])) +
+            m[2] * (m[4] * (m[9] * m[15] - m[11] * m[13]) - 
+                   m[5] * (m[8] * m[15] - m[11] * m[12]) + 
+                   m[7] * (m[8] * m[13] - m[9] * m[12])) -
+            m[3] * (m[4] * (m[9] * m[14] - m[10] * m[13]) - 
+                   m[5] * (m[8] * m[14] - m[10] * m[12]) + 
+                   m[6] * (m[8] * m[13] - m[9] * m[12]));
+    }
+    
+    float trace() const {
+        return (*this)(0,0) + (*this)(1,1) + (*this)(2,2) + (*this)(3,3);
+    }
+    
+    // Data access
+    float* data() { return reinterpret_cast<float*>(Message<Matrix4x4f>::data()); }
+    const float* data() const { return reinterpret_cast<const float*>(Message<Matrix4x4f>::data()); }
+    
+#ifdef PSYNE_ENABLE_EIGEN
+    auto as_eigen() {
+        return Eigen::Map<Eigen::Matrix4f>(data());
+    }
+    
+    auto as_eigen() const {
+        return Eigen::Map<const Eigen::Matrix4f>(data());
+    }
+#endif
+};
+
+// ============================================================================
+// Vector3f Implementation
+// ============================================================================
+
+/**
+ * @class Vector3f
+ * @brief 3D single-precision float vector with named accessors
+ */
+class Vector3f : public Message<Vector3f> {
+public:
+    static constexpr uint32_t message_type = 103;
+    static constexpr size_t SIZE = 3;
+    
+    using Message<Vector3f>::Message;
+    
+    static size_t calculate_size() {
+        return SIZE * sizeof(float);
+    }
+    
+    void initialize() {
+        std::fill(data(), data() + SIZE, 0.0f);
+    }
+    
+    // Named accessors
+    float& x() { return data()[0]; }
+    float& y() { return data()[1]; }
+    float& z() { return data()[2]; }
+    
+    const float& x() const { return data()[0]; }
+    const float& y() const { return data()[1]; }
+    const float& z() const { return data()[2]; }
+    
+    // Array access
+    float& operator[](size_t index) {
+        return data()[index];
+    }
+    
+    const float& operator[](size_t index) const {
+        return data()[index];
+    }
+    
+    // Vector operations
+    float length() const {
+        return std::sqrt(x()*x() + y()*y() + z()*z());
+    }
+    
+    float length_squared() const {
+        return x()*x() + y()*y() + z()*z();
+    }
+    
+    void normalize() {
+        float len = length();
+        if (len > 1e-6f) {
+            x() /= len;
+            y() /= len;
+            z() /= len;
+        }
+    }
+    
+    float dot(const Vector3f& other) const {
+        return x() * other.x() + y() * other.y() + z() * other.z();
+    }
+    
+    // In-place scalar operations
+    Vector3f& operator*=(float scalar) {
+        x() *= scalar;
+        y() *= scalar;
+        z() *= scalar;
+        return *this;
+    }
+    
+    Vector3f& operator+=(const Vector3f& other) {
+        x() += other.x();
+        y() += other.y();
+        z() += other.z();
+        return *this;
+    }
+    
+    float* data() { return reinterpret_cast<float*>(Message<Vector3f>::data()); }
+    const float* data() const { return reinterpret_cast<const float*>(Message<Vector3f>::data()); }
+
+#ifdef PSYNE_ENABLE_EIGEN
+    auto as_eigen() {
+        return Eigen::Map<Eigen::Vector3f>(data());
+    }
+    
+    auto as_eigen() const {
+        return Eigen::Map<const Eigen::Vector3f>(data());
+    }
+#endif
+};
+
+// ============================================================================
+// Simplified Implementations for Other Types
+// ============================================================================
+
+/**
+ * @class Int8Vector
+ * @brief Quantized 8-bit signed integer vector
+ */
+class Int8Vector : public Message<Int8Vector> {
+public:
+    static constexpr uint32_t message_type = 105;
+    
+    using Message<Int8Vector>::Message;
+    
+    static size_t calculate_size() {
+        return 1024; // Default size
+    }
+    
+    void initialize() {
+        header().size = 0;
+        header().scale = 1.0f;
+        header().zero_point = 0;
+    }
+    
+    struct Header {
+        uint32_t size;
+        float scale;
+        int32_t zero_point;
+    };
+    
+    Header& header() { return *reinterpret_cast<Header*>(Message<Int8Vector>::data()); }
+    const Header& header() const { return *reinterpret_cast<const Header*>(Message<Int8Vector>::data()); }
+    
+    int8_t* data() { return reinterpret_cast<int8_t*>(Message<Int8Vector>::data()) + sizeof(Header); }
+    const int8_t* data() const { return reinterpret_cast<const int8_t*>(Message<Int8Vector>::data()) + sizeof(Header); }
+    
+    size_t size() const { return header().size; }
+    
+    void resize(size_t new_size) {
+        header().size = static_cast<uint32_t>(new_size);
+    }
+    
+    void set_quantization_params(float scale, int32_t zero_point) {
+        header().scale = scale;
+        header().zero_point = zero_point;
+    }
+    
+    int8_t& operator[](size_t index) {
+        return data()[index];
+    }
+    
+    const int8_t& operator[](size_t index) const {
+        return data()[index];
+    }
+};
+
+/**
+ * @class ComplexVectorF
+ * @brief Vector of single-precision complex numbers
+ */
+class ComplexVectorF : public Message<ComplexVectorF> {
+public:
+    static constexpr uint32_t message_type = 107;
+    using ComplexType = std::complex<float>;
+    
+    using Message<ComplexVectorF>::Message;
+    
+    static size_t calculate_size() {
+        return 1024 * sizeof(ComplexType);
+    }
+    
+    void initialize() {
+        header().size = 0;
+    }
+    
+    struct Header {
+        uint32_t size;
+        uint32_t padding;
+    };
+    
+    Header& header() { return *reinterpret_cast<Header*>(Message<ComplexVectorF>::data()); }
+    const Header& header() const { return *reinterpret_cast<const Header*>(Message<ComplexVectorF>::data()); }
+    
+    ComplexType* data() { 
+        return reinterpret_cast<ComplexType*>(
+            reinterpret_cast<uint8_t*>(Message<ComplexVectorF>::data()) + sizeof(Header)
+        ); 
+    }
+    
+    const ComplexType* data() const { 
+        return reinterpret_cast<const ComplexType*>(
+            reinterpret_cast<const uint8_t*>(Message<ComplexVectorF>::data()) + sizeof(Header)
+        ); 
+    }
+    
+    size_t size() const { return header().size; }
+    
+    void resize(size_t new_size) {
+        header().size = static_cast<uint32_t>(new_size);
+    }
+    
+    ComplexType& operator[](size_t index) {
+        return data()[index];
+    }
+    
+    const ComplexType& operator[](size_t index) const {
+        return data()[index];
+    }
+    
+    float power() const {
+        float total = 0.0f;
+        for (size_t i = 0; i < size(); ++i) {
+            float real = data()[i].real();
+            float imag = data()[i].imag();
+            total += real * real + imag * imag;
+        }
+        return total;
+    }
+    
+    void conjugate() {
+        for (size_t i = 0; i < size(); ++i) {
+            data()[i] = std::conj(data()[i]);
+        }
+    }
+};
+
+/**
+ * @class MLTensorF
+ * @brief Multi-dimensional tensor for machine learning
+ */
+class MLTensorF : public Message<MLTensorF> {
+public:
+    static constexpr uint32_t message_type = 108;
+    static constexpr size_t MAX_DIMS = 8;
+    
+    enum class Layout {
+        NCHW,
+        NHWC,
+        CHW,
+        HWC,
+        Custom
+    };
+    
+    using Message<MLTensorF>::Message;
+    
+    static size_t calculate_size() {
+        return 1024 * 1024; // 1MB default
+    }
+    
+    void initialize() {
+        header().num_dims = 0;
+        header().layout = Layout::Custom;
+        std::fill(header().shape, header().shape + MAX_DIMS, 0);
+        header().total_elements = 0;
+    }
+    
+    struct Header {
+        uint32_t num_dims;
+        Layout layout;
+        uint32_t shape[MAX_DIMS];
+        uint32_t total_elements;
+        uint32_t padding[2];
+    };
+    
+    Header& header() { return *reinterpret_cast<Header*>(Message<MLTensorF>::data()); }
+    const Header& header() const { return *reinterpret_cast<const Header*>(Message<MLTensorF>::data()); }
+    
+    float* data() { 
+        return reinterpret_cast<float*>(
+            reinterpret_cast<uint8_t*>(Message<MLTensorF>::data()) + sizeof(Header)
+        ); 
+    }
+    
+    const float* data() const { 
+        return reinterpret_cast<const float*>(
+            reinterpret_cast<const uint8_t*>(Message<MLTensorF>::data()) + sizeof(Header)
+        ); 
+    }
+    
+    void set_shape(const std::vector<uint32_t>& new_shape, Layout layout = Layout::Custom) {
+        header().num_dims = static_cast<uint32_t>(new_shape.size());
+        header().layout = layout;
+        
+        std::copy(new_shape.begin(), new_shape.end(), header().shape);
+        
+        uint32_t total = 1;
+        for (uint32_t dim : new_shape) {
+            total *= dim;
+        }
+        header().total_elements = total;
+    }
+    
+    std::vector<uint32_t> shape() const {
+        return std::vector<uint32_t>(header().shape, header().shape + header().num_dims);
+    }
+    
+    uint32_t total_elements() const { return header().total_elements; }
+    Layout layout() const { return header().layout; }
+};
+
+/**
+ * @class SparseMatrixF
+ * @brief Sparse matrix in CSR format
+ */
+class SparseMatrixF : public Message<SparseMatrixF> {
+public:
+    static constexpr uint32_t message_type = 109;
+    
+    using Message<SparseMatrixF>::Message;
+    
+    static size_t calculate_size() {
+        return 1024 * 1024; // 1MB default
+    }
+    
+    void initialize() {
+        header().rows = 0;
+        header().cols = 0;
+        header().nnz = 0;
+    }
+    
+    struct Header {
+        uint32_t rows;
+        uint32_t cols;
+        uint32_t nnz;
+        uint32_t padding;
+    };
+    
+    Header& header() { return *reinterpret_cast<Header*>(Message<SparseMatrixF>::data()); }
+    const Header& header() const { return *reinterpret_cast<const Header*>(Message<SparseMatrixF>::data()); }
+    
+    float* values() { 
+        return reinterpret_cast<float*>(
+            reinterpret_cast<uint8_t*>(Message<SparseMatrixF>::data()) + sizeof(Header)
+        ); 
+    }
+    
+    const float* values() const { 
+        return reinterpret_cast<const float*>(
+            reinterpret_cast<const uint8_t*>(Message<SparseMatrixF>::data()) + sizeof(Header)
+        ); 
+    }
+    
+    uint32_t* column_indices() {
+        return reinterpret_cast<uint32_t*>(values() + header().nnz);
+    }
+    
+    const uint32_t* column_indices() const {
+        return reinterpret_cast<const uint32_t*>(values() + header().nnz);
+    }
+    
+    uint32_t* row_pointers() {
+        return column_indices() + header().nnz;
+    }
+    
+    const uint32_t* row_pointers() const {
+        return column_indices() + header().nnz;
+    }
+    
+    uint32_t rows() const { return header().rows; }
+    uint32_t cols() const { return header().cols; }
+    uint32_t nnz() const { return header().nnz; }
+    
+    void set_structure(uint32_t rows, uint32_t cols, uint32_t nnz) {
+        header().rows = rows;
+        header().cols = cols;
+        header().nnz = nnz;
+        std::fill(row_pointers(), row_pointers() + rows + 1, 0);
+    }
+    
+    void multiply_vector(const float* x, float* y) const {
+        for (uint32_t row = 0; row < header().rows; ++row) {
+            float sum = 0.0f;
+            uint32_t start = row_pointers()[row];
+            uint32_t end = row_pointers()[row + 1];
+            
+            for (uint32_t idx = start; idx < end; ++idx) {
+                sum += values()[idx] * x[column_indices()[idx]];
+            }
+            
+            y[row] = sum;
+        }
+    }
+};
+
+}
 
 } // namespace psyne
 

@@ -99,16 +99,31 @@ void* UnixChannel::reserve_space(size_t size) {
     // Allocate buffer
     auto buffer = std::make_unique<std::vector<uint8_t>>(total_size);
     void* user_data = buffer->data() + sizeof(UnixFrameHeader);
+    std::vector<uint8_t>* buffer_ptr = buffer.release();
     
-    // Store buffer for later commit
-    void* handle = buffer.release();
+    // Map user data pointer to buffer pointer
+    {
+        std::lock_guard<std::mutex> lock(handle_mutex_);
+        user_data_to_buffer_[user_data] = buffer_ptr;
+    }
+    
     return user_data;
 }
 
 void UnixChannel::commit_message(void* handle) {
     if (!handle) return;
     
-    auto* buffer = static_cast<std::vector<uint8_t>*>(handle);
+    // Find buffer from user data pointer
+    std::vector<uint8_t>* buffer = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(handle_mutex_);
+        auto it = user_data_to_buffer_.find(handle);
+        if (it == user_data_to_buffer_.end()) {
+            return; // Invalid handle
+        }
+        buffer = it->second;
+        user_data_to_buffer_.erase(it); // Remove mapping
+    }
     
     // Get user data info
     uint8_t* user_data = buffer->data() + sizeof(UnixFrameHeader);
