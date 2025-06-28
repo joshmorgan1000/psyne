@@ -67,8 +67,11 @@ add_library(psyne SHARED
     # Public header
     "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
     
-    # Minimal implementation for testing (replaces other implementation files)
+    # Core implementation - minimal set for WebRTC demo
     "${CMAKE_SOURCE_DIR}/src/psyne_minimal.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/webrtc_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/webrtc/ice_agent.cpp"
+    "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
     
     # Header-only files
     "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"

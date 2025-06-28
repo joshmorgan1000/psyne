@@ -1226,6 +1226,86 @@ std::string get_trace_report(const std::string& channel_uri);
 std::string create_debug_dashboard();
 
 // ============================================================================
+// WebRTC API
+// ============================================================================
+
+namespace webrtc {
+
+/**
+ * @struct WebRTCConfig
+ * @brief Configuration for WebRTC connections
+ */
+struct WebRTCConfig {
+    std::vector<std::string> stun_servers = {
+        "stun.l.google.com:19302",
+        "stun1.l.google.com:19302"
+    };
+    std::vector<std::string> turn_servers;
+    std::string data_channel_label = "psyne-channel";
+    bool ordered = true;
+    std::chrono::milliseconds ice_gathering_timeout{5000};
+    std::chrono::milliseconds connection_timeout{30000};
+};
+
+/**
+ * @brief Create a WebRTC channel for peer-to-peer communication
+ * @param peer_id Target peer identifier
+ * @param buffer_size Buffer size for messages (default: 1MB)
+ * @param signaling_server_uri WebSocket signaling server URI
+ * @param config WebRTC configuration
+ * @return Unique pointer to the channel
+ * 
+ * WebRTC channels enable direct peer-to-peer communication with NAT traversal
+ * support. Perfect for real-time gaming, video calls, and low-latency messaging.
+ * 
+ * @example
+ * @code
+ * // Create WebRTC channel to peer "player2"
+ * auto channel = psyne::webrtc::create_channel(
+ *     "player2", 
+ *     1024*1024, 
+ *     "ws://signaling.example.com:8080"
+ * );
+ * 
+ * // Send game state update
+ * psyne::FloatVector position(*channel);
+ * position.resize(3);
+ * position[0] = x; position[1] = y; position[2] = z;
+ * position.send();
+ * 
+ * // Receive opponent's position
+ * auto opponent_pos = channel->receive<psyne::FloatVector>();
+ * @endcode
+ */
+std::unique_ptr<Channel> create_channel(
+    const std::string& peer_id,
+    size_t buffer_size = 1024 * 1024,
+    const std::string& signaling_server_uri = "ws://localhost:8080",
+    const WebRTCConfig& config = {}
+);
+
+/**
+ * @brief Create a WebRTC gaming channel optimized for real-time games
+ * @param peer_id Target peer identifier
+ * @param game_room_id Game room or session identifier
+ * @param signaling_server_uri WebSocket signaling server URI
+ * @return Optimized channel for gaming applications
+ * 
+ * Gaming channels are pre-configured with:
+ * - Low-latency settings
+ * - Unordered delivery for position updates
+ * - Automatic NAT traversal
+ * - Built-in latency monitoring
+ */
+std::unique_ptr<Channel> create_gaming_channel(
+    const std::string& peer_id,
+    const std::string& game_room_id,
+    const std::string& signaling_server_uri = "ws://localhost:8080"
+);
+
+} // namespace webrtc
+
+// ============================================================================
 // UDP Multicast API
 // ============================================================================
 

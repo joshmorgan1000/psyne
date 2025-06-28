@@ -6,6 +6,7 @@
 #include "unix_channel.hpp"
 #include "udp_multicast_channel.hpp"
 #include "websocket_channel.hpp"
+#include "webrtc_channel.hpp"
 #include <stdexcept>
 #include <regex>
 
@@ -156,6 +157,20 @@ std::unique_ptr<Channel> Channel::create(
         // ws://host:port for client, ws://:port for server
         bool is_server = path[0] == ':';
         impl = std::make_unique<detail::WebSocketChannel>(uri, buffer_size, is_server);
+    } else if (scheme == "webrtc") {
+        // Create WebRTC channel
+        // webrtc://peer-id or webrtc://signaling-server/room-id
+        detail::WebRTCConfig webrtc_config;
+        
+        // Add default STUN servers
+        webrtc_config.stun_servers.push_back({"stun.l.google.com", 19302, "", ""});
+        webrtc_config.stun_servers.push_back({"stun1.l.google.com", 19302, "", ""});
+        
+        // Default signaling server (can be overridden)
+        std::string signaling_server = "ws://localhost:8080";
+        
+        impl = detail::create_webrtc_channel(uri, buffer_size, mode, type, 
+                                           webrtc_config, signaling_server, compression_config);
     } else {
         throw std::invalid_argument("Unknown URI scheme: " + scheme);
     }

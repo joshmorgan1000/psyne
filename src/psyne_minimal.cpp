@@ -14,8 +14,62 @@
 #include <unistd.h>
 #include "../src/channel/tcp_channel_stub.hpp"
 #include "../src/compression/compression.hpp"
+#include "channel/webrtc_channel.hpp"
 
 namespace psyne {
+
+// Channel wrapper to bridge ChannelImpl to Channel interface
+namespace detail {
+class ChannelWrapper : public Channel {
+public:
+    explicit ChannelWrapper(std::unique_ptr<ChannelImpl> impl)
+        : impl_(std::move(impl)) {}
+        
+    void stop() override {
+        impl_->stop();
+    }
+    
+    bool is_stopped() const override {
+        return impl_->is_stopped();
+    }
+    
+    const std::string& uri() const override {
+        return impl_->uri();
+    }
+    
+    ChannelType type() const override {
+        return impl_->type();
+    }
+    
+    ChannelMode mode() const override {
+        return impl_->mode();
+    }
+    
+    void* receive_raw_message(size_t& size, uint32_t& type) override {
+        return impl_->receive_message(size, type);
+    }
+    
+    void release_raw_message(void* handle) override {
+        impl_->release_message(handle);
+    }
+    
+    bool has_metrics() const override {
+        return impl_->has_metrics();
+    }
+    
+    debug::ChannelMetrics get_metrics() const override {
+        return impl_->get_metrics();
+    }
+    
+    void reset_metrics() override {
+        impl_->reset_metrics();
+    }
+    
+private:
+    std::unique_ptr<ChannelImpl> impl_;
+};
+} // namespace detail
+
 
 // Simple message queue implementation for testing - Fixed unbounded growth
 class SimpleMessageQueue {
@@ -278,7 +332,7 @@ std::unique_ptr<Channel> Channel::create(
     }
     
     std::string protocol = uri.substr(0, uri.find("://"));
-    if (protocol != "memory" && protocol != "ipc" && protocol != "unix" && protocol != "tcp" && protocol != "ws" && protocol != "wss") {
+    if (protocol != "memory" && protocol != "ipc" && protocol != "unix" && protocol != "tcp" && protocol != "ws" && protocol != "wss" && protocol != "webrtc") {
         throw std::invalid_argument("Unsupported protocol: " + protocol);
     }
     
@@ -287,6 +341,17 @@ std::unique_ptr<Channel> Channel::create(
         return std::make_unique<IPCChannel>(uri, buffer_size, type);
     } else if (protocol == "tcp") {
         return detail::create_tcp_channel(uri, buffer_size, mode, type, compression_config);
+    } else if (protocol == "webrtc") {
+        // Create WebRTC channel with default configuration
+        detail::WebRTCConfig webrtc_config;
+        webrtc_config.stun_servers.push_back({"stun.l.google.com", 19302, "", ""});
+        
+        std::string signaling_server = "ws://localhost:8080";
+        auto webrtc_impl = detail::create_webrtc_channel(uri, buffer_size, mode, type, 
+                                                       webrtc_config, signaling_server, compression_config);
+        
+        // Wrap in a Channel-compatible interface
+        return std::make_unique<detail::ChannelWrapper>(std::move(webrtc_impl));
     } else {
         // Default to memory channel for all other protocols (for now)
         return std::make_unique<TestChannel>(uri, buffer_size, type);
