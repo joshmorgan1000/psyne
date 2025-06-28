@@ -18,17 +18,17 @@ public:
     
     void apply_optimizations(Channel& channel) {
         // Apply channel-specific optimizations
-        if (config_.enable_prefetch) {
+        if (config_.enable_prefetching) {
             // Enable memory prefetching
             apply_prefetch_optimization(channel);
         }
         
-        if (config_.enable_hugepages) {
+        if (config_.enable_huge_pages) {
             // Enable huge page support if available
             apply_hugepage_optimization(channel);
         }
         
-        if (config_.enable_numa_binding) {
+        if (config_.enable_cpu_affinity) {
             // Apply NUMA optimizations
             apply_numa_optimization(channel);
         }
@@ -38,7 +38,7 @@ public:
         if (!buffer || size == 0) return;
         
         // Apply memory-specific optimizations
-        if (config_.enable_prefetch) {
+        if (config_.enable_prefetching) {
             // Prefetch memory pages
             const size_t cache_line_size = 64;
             for (size_t offset = 0; offset < size; offset += cache_line_size) {
@@ -46,7 +46,7 @@ public:
             }
         }
         
-        if (config_.enable_memory_locking) {
+        if (config_.enable_simd) {
             // Lock memory pages (requires root privileges)
             // mlock(buffer, size); // Commented out for safety
         }
@@ -82,10 +82,10 @@ public:
     std::string get_summary() const {
         std::ostringstream ss;
         ss << "Performance Manager Summary:\\n";
-        ss << "  Prefetch enabled: " << (config_.enable_prefetch ? "Yes" : "No") << "\\n";
-        ss << "  Huge pages enabled: " << (config_.enable_hugepages ? "Yes" : "No") << "\\n";
-        ss << "  NUMA binding enabled: " << (config_.enable_numa_binding ? "Yes" : "No") << "\\n";
-        ss << "  Memory locking enabled: " << (config_.enable_memory_locking ? "Yes" : "No") << "\\n";
+        ss << "  Prefetch enabled: " << (config_.enable_prefetching ? "Yes" : "No") << "\\n";
+        ss << "  Huge pages enabled: " << (config_.enable_huge_pages ? "Yes" : "No") << "\\n";
+        ss << "  NUMA binding enabled: " << (config_.enable_cpu_affinity ? "Yes" : "No") << "\\n";
+        ss << "  Memory locking enabled: " << (config_.enable_simd ? "Yes" : "No") << "\\n";
         return ss.str();
     }
     
@@ -98,11 +98,11 @@ public:
         recommendations.push_back("Use NUMA-aware allocation for multi-socket systems");
         recommendations.push_back("Enable hardware prefetching for sequential access patterns");
         
-        if (!config_.enable_prefetch) {
+        if (!config_.enable_prefetching) {
             recommendations.push_back("Consider enabling memory prefetching for better cache utilization");
         }
         
-        if (!config_.enable_hugepages) {
+        if (!config_.enable_huge_pages) {
             recommendations.push_back("Consider enabling huge pages for reduced TLB pressure");
         }
         

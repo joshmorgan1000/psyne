@@ -323,6 +323,11 @@ void RDMAChannel::update_latency_stats(uint64_t latency_ns) {
     }
 }
 
+uint64_t RDMAChannel::calculate_checksum(const uint8_t* data, size_t size) {
+    // Use the same hash seed as other channels for consistency
+    return utils::calculate_checksum(data, size, 0);
+}
+
 } // namespace detail
 
 // Factory function implementations
@@ -471,11 +476,6 @@ std::unique_ptr<Channel> create_channel(const std::string& uri,
             throw std::invalid_argument("Invalid RDMA URI for client: " + uri);
         }
     }
-}
-
-uint64_t RDMAChannel::calculate_checksum(const uint8_t* data, size_t size) {
-    // Use the same hash seed as other channels for consistency
-    return utils::calculate_checksum(data, size, 0);
 }
 
 } // namespace rdma

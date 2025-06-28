@@ -39,22 +39,6 @@ if(NOT OpenSSL_FOUND)
     message(FATAL_ERROR "OpenSSL not found. Please install OpenSSL development libraries.")
 endif()
 
-# ----------------------------------------------------------------------------------------
-# Vulkan
-# ----------------------------------------------------------------------------------------
-find_package(Vulkan REQUIRED)
-if(NOT Vulkan_FOUND)
-    message(FATAL_ERROR "Vulkan not found. Please install Vulkan development libraries.")
-else()
-    if(NOT Vulkan_INCLUDE_DIRS)
-        message(FATAL_ERROR "Vulkan include directories not found. Please ensure Vulkan development libraries are installed.")
-    endif()
-    if(NOT Vulkan_LIBRARY)
-        message(FATAL_ERROR "Vulkan library not found. Please ensure Vulkan development libraries are installed.")
-    endif()
-    message(STATUS "Vulkan include directories: ${Vulkan_INCLUDE_DIRS}")
-    message(STATUS "Vulkan library: ${Vulkan_LIBRARY}")
-endif()
 
 # ----------------------------------------------------------------------------------------
 # Threads
@@ -84,6 +68,8 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.hpp"
     "${CMAKE_SOURCE_DIR}/src/channel/multicast_factory.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/websocket_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/websocket_channel.hpp"
     "${CMAKE_SOURCE_DIR}/src/channel/rdma_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/rdma_channel.hpp"
     "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
@@ -108,7 +94,6 @@ target_link_libraries(
     Eigen3::Eigen
     OpenSSL::SSL
     OpenSSL::Crypto
-    Vulkan::Vulkan
     Threads::Threads
 )
 target_include_directories(psyne
@@ -116,7 +101,6 @@ target_include_directories(psyne
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/include/psyne
     ${CMAKE_SOURCE_DIR}/src/utils
-    ${Vulkan_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
     $ENV{HOME}/boost
 )

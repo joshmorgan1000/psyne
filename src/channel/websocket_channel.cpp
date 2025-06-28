@@ -1,5 +1,5 @@
 #include "websocket_channel.hpp"
-#include "../memory/slab.hpp"
+#include "../memory/ring_buffer_impl.hpp"
 #include <iostream>
 #include <regex>
 
@@ -40,10 +40,6 @@ WebSocketChannel::WebSocketChannel(const std::string& uri, size_t buffer_size, b
 }
 
 WebSocketChannel::~WebSocketChannel() {
-    stop();
-}
-
-void WebSocketChannel::stop() {
     ChannelImpl::stop();  // Call base class stop() to set stopped_ flag
     
     // Close WebSocket connection

@@ -319,6 +319,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Issues**: [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions)
 
+## 🤖 Development Attribution
+
+This project was developed with significant assistance from AI frameworks including **Claude** (Anthropic), which contributed to:
+- Architecture design and implementation
+- Code optimization and refactoring  
+- Documentation and examples
+- Testing and debugging
+
+While AI provided substantial development support, all design decisions, code review, and project direction remained under human oversight.
+
 ---
 
 **Psyne** - Zero-copy messaging at the speed of thought 🚀
