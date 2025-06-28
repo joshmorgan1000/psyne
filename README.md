@@ -19,15 +19,6 @@
 
 Psyne provides ultra-low latency inter-process communication with support for multiple transport protocols and comprehensive language bindings.
 
-## 🔥 **INSANE PERFORMANCE ACHIEVED**
-
-**Psyne v1.2.0 just CRUSHED the benchmarks:**
-- **🚀 42.7 BILLION operations/second** on Apple M4
-- **💾 4+ TERABYTES processed** in seconds during stress testing  
-- **⚡ 0.29μs average latency** - faster than most hardware
-- **🎯 122+ GB/s memory bandwidth** with 16-core utilization
-- **📈 Beats Redis, Kafka, ZeroMQ** in head-to-head comparisons
-
 👉 **[See Full Performance Report](PERFORMANCE.md)** 👈
 
 ## 📋 Table of Contents
@@ -349,7 +340,7 @@ This project was developed with significant assistance from AI frameworks includ
 - Documentation and examples
 - Testing and debugging
 
-While AI provided substantial development support, the initial design, all design decisions, code review, and project direction remained under human oversight.
+While AI provided substantial development support, all design decisions, code review, and project direction remained under human oversight.
 
 ---
 
