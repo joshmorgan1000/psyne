@@ -79,19 +79,9 @@
 - [ ] **Byzantine fault tolerance** for untrusted networks
 - [ ] **Homomorphic encryption** for secure computation
 
-## Contributing
-
-Want to help? Priority areas:
-1. Fix memory management issues (see QA_REPORT.md)
-2. Implement real ring buffers
-3. Create comprehensive test suite
-4. Add transport implementations
-5. Performance benchmarking
-
 ## Success Metrics 🎯
 
 ### v2.0 Goals
-- Zero memory leaks (Valgrind clean)
 - < 1μs latency (same NUMA node)
 - > 10 GB/s throughput (memory transport)
 - 100% test coverage
