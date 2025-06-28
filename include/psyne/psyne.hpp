@@ -276,6 +276,9 @@ using MPMCChannel = Channel;
 // Reliability Features
 #include "reliability/reliability.hpp"
 
+// Performance Optimizations
+#include "perf/performance.hpp"
+
 // GPU Support (optional - requires Metal/Vulkan/CUDA)
 #ifdef PSYNE_GPU_SUPPORT
 #include "gpu/gpu_buffer.hpp"

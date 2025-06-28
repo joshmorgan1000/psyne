@@ -86,6 +86,9 @@ public:
     bool is_acknowledged(MessageID msg_id) const;
     size_t pending_count() const;
     
+    // Tracking management
+    void remove_tracking(MessageID msg_id);
+    
     // Statistics
     struct Stats {
         std::atomic<uint64_t> messages_sent{0};
@@ -142,7 +145,7 @@ public:
     ~AcknowledgedMessage() {
         if (!sent_) {
             // If message was never sent, clean up tracking
-            // This would need implementation in AcknowledgmentManager
+            ack_mgr_.remove_tracking(msg_id_);
         }
     }
     

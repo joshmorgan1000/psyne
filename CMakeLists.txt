@@ -119,7 +119,13 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/reliability/acknowledgment.cpp"
     "${CMAKE_SOURCE_DIR}/src/reliability/retry.cpp"
     "${CMAKE_SOURCE_DIR}/src/reliability/heartbeat.cpp"
+    "${CMAKE_SOURCE_DIR}/src/reliability/replay_buffer.cpp"
     "${CMAKE_SOURCE_DIR}/src/reliability/reliability.cpp"
+    "${CMAKE_SOURCE_DIR}/src/perf/simd_operations.cpp"
+    "${CMAKE_SOURCE_DIR}/src/perf/huge_pages.cpp"
+    "${CMAKE_SOURCE_DIR}/src/perf/cpu_affinity.cpp"
+    "${CMAKE_SOURCE_DIR}/src/perf/prefetch.cpp"
+    "${CMAKE_SOURCE_DIR}/src/perf/performance.cpp"
     ${GPU_SOURCES}
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer.cpp"
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer_impl.hpp"

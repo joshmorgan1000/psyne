@@ -140,6 +140,11 @@ private:
     void update_connection_state(ConnectionInfo& conn_info, ConnectionState new_state);
     void attempt_reconnection(ConnectionInfo& conn_info);
     uint32_t generate_sender_id();
+    
+    // Internal methods that assume lock is already held
+    void send_heartbeat_internal(ConnectionInfo& conn_info);
+    void update_connection_state_internal(ConnectionInfo& conn_info, ConnectionState new_state);
+    void attempt_reconnection_internal(ConnectionInfo& conn_info);
 };
 
 // RAII wrapper for automatic heartbeat management

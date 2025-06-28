@@ -74,41 +74,49 @@ void AcknowledgmentManager::track_message(MessageID msg_id, AckType type,
 }
 
 void AcknowledgmentManager::process_acknowledgment(const AckMessage& ack) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // Capture callback for execution outside mutex
+    std::function<void(MessageID, AckStatus)> callback;
     
-    auto it = pending_acks_.find(ack.original_msg_id);
-    if (it == pending_acks_.end()) {
-        // Acknowledgment for unknown message (might be duplicate or late)
-        return;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = pending_acks_.find(ack.original_msg_id);
+        if (it == pending_acks_.end()) {
+            // Acknowledgment for unknown message (might be duplicate or late)
+            return;
+        }
+        
+        AckRequest& request = it->second;
+        
+        // Update statistics
+        switch (ack.status) {
+            case AckStatus::Acknowledged:
+                stats_.messages_acknowledged.fetch_add(1, std::memory_order_relaxed);
+                break;
+            case AckStatus::Failed:
+                stats_.messages_failed.fetch_add(1, std::memory_order_relaxed);
+                break;
+            default:
+                break;
+        }
+        
+        // Capture callback for execution outside mutex
+        callback = request.callback;
+        
+        // Move to completed and remove from pending
+        completed_acks_[ack.original_msg_id] = ack.status;
+        pending_acks_.erase(it);
     }
     
-    AckRequest& request = it->second;
-    
-    // Update statistics
-    switch (ack.status) {
-        case AckStatus::Acknowledged:
-            stats_.messages_acknowledged.fetch_add(1, std::memory_order_relaxed);
-            break;
-        case AckStatus::Failed:
-            stats_.messages_failed.fetch_add(1, std::memory_order_relaxed);
-            break;
-        default:
-            break;
-    }
-    
-    // Call callback if provided
-    if (request.callback) {
+    // Execute callback outside of mutex
+    if (callback) {
         try {
-            request.callback(ack.original_msg_id, ack.status);
+            callback(ack.original_msg_id, ack.status);
         } catch (const std::exception& e) {
             // Log error but don't let callback exceptions break the manager
             // In a real implementation, this would use proper logging
         }
     }
-    
-    // Move to completed and remove from pending
-    completed_acks_[ack.original_msg_id] = ack.status;
-    pending_acks_.erase(it);
 }
 
 void AcknowledgmentManager::send_acknowledgment(Channel& channel, MessageID msg_id, 
@@ -236,6 +244,22 @@ void AcknowledgmentManager::reset_stats() {
 void AcknowledgmentManager::cleanup_completed() {
     std::lock_guard<std::mutex> lock(mutex_);
     cleanup_old_entries();
+}
+
+void AcknowledgmentManager::remove_tracking(MessageID msg_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Remove from pending acknowledgments if it exists
+    auto it = pending_acks_.find(msg_id);
+    if (it != pending_acks_.end()) {
+        pending_acks_.erase(it);
+    }
+    
+    // Also remove from completed if it exists
+    auto completed_it = completed_acks_.find(msg_id);
+    if (completed_it != completed_acks_.end()) {
+        completed_acks_.erase(completed_it);
+    }
 }
 
 void AcknowledgmentManager::cleanup_old_entries() {

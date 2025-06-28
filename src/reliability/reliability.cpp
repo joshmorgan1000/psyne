@@ -20,6 +20,9 @@ ReliabilityManager::ReliabilityManager() : started_(false) {
     
     ack_manager_.set_default_timeout(std::chrono::seconds(30));
     ack_manager_.set_default_max_retries(3);
+    
+    ReplayBufferConfig default_replay_config = create_short_term_replay_config();
+    replay_buffer_.set_config(default_replay_config);
 }
 
 ReliabilityManager::~ReliabilityManager() {
@@ -27,7 +30,7 @@ ReliabilityManager::~ReliabilityManager() {
 }
 
 template<typename MessageType>
-void ReliabilityManager::send_reliable_message(Channel& channel, MessageType& message,
+void ReliabilityManager::send_reliable_message(Channel& channel, MessageType&& message,
                                               AckType ack_type,
                                               const RetryConfig& retry_config,
                                               std::chrono::milliseconds ack_timeout) {
@@ -49,8 +52,8 @@ void ReliabilityManager::send_reliable_message(Channel& channel, MessageType& me
         ack_manager_.track_message(msg_id, ack_type, timeout, ack_callback);
     }
     
-    // Set up retry mechanism
-    auto retry_func = [&message]() -> bool {
+    // Set up retry mechanism - move message to avoid use-after-free
+    auto retry_func = [message = std::move(message)]() mutable -> bool {
         try {
             message.send();
             return true;
@@ -130,6 +133,16 @@ ReliabilityManager::CombinedStats ReliabilityManager::get_combined_stats() const
     stats.heartbeats.reconnections_successful = heartbeat_stats.reconnections_successful.load();
     stats.heartbeats.reconnections_failed = heartbeat_stats.reconnections_failed.load();
     
+    // Copy replay buffer stats
+    const auto& replay_stats = replay_buffer_.get_stats();
+    stats.replay.messages_stored = replay_stats.messages_stored.load();
+    stats.replay.messages_replayed = replay_stats.messages_replayed.load();
+    stats.replay.replay_successes = replay_stats.replay_successes.load();
+    stats.replay.replay_failures = replay_stats.replay_failures.load();
+    stats.replay.messages_expired = replay_stats.messages_expired.load();
+    stats.replay.messages_evicted = replay_stats.messages_evicted.load();
+    stats.replay.cleanup_runs = replay_stats.cleanup_runs.load();
+    
     return stats;
 }
 
@@ -164,12 +177,14 @@ void ReliabilityManager::reset_all_stats() {
     ack_manager_.reset_stats();
     retry_manager_.reset_stats();
     heartbeat_manager_.reset_stats();
+    replay_buffer_.reset_stats();
 }
 
 void ReliabilityManager::start_all() {
     if (!started_) {
         retry_manager_.start();
         heartbeat_manager_.start();
+        replay_buffer_.start();
         started_ = true;
     }
 }
@@ -179,6 +194,7 @@ void ReliabilityManager::stop_all() {
         ack_manager_.stop();
         retry_manager_.stop();
         heartbeat_manager_.stop();
+        replay_buffer_.stop();
         started_ = false;
     }
 }
@@ -186,11 +202,13 @@ void ReliabilityManager::stop_all() {
 void ReliabilityManager::pause_all() {
     retry_manager_.stop(); // RetryManager doesn't have pause, so stop/start
     heartbeat_manager_.pause();
+    replay_buffer_.pause();
 }
 
 void ReliabilityManager::resume_all() {
     retry_manager_.start();
     heartbeat_manager_.resume();
+    replay_buffer_.resume();
 }
 
 // Factory function implementation

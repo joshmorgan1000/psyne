@@ -372,18 +372,53 @@ void MLTensor<T>::normalize_l2() {
 
 template<typename T>
 void MLTensor<T>::set_name(const std::string& name) {
-    // This is a simplified implementation - in practice would need to manage header size carefully
-    // For now, just store in a static thread-local map
-    static thread_local std::map<const void*, std::string> name_map;
-    name_map[this->Message<MLTensor<T>>::data()] = name;
+    if (!this->Message<MLTensor<T>>::data()) return;
+    
+    uint8_t* ptr = this->Message<MLTensor<T>>::data();
+    
+    // Skip shape data
+    size_t shape_size = *reinterpret_cast<const size_t*>(ptr);
+    ptr += sizeof(size_t) + shape_size * sizeof(size_t);
+    
+    // Skip layout
+    ptr += sizeof(int);
+    
+    // Update name length and store name
+    *reinterpret_cast<size_t*>(ptr) = name.length();
+    ptr += sizeof(size_t);
+    
+    if (name.length() > 0) {
+        std::memcpy(ptr, name.c_str(), name.length());
+    }
 }
 
 template<typename T>
 const std::string& MLTensor<T>::name() const {
-    static thread_local std::map<const void*, std::string> name_map;
-    static const std::string empty_name;
-    auto it = name_map.find(this->Message<MLTensor<T>>::data());
-    return it != name_map.end() ? it->second : empty_name;
+    static thread_local std::string cached_name;
+    cached_name.clear();
+    
+    if (!this->Message<MLTensor<T>>::data()) {
+        return cached_name; // empty string
+    }
+    
+    const uint8_t* ptr = this->Message<MLTensor<T>>::data();
+    
+    // Skip shape data
+    size_t shape_size = *reinterpret_cast<const size_t*>(ptr);
+    ptr += sizeof(size_t) + shape_size * sizeof(size_t);
+    
+    // Skip layout
+    ptr += sizeof(int);
+    
+    // Read name length and extract name
+    size_t name_length = *reinterpret_cast<const size_t*>(ptr);
+    ptr += sizeof(size_t);
+    
+    if (name_length > 0) {
+        cached_name.assign(reinterpret_cast<const char*>(ptr), name_length);
+    }
+    
+    return cached_name;
 }
 
 // Explicit template instantiations for common ML types

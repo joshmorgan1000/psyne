@@ -6,6 +6,7 @@
 #include "acknowledgment.hpp"
 #include "retry.hpp"
 #include "heartbeat.hpp"
+#include "replay_buffer.hpp"
 #include <optional>
 #include <memory>
 
@@ -32,14 +33,16 @@ public:
     AcknowledgmentManager& acknowledgments() { return ack_manager_; }
     RetryManager& retries() { return retry_manager_; }
     HeartbeatManager& heartbeats() { return heartbeat_manager_; }
+    ReplayBuffer& replay_buffer() { return replay_buffer_; }
     
     const AcknowledgmentManager& acknowledgments() const { return ack_manager_; }
     const RetryManager& retries() const { return retry_manager_; }
     const HeartbeatManager& heartbeats() const { return heartbeat_manager_; }
+    const ReplayBuffer& replay_buffer() const { return replay_buffer_; }
     
     // Integrated operations
     template<typename MessageType>
-    void send_reliable_message(Channel& channel, MessageType& message,
+    void send_reliable_message(Channel& channel, MessageType&& message,
                               AckType ack_type = AckType::Simple,
                               const RetryConfig& retry_config = {},
                               std::chrono::milliseconds ack_timeout = std::chrono::milliseconds::zero());
@@ -79,6 +82,16 @@ public:
             uint64_t reconnections_failed;
         } heartbeats;
         
+        struct ReplayStatsData {
+            uint64_t messages_stored;
+            uint64_t messages_replayed;
+            uint64_t replay_successes;
+            uint64_t replay_failures;
+            uint64_t messages_expired;
+            uint64_t messages_evicted;
+            uint64_t cleanup_runs;
+        } replay;
+        
         // Derived metrics
         double message_success_rate() const;
         double connection_uptime() const;
@@ -98,6 +111,7 @@ private:
     AcknowledgmentManager ack_manager_;
     RetryManager retry_manager_;
     HeartbeatManager heartbeat_manager_;
+    ReplayBuffer replay_buffer_;
     
     bool started_;
 };

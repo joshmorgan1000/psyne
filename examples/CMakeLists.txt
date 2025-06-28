@@ -48,6 +48,8 @@ add_psyne_example(ipc_test)
 add_psyne_example(tcp_server)
 add_psyne_example(tcp_client)
 add_psyne_example(enhanced_types_demo)
+add_psyne_example(performance_demo)
+add_psyne_example(high_performance_messaging)
 
 # GPU examples (optional)
 if(PSYNE_GPU_SUPPORT)

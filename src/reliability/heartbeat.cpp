@@ -115,7 +115,10 @@ void HeartbeatManager::send_heartbeat(const std::string& connection_id) {
     auto it = connections_.find(connection_id);
     if (it == connections_.end()) return;
     
-    ConnectionInfo& conn_info = it->second;
+    send_heartbeat_internal(it->second);
+}
+
+void HeartbeatManager::send_heartbeat_internal(ConnectionInfo& conn_info) {
     if (!conn_info.config.send_heartbeats || !conn_info.channel) return;
     
     HeartbeatMessage heartbeat;
@@ -134,7 +137,7 @@ void HeartbeatManager::send_heartbeat(const std::string& connection_id) {
         stats_.heartbeats_sent.fetch_add(1, std::memory_order_relaxed);
     } catch (const std::exception& e) {
         // Failed to send heartbeat - consider connection issues
-        update_connection_state(conn_info, ConnectionState::Failed);
+        update_connection_state_internal(conn_info, ConnectionState::Failed);
     }
 }
 
@@ -271,7 +274,7 @@ void HeartbeatManager::process_connection_heartbeat(ConnectionInfo& conn_info) {
     auto time_since_last_sent = now - conn_info.last_heartbeat_sent;
     
     if (time_since_last_sent >= conn_info.config.interval) {
-        send_heartbeat(conn_info.connection_id);
+        send_heartbeat_internal(conn_info);
     }
 }
 
@@ -287,38 +290,59 @@ void HeartbeatManager::check_connection_timeouts(ConnectionInfo& conn_info) {
         
         if (conn_info.missed_heartbeats >= conn_info.config.max_missed_heartbeats) {
             if (conn_info.state == ConnectionState::Connected) {
-                update_connection_state(conn_info, ConnectionState::Disconnected);
+                update_connection_state_internal(conn_info, ConnectionState::Disconnected);
                 stats_.connections_lost.fetch_add(1, std::memory_order_relaxed);
                 
                 // Attempt reconnection if enabled
                 if (conn_info.config.auto_reconnect) {
-                    attempt_reconnection(conn_info);
+                    attempt_reconnection_internal(conn_info);
                 }
             }
         } else if (conn_info.state == ConnectionState::Connected) {
-            update_connection_state(conn_info, ConnectionState::Heartbeat_Missing);
+            update_connection_state_internal(conn_info, ConnectionState::Heartbeat_Missing);
         }
     }
 }
 
 void HeartbeatManager::update_connection_state(ConnectionInfo& conn_info, 
                                              ConnectionState new_state) {
+    std::string connection_id;
+    std::function<void(const std::string&, ConnectionState)> callback;
+    
     if (conn_info.state != new_state) {
         conn_info.state = new_state;
         
+        // Capture callback and connection ID for execution outside mutex
         if (conn_info.state_change_callback) {
-            try {
-                conn_info.state_change_callback(conn_info.connection_id, new_state);
-            } catch (...) {
-                // Ignore callback exceptions
-            }
+            connection_id = conn_info.connection_id;
+            callback = conn_info.state_change_callback;
+        }
+    }
+    
+    // Execute callback outside of mutex if we have one
+    if (callback) {
+        try {
+            callback(connection_id, new_state);
+        } catch (...) {
+            // Ignore callback exceptions
         }
     }
 }
 
+void HeartbeatManager::update_connection_state_internal(ConnectionInfo& conn_info, 
+                                                      ConnectionState new_state) {
+    // Internal version that doesn't execute callbacks (assumes lock held)
+    conn_info.state = new_state;
+}
+
 void HeartbeatManager::attempt_reconnection(ConnectionInfo& conn_info) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    attempt_reconnection_internal(conn_info);
+}
+
+void HeartbeatManager::attempt_reconnection_internal(ConnectionInfo& conn_info) {
     if (conn_info.reconnect_attempts >= conn_info.config.max_reconnect_attempts) {
-        update_connection_state(conn_info, ConnectionState::Failed);
+        update_connection_state_internal(conn_info, ConnectionState::Failed);
         return;
     }
     
@@ -329,22 +353,29 @@ void HeartbeatManager::attempt_reconnection(ConnectionInfo& conn_info) {
         conn_info.reconnect_attempts++;
         stats_.reconnections_attempted.fetch_add(1, std::memory_order_relaxed);
         
-        update_connection_state(conn_info, ConnectionState::Connecting);
+        update_connection_state_internal(conn_info, ConnectionState::Connecting);
         
+        // Capture callback and connection ID for execution outside mutex
+        std::string connection_id = conn_info.connection_id;
+        auto reconnect_callback = conn_info.reconnect_callback;
+        
+        // Temporarily release lock to execute callback
         bool success = false;
-        if (conn_info.reconnect_callback) {
+        if (reconnect_callback) {
+            mutex_.unlock();
             try {
-                success = conn_info.reconnect_callback(conn_info.connection_id);
+                success = reconnect_callback(connection_id);
             } catch (...) {
                 success = false;
             }
+            mutex_.lock();
         }
         
         if (success) {
             stats_.reconnections_successful.fetch_add(1, std::memory_order_relaxed);
             conn_info.missed_heartbeats = 0;
             conn_info.last_heartbeat_received = now;
-            update_connection_state(conn_info, ConnectionState::Connected);
+            update_connection_state_internal(conn_info, ConnectionState::Connected);
         } else {
             stats_.reconnections_failed.fetch_add(1, std::memory_order_relaxed);
             conn_info.last_heartbeat_sent = now; // Reset for next attempt delay

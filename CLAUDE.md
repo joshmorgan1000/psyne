@@ -8,6 +8,7 @@ Code may not be correct. When in doubt, refer to the [README.md](README.md) docu
 
 - Do not add any git workflows or hooks at this time. CI/CD is managed separate of the source code repository.
 - Do not make any changes to the `utils.hpp` file.
+- Header-only classes are preferred unless unavoiable.
 - All code must be unit tested.
 - All code must be documented with Doxygen comments in javadoc style.
 - We would like to minimize the dependencies on third-party libraries.
