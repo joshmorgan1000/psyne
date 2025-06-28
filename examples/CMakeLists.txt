@@ -48,6 +48,11 @@ add_psyne_example(ipc_test)
 add_psyne_example(tcp_server)
 add_psyne_example(tcp_client)
 
+# GPU examples (optional)
+if(PSYNE_GPU_SUPPORT)
+    add_psyne_example(gpu_vector_demo)
+endif()
+
 # ----------------------------------------------------------------------------------------
 # Tests (commented out for now)
 # ----------------------------------------------------------------------------------------

@@ -206,8 +206,40 @@ const double& DoubleMatrix::at(size_t row, size_t col) const {
     return matrix_data[row * cols() + col];
 }
 
+// Fixed-size matrix types
+namespace types {
+    class Matrix4x4f;
+    class Matrix3x3f;
+    class Matrix2x2f;
+    class Vector4f;
+    class Vector3f;
+    class Int8Vector;
+    class UInt8Vector;
+}
+
 // Explicit template instantiations
 template class Message<FloatVector>;
 template class Message<DoubleMatrix>;
+template class Message<types::Matrix4x4f>;
+template class Message<types::Matrix3x3f>;
+template class Message<types::Matrix2x2f>;
+template class Message<types::Vector4f>;
+template class Message<types::Vector3f>;
+template class Message<types::Int8Vector>;
+template class Message<types::UInt8Vector>;
+
+#ifdef PSYNE_GPU_SUPPORT
+// Forward declarations for GPU types
+namespace gpu {
+    class GPUFloatVector;
+    class GPUMatrix;
+    class GPUTensor;
+}
+
+// GPU message template instantiations
+template class Message<gpu::GPUFloatVector>;
+template class Message<gpu::GPUMatrix>;
+template class Message<gpu::GPUTensor>;
+#endif
 
 } // namespace psyne

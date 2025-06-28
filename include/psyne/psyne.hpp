@@ -89,6 +89,10 @@ protected:
     const uint8_t* data() const { return data_; }
     size_t size() const { return size_; }
     
+    // Access to channel for derived classes
+    Channel& channel() { return *channel_; }
+    const Channel& channel() const { return *channel_; }
+    
     // Called before sending
     virtual void before_send() {}
     
@@ -261,4 +265,14 @@ using MPSCChannel = Channel;
 using MPMCChannel = Channel;
 
 } // namespace psyne
+
+// Enhanced Message Types
+#include "types/fixed_matrices.hpp"
+#include "types/quantized_vectors.hpp"
+
+// GPU Support (optional - requires Metal/Vulkan/CUDA)
+#ifdef PSYNE_GPU_SUPPORT
+#include "gpu/gpu_buffer.hpp"
+#include "gpu/gpu_message.hpp"
+#endif
 
