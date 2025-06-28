@@ -33,3 +33,6 @@
 
 git_apply.sh
 build/
+
+CLAUDE.md
+.claude/

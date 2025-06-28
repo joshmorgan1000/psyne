@@ -6,6 +6,7 @@
 #include <memory>
 #include <map>
 #include <iostream>
+#include <stdexcept>
 
 namespace psyne {
 
@@ -134,6 +135,23 @@ std::unique_ptr<Channel> Channel::create(
     bool enable_metrics,
     const compression::CompressionConfig& compression_config
 ) {
+    // Validate buffer size
+    if (buffer_size == 0) {
+        throw std::invalid_argument("Buffer size cannot be zero");
+    }
+    
+    // Validate URI format
+    if (uri.find("://") == std::string::npos) {
+        throw std::invalid_argument("Invalid URI format: missing protocol");
+    }
+    
+    std::string protocol = uri.substr(0, uri.find("://"));
+    std::cout << "DEBUG: Validating protocol: " << protocol << std::endl;
+    if (protocol != "memory" && protocol != "ipc" && protocol != "unix" && protocol != "tcp" && protocol != "ws" && protocol != "wss") {
+        std::cout << "DEBUG: Throwing exception for unsupported protocol: " << protocol << std::endl;
+        throw std::invalid_argument("Unsupported protocol: " + protocol);
+    }
+    
     return std::make_unique<TestChannel>(uri, buffer_size, type);
 }
 
