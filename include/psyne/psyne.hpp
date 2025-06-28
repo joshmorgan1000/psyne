@@ -1146,228 +1146,12 @@ using SparseMatrix = SparseMatrixF;
 using QInt8 = Int8Vector;
 using QUInt8 = UInt8Vector;
 
-// ============================================================================
-// Matrix4x4f Implementation
-// ============================================================================
 
-/**
- * @class Matrix4x4f
- * @brief 4x4 single-precision float matrix for 3D transformations
- */
-class Matrix4x4f : public Message<Matrix4x4f> {
-public:
-    static constexpr uint32_t message_type = 101;
-    static constexpr size_t ROWS = 4;
-    static constexpr size_t COLS = 4;
-    static constexpr size_t SIZE = ROWS * COLS;
-    
-    using Message<Matrix4x4f>::Message;
-    
-    static size_t calculate_size() {
-        return SIZE * sizeof(float);
-    }
-    
-    void initialize() {
-        // Initialize as identity matrix
-        std::fill(data(), data() + SIZE, 0.0f);
-        for (size_t i = 0; i < 4; ++i) {
-            (*this)(i, i) = 1.0f;
-        }
-    }
-    
-    // Element access
-    float& operator()(size_t row, size_t col) {
-        return data()[row * COLS + col];
-    }
-    
-    const float& operator()(size_t row, size_t col) const {
-        return data()[row * COLS + col];
-    }
-    
-    // Matrix operations
-    float determinant() const {
-        const float* m = data();
-        return 
-            m[0] * (m[5] * (m[10] * m[15] - m[11] * m[14]) - 
-                   m[6] * (m[9] * m[15] - m[11] * m[13]) + 
-                   m[7] * (m[9] * m[14] - m[10] * m[13])) -
-            m[1] * (m[4] * (m[10] * m[15] - m[11] * m[14]) - 
-                   m[6] * (m[8] * m[15] - m[11] * m[12]) + 
-                   m[7] * (m[8] * m[14] - m[10] * m[12])) +
-            m[2] * (m[4] * (m[9] * m[15] - m[11] * m[13]) - 
-                   m[5] * (m[8] * m[15] - m[11] * m[12]) + 
-                   m[7] * (m[8] * m[13] - m[9] * m[12])) -
-            m[3] * (m[4] * (m[9] * m[14] - m[10] * m[13]) - 
-                   m[5] * (m[8] * m[14] - m[10] * m[12]) + 
-                   m[6] * (m[8] * m[13] - m[9] * m[12]));
-    }
-    
-    float trace() const {
-        return (*this)(0,0) + (*this)(1,1) + (*this)(2,2) + (*this)(3,3);
-    }
-    
-    // Data access
-    float* data() { return reinterpret_cast<float*>(Message<Matrix4x4f>::data()); }
-    const float* data() const { return reinterpret_cast<const float*>(Message<Matrix4x4f>::data()); }
-    
-#ifdef PSYNE_ENABLE_EIGEN
-    auto as_eigen() {
-        return Eigen::Map<Eigen::Matrix4f>(data());
-    }
-    
-    auto as_eigen() const {
-        return Eigen::Map<const Eigen::Matrix4f>(data());
-    }
-#endif
-};
-
-// ============================================================================
-// Vector3f Implementation
-// ============================================================================
-
-/**
- * @class Vector3f
- * @brief 3D single-precision float vector with named accessors
- */
-class Vector3f : public Message<Vector3f> {
-public:
-    static constexpr uint32_t message_type = 103;
-    static constexpr size_t SIZE = 3;
-    
-    using Message<Vector3f>::Message;
-    
-    static size_t calculate_size() {
-        return SIZE * sizeof(float);
-    }
-    
-    void initialize() {
-        std::fill(data(), data() + SIZE, 0.0f);
-    }
-    
-    // Named accessors
-    float& x() { return data()[0]; }
-    float& y() { return data()[1]; }
-    float& z() { return data()[2]; }
-    
-    const float& x() const { return data()[0]; }
-    const float& y() const { return data()[1]; }
-    const float& z() const { return data()[2]; }
-    
-    // Array access
-    float& operator[](size_t index) {
-        return data()[index];
-    }
-    
-    const float& operator[](size_t index) const {
-        return data()[index];
-    }
-    
-    // Vector operations
-    float length() const {
-        return std::sqrt(x()*x() + y()*y() + z()*z());
-    }
-    
-    float length_squared() const {
-        return x()*x() + y()*y() + z()*z();
-    }
-    
-    void normalize() {
-        float len = length();
-        if (len > 1e-6f) {
-            x() /= len;
-            y() /= len;
-            z() /= len;
-        }
-    }
-    
-    float dot(const Vector3f& other) const {
-        return x() * other.x() + y() * other.y() + z() * other.z();
-    }
-    
-    // In-place scalar operations
-    Vector3f& operator*=(float scalar) {
-        x() *= scalar;
-        y() *= scalar;
-        z() *= scalar;
-        return *this;
-    }
-    
-    Vector3f& operator+=(const Vector3f& other) {
-        x() += other.x();
-        y() += other.y();
-        z() += other.z();
-        return *this;
-    }
-    
-    float* data() { return reinterpret_cast<float*>(Message<Vector3f>::data()); }
-    const float* data() const { return reinterpret_cast<const float*>(Message<Vector3f>::data()); }
-
-#ifdef PSYNE_ENABLE_EIGEN
-    auto as_eigen() {
-        return Eigen::Map<Eigen::Vector3f>(data());
-    }
-    
-    auto as_eigen() const {
-        return Eigen::Map<const Eigen::Vector3f>(data());
-    }
-#endif
-};
 
 // ============================================================================
 // Simplified Implementations for Other Types
 // ============================================================================
 
-/**
- * @class Int8Vector
- * @brief Quantized 8-bit signed integer vector
- */
-class Int8Vector : public Message<Int8Vector> {
-public:
-    static constexpr uint32_t message_type = 105;
-    
-    using Message<Int8Vector>::Message;
-    
-    static size_t calculate_size() {
-        return 1024; // Default size
-    }
-    
-    void initialize() {
-        header().size = 0;
-        header().scale = 1.0f;
-        header().zero_point = 0;
-    }
-    
-    struct Header {
-        uint32_t size;
-        float scale;
-        int32_t zero_point;
-    };
-    
-    Header& header() { return *reinterpret_cast<Header*>(Message<Int8Vector>::data()); }
-    const Header& header() const { return *reinterpret_cast<const Header*>(Message<Int8Vector>::data()); }
-    
-    int8_t* data() { return reinterpret_cast<int8_t*>(Message<Int8Vector>::data()) + sizeof(Header); }
-    const int8_t* data() const { return reinterpret_cast<const int8_t*>(Message<Int8Vector>::data()) + sizeof(Header); }
-    
-    size_t size() const { return header().size; }
-    
-    void resize(size_t new_size) {
-        header().size = static_cast<uint32_t>(new_size);
-    }
-    
-    void set_quantization_params(float scale, int32_t zero_point) {
-        header().scale = scale;
-        header().zero_point = zero_point;
-    }
-    
-    int8_t& operator[](size_t index) {
-        return data()[index];
-    }
-    
-    const int8_t& operator[](size_t index) const {
-        return data()[index];
-    }
-};
 
 /**
  * @class ComplexVectorF
@@ -1672,6 +1456,10 @@ auto as_eigen_matrix(ByteVector& vec, size_t rows, size_t cols) {
         cols
     );
 }
+
+// Include enhanced message types to provide complete implementations
+// for forward-declared classes like Matrix4x4f, Vector3f, Int8Vector
+#include "../src/types/enhanced_types.hpp"
 
 } // namespace psyne
 #endif // PSYNE_ENABLE_EIGEN

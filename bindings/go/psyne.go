@@ -5,7 +5,7 @@
 //
 // Example:
 //
-//	import "github.com/yourusername/psyne/go"
+//	import "github.com/joshmorgan1000/psyne/go"
 //	
 //	// Initialize the library
 //	if err := psyne.Init(); err != nil {

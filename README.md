@@ -3,10 +3,10 @@
   
   **High-performance, zero-copy messaging library optimized for AI/ML applications**
   
-  [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yourusername/psyne)
+  [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/joshmorgan1000/psyne)
   [![C++ Standard](https://img.shields.io/badge/C++-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourusername/psyne/actions)
+  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/joshmorgan1000/psyne/actions)
   
   [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🛠️ Language Bindings](#️-language-bindings) • [⚡ Performance](#-performance) • [🤝 Contributing](#-contributing)
 </div>
@@ -152,7 +152,7 @@ await channel.send({ type: 'prediction', data: [1, 2, 3, 4] });
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/psyne.git
+git clone https://github.com/joshmorgan1000/psyne.git
 cd psyne
 
 # Build with CMake
@@ -185,18 +185,18 @@ go get github.com/psyne/go
 
 ## 🏗️ Architecture
 
-Psyne is built around a **zero-copy message passing** architecture:
+Psyne is built around a **zero-copy message passing** architecture. Unless the message leaves the system, it is simply a pointer/view into a pre-allocated memory buffer. This concept extends to GPU buffers.
 
 ```
-┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
-│   Application   │◄──►│    Psyne     │◄──►│   Application   │
-│    Process A    │    │   Channel    │    │    Process B    │
-└─────────────────┘    └──────────────┘    └─────────────────┘
-                              │
-                    ┌─────────▼─────────┐
-                    │  Ring Buffer Pool │
-                    │ (Zero-Copy Memory)│
-                    └───────────────────┘
+                          ┌──────────────┐
+                          │    Psyne     │
+                          │  "Channel"   │
+                          └──────────────┘
+                                 │
+┌─────────────────┐    ┌─────────▼──────────┐    ┌─────────────────┐
+│   Application   │◄──►│  Ring Buffer Pool  │◄──►│   Application   │
+│    Process A    │    │ (Zero-Copy Memory) │    │    Process B    │
+└─────────────────┘    └────────────────────┘    └─────────────────┘
 ```
 
 ### Core Components
@@ -294,7 +294,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Clone with submodules
-git clone --recursive https://github.com/yourusername/psyne.git
+git clone --recursive https://github.com/joshmorgan1000/psyne.git
 
 # Build with development options
 cmake .. -DPSYNE_BUILD_TESTS=ON -DPSYNE_BUILD_EXAMPLES=ON
@@ -316,10 +316,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Documentation**: [docs.psyne.io](https://docs.psyne.io)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/psyne/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/psyne/discussions)
-- **Email**: support@psyne.io
+- **Issues**: [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions)
 
 ---
 

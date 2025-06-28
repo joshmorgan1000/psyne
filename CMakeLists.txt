@@ -97,8 +97,6 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/types/types.hpp"
     "${CMAKE_SOURCE_DIR}/src/types/enhanced_types.hpp"
     "${CMAKE_SOURCE_DIR}/src/types/advanced_types.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/utils.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/xxhash32.h"
     "${CMAKE_SOURCE_DIR}/src/psyne_impl.hpp"
     "${CMAKE_SOURCE_DIR}/src/psyne_lib.cpp"
     "${CMAKE_SOURCE_DIR}/src/reliability/reliability_manager.cpp"

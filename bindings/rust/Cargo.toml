@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Psyne Contributors"]
 description = "Rust bindings for Psyne zero-copy messaging library"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/psyne"
+repository = "https://github.com/joshmorgan1000/psyne"
 keywords = ["messaging", "zero-copy", "ipc", "rpc", "ml"]
 categories = ["api-bindings", "network-programming", "science"]
 

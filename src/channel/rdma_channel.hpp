@@ -40,11 +40,11 @@ struct RDMAHeader {
     uint32_t message_type;    ///< Message type identifier
     uint64_t sequence;        ///< Sequence number for ordering
     uint64_t timestamp;       ///< Timestamp (nanoseconds)
-    uint32_t checksum;        ///< Simple checksum for validation
+    uint64_t checksum;        ///< xxHash64 checksum for validation
     uint32_t flags;           ///< Control flags
 } __attribute__((packed));
 
-static_assert(sizeof(RDMAHeader) == 32, "RDMAHeader must be 32 bytes for optimal alignment");
+static_assert(sizeof(RDMAHeader) == 36, "RDMAHeader must be 36 bytes for optimal alignment");
 
 /**
  * @enum RDMATransportMode
@@ -167,6 +167,14 @@ public:
      * @param handle Memory registration handle
      */
     void unregister_memory(void* handle);
+
+    /**
+     * @brief Calculate checksum for RDMA payload
+     * @param data Pointer to data
+     * @param size Size of data in bytes
+     * @return 64-bit checksum
+     */
+    uint64_t calculate_checksum(const uint8_t* data, size_t size);
 
 private:
     // RDMA configuration and state

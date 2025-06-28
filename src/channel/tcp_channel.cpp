@@ -1,5 +1,5 @@
 #include "tcp_channel.hpp"
-#include "../utils/xxhash64.h"
+#include "../utils/checksum.hpp"
 #include <regex>
 #include <iostream>
 #include <cstring>
@@ -339,7 +339,7 @@ void TCPChannel::run_io_service() {
 }
 
 uint64_t TCPChannel::calculate_checksum(const uint8_t* data, size_t size) {
-    return XXHash64::hash(data, size, 0);
+    return utils::tcp::calculate_checksum(data, size);
 }
 
 // Factory function to create TCP channels from URI

@@ -225,8 +225,8 @@ We value all contributions and recognize contributors:
 
 ### 📞 Getting Help
 
-- **💬 Discussions**: [GitHub Discussions](https://github.com/yourusername/psyne/discussions) - general questions
-- **🐛 Issues**: [GitHub Issues](https://github.com/yourusername/psyne/issues) - bugs and feature requests
+- **💬 Discussions**: [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions) - general questions
+- **🐛 Issues**: [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues) - bugs and feature requests
 - **📧 Email**: maintainers@psyne.io - sensitive issues or private communication
 - **🗣️ Chat**: Join our Discord/Slack (link in README) - real-time discussion
 

@@ -1,5 +1,5 @@
 #include "unix_channel.hpp"
-#include "../utils/xxhash64.h"
+#include "../utils/checksum.hpp"
 #include <iostream>
 #include <cstring>
 
@@ -413,7 +413,7 @@ void UnixChannel::handle_send(std::shared_ptr<unix_socket::socket> sock,
 }
 
 uint64_t UnixChannel::calculate_checksum(const void* data, size_t size) {
-    return XXHash64::hash(data, size, 0x12345678);
+    return utils::unix_socket::calculate_checksum(data, size);
 }
 
 void UnixChannel::cleanup_socket_file() {

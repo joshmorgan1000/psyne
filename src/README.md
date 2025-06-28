@@ -5,11 +5,6 @@ This directory contains the implementation files for the Psyne library.
 ## Structure
 
 - `psyne.cpp` - Main library implementation file (minimal, as Psyne is primarily header-only)
-- `utils/` - Utility headers and implementations
-  - `utils.hpp` - General utility functions
-  - `xxhash32.h` - Fast hash function for message integrity
-  - `vthread.hpp` - Thread utilities
-  - `nlohmann/` - JSON library (for future configuration support)
 
 ## Notes
 

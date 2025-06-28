@@ -1,6 +1,6 @@
 #include "udp_multicast_channel.hpp"
 #include "../memory/ring_buffer_impl.hpp"
-#include "../utils/xxhash64.h"
+#include "../utils/checksum.hpp"
 #include <regex>
 #include <iostream>
 #include <chrono>
@@ -462,7 +462,7 @@ void UDPMulticastChannel::run_io_service() {
 }
 
 uint64_t UDPMulticastChannel::calculate_checksum(const uint8_t* data, size_t size) {
-    return XXHash64::hash(data, size, 0);
+    return utils::udp::calculate_checksum(data, size);
 }
 
 bool UDPMulticastChannel::validate_message(const UDPMulticastHeader& header, 

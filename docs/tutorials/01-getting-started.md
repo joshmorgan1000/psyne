@@ -23,7 +23,7 @@ Psyne is a zero-copy messaging library optimized for AI/ML workloads. It provide
 ### Building from Source
 
 ```bash
-git clone https://github.com/yourusername/psyne.git
+git clone https://github.com/joshmorgan1000/psyne.git
 cd psyne
 mkdir build && cd build
 cmake ..

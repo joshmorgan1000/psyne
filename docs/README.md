@@ -85,14 +85,14 @@ This documentation follows these principles:
 ## 🤝 Contributing to Documentation
 
 Found an error or want to improve the docs?
-- **Issues**: Report documentation bugs on [GitHub Issues](https://github.com/yourusername/psyne/issues)
+- **Issues**: Report documentation bugs on [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues)
 - **Pull Requests**: Submit improvements via pull requests
-- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/yourusername/psyne/discussions)
+- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions)
 
 ## 📞 Need Help?
 
-- **🐛 Bugs**: [GitHub Issues](https://github.com/yourusername/psyne/issues)
-- **💬 Questions**: [GitHub Discussions](https://github.com/yourusername/psyne/discussions)
+- **🐛 Bugs**: [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues)
+- **💬 Questions**: [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions)
 - **📧 Support**: support@psyne.io
 
 ---

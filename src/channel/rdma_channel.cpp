@@ -1,5 +1,5 @@
 #include "rdma_channel.hpp"
-#include "../utils/xxhash32.h"
+#include "../utils/checksum.hpp"
 #include <regex>
 #include <iostream>
 #include <chrono>
@@ -173,7 +173,7 @@ void RDMAChannel::commit_message(void* handle) {
     header->sequence = sequence_number_++;
     header->timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    header->checksum = XXHash32::hash(payload_start, payload_size, 0);
+    header->checksum = calculate_checksum(payload_start, payload_size);
     header->flags = 0;
     
     // Post send operation
@@ -471,6 +471,11 @@ std::unique_ptr<Channel> create_channel(const std::string& uri,
             throw std::invalid_argument("Invalid RDMA URI for client: " + uri);
         }
     }
+}
+
+uint64_t RDMAChannel::calculate_checksum(const uint8_t* data, size_t size) {
+    // Use the same hash seed as other channels for consistency
+    return utils::calculate_checksum(data, size, 0);
 }
 
 } // namespace rdma

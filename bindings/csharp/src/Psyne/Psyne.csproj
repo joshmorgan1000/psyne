@@ -14,8 +14,8 @@
     <Authors>Psyne Contributors</Authors>
     <Description>High-performance zero-copy messaging library for AI/ML applications</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/yourusername/psyne</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/yourusername/psyne</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/joshmorgan1000/psyne</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/joshmorgan1000/psyne</RepositoryUrl>
     <PackageTags>messaging;rpc;zerocopy;ai;ml;highperformance</PackageTags>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <IncludeSymbols>true</IncludeSymbols>
