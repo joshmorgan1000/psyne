@@ -122,27 +122,36 @@ target_include_directories(psyne
 )
 
 # ------------------------------------------------------------------------------
-# Examples
+# Examples (optional)
 # ------------------------------------------------------------------------------
-add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
+option(PSYNE_BUILD_EXAMPLES "Build example programs" OFF)
+if(PSYNE_BUILD_EXAMPLES)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
+endif()
 
 # ------------------------------------------------------------------------------
-# Tests
+# Tests (optional)
 # ------------------------------------------------------------------------------
-enable_testing()
-add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
+option(PSYNE_BUILD_TESTS "Build unit tests" OFF)
+if(PSYNE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
+endif()
 
 # ------------------------------------------------------------------------------
-# Benchmarks
+# Benchmarks (optional)
 # ------------------------------------------------------------------------------
-add_subdirectory(${CMAKE_SOURCE_DIR}/benchmarks)
+option(PSYNE_BUILD_BENCHMARKS "Build benchmark programs" OFF)
+if(PSYNE_BUILD_BENCHMARKS)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/benchmarks)
+endif()
 
 # ------------------------------------------------------------------------------
 # Python bindings (optional)
 # ------------------------------------------------------------------------------
 option(PSYNE_PYTHON_BINDINGS "Build Python bindings" OFF)
 if(PSYNE_PYTHON_BINDINGS)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/python)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/bindings/python)
 endif()
 
 # ------------------------------------------------------------------------------
@@ -160,4 +169,13 @@ message(STATUS "Project Version:     ${PROJECT_VERSION}")
 message(STATUS "CMake Version:       ${CMAKE_VERSION}")
 message(STATUS "C++ Standard:        ${CMAKE_CXX_STANDARD}")
 message(STATUS "OpenSSL Version:     ${OPENSSL_VERSION}")
+message(STATUS "")
+message(STATUS "Optional Components:")
+message(STATUS "  Examples:          ${PSYNE_BUILD_EXAMPLES}")
+message(STATUS "  Tests:             ${PSYNE_BUILD_TESTS}")
+message(STATUS "  Benchmarks:        ${PSYNE_BUILD_BENCHMARKS}")
+message(STATUS "  Python Bindings:   ${PSYNE_PYTHON_BINDINGS}")
+message(STATUS "")
+message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=ON to build examples")
+message(STATUS "Use -DPSYNE_BUILD_TESTS=ON to build tests")
 message(STATUS "===================================================")

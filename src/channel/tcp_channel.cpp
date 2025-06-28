@@ -357,7 +357,21 @@ std::unique_ptr<ChannelImpl> create_tcp_channel(
     }
     
     std::string host = match[1];
-    uint16_t port = std::stoi(match[2]);
+    
+    // Validate and parse port number
+    std::string port_str = match[2];
+    int port_int;
+    try {
+        port_int = std::stoi(port_str);
+    } catch (const std::exception& e) {
+        throw std::invalid_argument("Invalid port number: " + port_str);
+    }
+    
+    if (port_int < 0 || port_int > 65535) {
+        throw std::invalid_argument("Port number must be between 0 and 65535, got: " + std::to_string(port_int));
+    }
+    
+    uint16_t port = static_cast<uint16_t>(port_int);
     
     if (host.empty()) {
         // Server mode - listen on all interfaces

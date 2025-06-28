@@ -1,5 +1,5 @@
 #include <psyne/psyne.hpp>
-#include <psyne/routing.hpp>
+#include "../src/routing/routing.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>

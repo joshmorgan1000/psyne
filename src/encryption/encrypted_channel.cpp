@@ -60,15 +60,23 @@ bool EncryptedChannel::InitializeCrypto() {
     
     // Use provided key or generate one
     if (config_.key.empty()) {
-        int key_len = EVP_CIPHER_key_length(cipher);
-        config_.key = crypto_utils::GenerateRandomBytes(key_len);
+        try {
+            int key_len = EVP_CIPHER_key_length(cipher);
+            config_.key = crypto_utils::GenerateRandomBytes(key_len);
+        } catch (const std::exception& e) {
+            return false; // Return false on crypto initialization failure
+        }
     }
     session_key_ = config_.key;
     
     // Use provided IV or generate one
     if (config_.iv.empty()) {
-        int iv_len = EVP_CIPHER_iv_length(cipher);
-        config_.iv = crypto_utils::GenerateRandomBytes(iv_len);
+        try {
+            int iv_len = EVP_CIPHER_iv_length(cipher);
+            config_.iv = crypto_utils::GenerateRandomBytes(iv_len);
+        } catch (const std::exception& e) {
+            return false; // Return false on crypto initialization failure
+        }
     }
     current_iv_ = config_.iv;
     
@@ -112,8 +120,14 @@ std::vector<uint8_t> EncryptedChannel::Encrypt(const void* data, size_t size) {
     
     // Generate new IV if requested
     if (config_.generate_random_iv) {
-        int iv_len = EVP_CIPHER_iv_length(cipher);
-        current_iv_ = crypto_utils::GenerateRandomBytes(iv_len);
+        try {
+            int iv_len = EVP_CIPHER_iv_length(cipher);
+            current_iv_ = crypto_utils::GenerateRandomBytes(iv_len);
+        } catch (const std::exception& e) {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            stats_.encryption_errors++;
+            return {}; // Return empty vector on IV generation failure
+        }
     }
     
     // Initialize encryption

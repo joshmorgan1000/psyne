@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <shared_mutex>
 #include <system_error>
+#include <random>
 #include <utility>
 #include <functional>
 #include <cstdint>
@@ -295,11 +296,16 @@ inline static uint64_t get_now() {
 }
 inline static std::string random_string(size_t length) {
     static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> letter_dist(10, sizeof(alphanum) - 2);
+    static std::uniform_int_distribution<> char_dist(0, sizeof(alphanum) - 2);
+    
     std::string result;
     result.reserve(length);
-    result += alphanum[(rand() % (sizeof(alphanum) - 11)) + 10]; // Ensure first char is a letter
+    result += alphanum[letter_dist(gen)]; // Ensure first char is a letter
     for (size_t i = 1; i < length; ++i) {
-        result += alphanum[rand() % (sizeof(alphanum) - 1)];
+        result += alphanum[char_dist(gen)];
     }
     return result;
 }
@@ -356,10 +362,15 @@ static inline void RedrawAllProgressBars() {
 }
 static inline std::function<void(float)>
 log_progress(const std::string& header, const std::string& thread_name = getGlobalContext().thread_context) {
-    std::string random_string = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static const char random_chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dist(0, sizeof(random_chars) - 2);
+    
     std::string random_id;
+    random_id.reserve(32);
     for (int i = 0; i < 32; i++) {
-        random_id += random_string[rand() % random_string.length()];
+        random_id += random_chars[dist(gen)];
     }
     std::thread log_progress_bar_thread([header, random_id, thread_name]() {
         getGlobalContext().thread_context = thread_name;

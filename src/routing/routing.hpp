@@ -11,8 +11,8 @@
  * @example routing_demo.cpp
  */
 
-#include "psyne.hpp"
-#include "../../src/routing/message_router.hpp"
+#include "../../include/psyne/psyne.hpp"
+#include "message_router.hpp"
 
 namespace psyne {
 

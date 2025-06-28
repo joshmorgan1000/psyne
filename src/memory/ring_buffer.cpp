@@ -1,6 +1,9 @@
 #include "ring_buffer_impl.hpp"
 #include <cstdlib>
 #include <new>
+#ifdef _WIN32
+#include <malloc.h>
+#endif
 
 namespace psyne {
 namespace detail {
@@ -22,10 +25,34 @@ static size_t align_size(size_t size, size_t alignment) {
     return ((size + alignment - 1) / alignment) * alignment;
 }
 
+// Portable aligned allocation
+static void* aligned_alloc_portable(size_t alignment, size_t size) {
+#if defined(_WIN32)
+    return _aligned_malloc(size, alignment);
+#elif defined(__APPLE__) || (defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 16)))
+    return std::aligned_alloc(alignment, size);
+#else
+    void* ptr = nullptr;
+    if (posix_memalign(&ptr, alignment, size) != 0) {
+        return nullptr;
+    }
+    return ptr;
+#endif
+}
+
+// Portable aligned free
+static void aligned_free_portable(void* ptr) {
+#if defined(_WIN32)
+    _aligned_free(ptr);
+#else
+    std::free(ptr);
+#endif
+}
+
 // SPSC Implementation
 SPSCRingBuffer::SPSCRingBuffer(size_t size)
     : buffer_size_(next_power_of_2(size)), mask_(buffer_size_ - 1),
-      buffer_(static_cast<uint8_t *>(std::aligned_alloc(64, align_size(buffer_size_, 64)))),
+      buffer_(static_cast<uint8_t *>(aligned_alloc_portable(64, align_size(buffer_size_, 64)))),
       write_pos_(0), read_pos_(0) {
     if (!buffer_)
         throw std::bad_alloc();
@@ -33,7 +60,7 @@ SPSCRingBuffer::SPSCRingBuffer(size_t size)
 }
 
 SPSCRingBuffer::~SPSCRingBuffer() {
-    std::free(buffer_);
+    aligned_free_portable(buffer_);
 }
 
 std::optional<SPSCRingBuffer::WriteHandle>
@@ -84,7 +111,7 @@ size_t SPSCRingBuffer::next_power_of_2(size_t n) {
 // MPSC Implementation
 MPSCRingBuffer::MPSCRingBuffer(size_t size)
     : buffer_size_(next_power_of_2(size)), mask_(buffer_size_ - 1),
-      buffer_(static_cast<uint8_t *>(std::aligned_alloc(64, align_size(buffer_size_, 64)))),
+      buffer_(static_cast<uint8_t *>(aligned_alloc_portable(64, align_size(buffer_size_, 64)))),
       write_pos_(0), read_pos_(0) {
     if (!buffer_)
         throw std::bad_alloc();
@@ -92,7 +119,7 @@ MPSCRingBuffer::MPSCRingBuffer(size_t size)
 }
 
 MPSCRingBuffer::~MPSCRingBuffer() {
-    std::free(buffer_);
+    aligned_free_portable(buffer_);
 }
 
 std::optional<MPSCRingBuffer::WriteHandle>
@@ -161,7 +188,7 @@ size_t MPSCRingBuffer::next_power_of_2(size_t n) {
 // SPMC Implementation
 SPMCRingBuffer::SPMCRingBuffer(size_t size)
     : buffer_size_(next_power_of_2(size)), mask_(buffer_size_ - 1),
-      buffer_(static_cast<uint8_t *>(std::aligned_alloc(64, align_size(buffer_size_, 64)))),
+      buffer_(static_cast<uint8_t *>(aligned_alloc_portable(64, align_size(buffer_size_, 64)))),
       write_pos_(0), read_pos_(0) {
     if (!buffer_)
         throw std::bad_alloc();
@@ -169,7 +196,7 @@ SPMCRingBuffer::SPMCRingBuffer(size_t size)
 }
 
 SPMCRingBuffer::~SPMCRingBuffer() {
-    std::free(buffer_);
+    aligned_free_portable(buffer_);
 }
 
 std::optional<SPMCRingBuffer::WriteHandle>
@@ -234,7 +261,7 @@ size_t SPMCRingBuffer::next_power_of_2(size_t n) {
 // MPMC Implementation
 MPMCRingBuffer::MPMCRingBuffer(size_t size)
     : buffer_size_(next_power_of_2(size)), mask_(buffer_size_ - 1),
-      buffer_(static_cast<uint8_t *>(std::aligned_alloc(64, align_size(buffer_size_, 64)))),
+      buffer_(static_cast<uint8_t *>(aligned_alloc_portable(64, align_size(buffer_size_, 64)))),
       write_pos_(0), read_pos_(0), commit_pos_(0) {
     if (!buffer_)
         throw std::bad_alloc();
@@ -242,7 +269,7 @@ MPMCRingBuffer::MPMCRingBuffer(size_t size)
 }
 
 MPMCRingBuffer::~MPMCRingBuffer() {
-    std::free(buffer_);
+    aligned_free_portable(buffer_);
 }
 
 std::optional<MPMCRingBuffer::WriteHandle>
