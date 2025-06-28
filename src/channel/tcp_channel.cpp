@@ -1,5 +1,5 @@
 #include "tcp_channel.hpp"
-#include "../utils/xxhash32.h"
+#include "../utils/xxhash64.h"
 #include <regex>
 #include <iostream>
 #include <cstring>
@@ -9,11 +9,13 @@ namespace detail {
 
 // Server constructor
 TCPChannel::TCPChannel(const std::string& uri, size_t buffer_size,
-                       ChannelMode mode, ChannelType type, uint16_t port)
+                       ChannelMode mode, ChannelType type, uint16_t port,
+                       const compression::CompressionConfig& compression_config)
     : ChannelImpl(uri, buffer_size, mode, type)
     , is_server_(true)
     , connected_(false)
-    , stopping_(false) {
+    , stopping_(false)
+    , compression_manager_(compression_config) {
     
     // Create acceptor for listening
     acceptor_ = std::make_unique<tcp::acceptor>(io_context_, tcp::endpoint(tcp::v4(), port));
@@ -28,11 +30,13 @@ TCPChannel::TCPChannel(const std::string& uri, size_t buffer_size,
 // Client constructor
 TCPChannel::TCPChannel(const std::string& uri, size_t buffer_size,
                        ChannelMode mode, ChannelType type,
-                       const std::string& host, uint16_t port)
+                       const std::string& host, uint16_t port,
+                       const compression::CompressionConfig& compression_config)
     : ChannelImpl(uri, buffer_size, mode, type)
     , is_server_(false)
     , connected_(false)
-    , stopping_(false) {
+    , stopping_(false)
+    , compression_manager_(compression_config) {
     
     // Create socket
     socket_ = std::make_unique<tcp::socket>(io_context_);
@@ -75,20 +79,46 @@ void TCPChannel::commit_message(void* handle) {
     // Calculate payload size
     auto* payload_start = static_cast<uint8_t*>(handle);
     auto* buffer_start = send_buffer_.data();
-    size_t payload_size = (payload_start - buffer_start) - sizeof(TCPFrameHeader);
+    size_t payload_size = send_buffer_.size() - sizeof(TCPFrameHeader);
+    
+    // Try compression if enabled
+    size_t final_payload_size = payload_size;
+    uint8_t* final_payload = payload_start;
+    bool compressed = false;
+    
+    if (compression_manager_.should_compress(payload_size)) {
+        size_t compressed_size = compression_manager_.compress_message(
+            payload_start, payload_size, compression_buffer_);
+        
+        if (compressed_size > 0) {
+            final_payload_size = compressed_size;
+            final_payload = compression_buffer_.data();
+            compressed = true;
+        }
+    }
+    
+    // Prepare final message buffer
+    std::vector<uint8_t> final_buffer(sizeof(TCPFrameHeader) + final_payload_size);
     
     // Fill in header
-    auto* header = reinterpret_cast<TCPFrameHeader*>(buffer_start);
-    header->length = sizeof(TCPFrameHeader) + payload_size;
+    auto* header = reinterpret_cast<TCPFrameHeader*>(final_buffer.data());
+    header->length = sizeof(TCPFrameHeader) + final_payload_size;
     header->type = 1;  // TODO: Get from message
-    header->checksum = calculate_checksum(payload_start, payload_size);
-    header->reserved = 0;
+    header->checksum = calculate_checksum(final_payload, final_payload_size);
+    header->original_size = compressed ? static_cast<uint32_t>(payload_size) : 0;
+    header->compression_type = static_cast<uint8_t>(compression_manager_.config().type);
+    header->compression_level = static_cast<uint8_t>(compression_manager_.config().level);
+    header->flags = 0;
+    
+    // Copy payload
+    std::memcpy(final_buffer.data() + sizeof(TCPFrameHeader), 
+                final_payload, final_payload_size);
     
     // Add to send queue
     {
         std::lock_guard<std::mutex> lock(send_mutex_);
         PendingMessage msg;
-        msg.data = std::move(send_buffer_);
+        msg.data = std::move(final_buffer);
         msg.type = header->type;
         send_queue_.push(std::move(msg));
         send_buffer_.clear();
@@ -116,8 +146,35 @@ void* TCPChannel::receive_message(size_t& size, uint32_t& type) {
     type = recv_queue_.front().type;
     recv_queue_.pop();
     
-    // Skip header and return payload
-    size = temp_recv_buffer_.size() - sizeof(TCPFrameHeader);
+    // Extract header
+    auto* header = reinterpret_cast<const TCPFrameHeader*>(temp_recv_buffer_.data());
+    uint8_t* payload = temp_recv_buffer_.data() + sizeof(TCPFrameHeader);
+    size_t payload_size = temp_recv_buffer_.size() - sizeof(TCPFrameHeader);
+    
+    // Check if decompression is needed
+    if (header->original_size > 0) {
+        // Message is compressed, decompress it
+        compression_buffer_.resize(header->original_size);
+        
+        size_t decompressed_size = compression_manager_.decompress_message(
+            payload, payload_size, compression_buffer_.data(), compression_buffer_.size());
+        
+        if (decompressed_size == 0 || decompressed_size != header->original_size) {
+            // Decompression failed
+            return nullptr;
+        }
+        
+        // Replace temp buffer with decompressed data
+        temp_recv_buffer_.resize(sizeof(TCPFrameHeader) + decompressed_size);
+        std::memcpy(temp_recv_buffer_.data() + sizeof(TCPFrameHeader),
+                    compression_buffer_.data(), decompressed_size);
+        
+        size = decompressed_size;
+    } else {
+        // Message is not compressed
+        size = payload_size;
+    }
+    
     return temp_recv_buffer_.data() + sizeof(TCPFrameHeader);
 }
 
@@ -210,7 +267,7 @@ void TCPChannel::handle_read_body(const boost::system::error_code& error,
     auto* payload = recv_buffer_.data() + sizeof(TCPFrameHeader);
     size_t payload_size = header->length - sizeof(TCPFrameHeader);
     
-    uint32_t checksum = calculate_checksum(payload, payload_size);
+    uint64_t checksum = calculate_checksum(payload, payload_size);
     if (checksum != header->checksum) {
         std::cerr << "TCP checksum mismatch!" << std::endl;
         start_read();  // Continue reading
@@ -281,14 +338,15 @@ void TCPChannel::run_io_service() {
     }
 }
 
-uint32_t TCPChannel::calculate_checksum(const uint8_t* data, size_t size) {
-    return XXHash32::hash(data, size, 0);
+uint64_t TCPChannel::calculate_checksum(const uint8_t* data, size_t size) {
+    return XXHash64::hash(data, size, 0);
 }
 
 // Factory function to create TCP channels from URI
 std::unique_ptr<ChannelImpl> create_tcp_channel(
     const std::string& uri, size_t buffer_size,
-    ChannelMode mode, ChannelType type) {
+    ChannelMode mode, ChannelType type,
+    const compression::CompressionConfig& compression_config) {
     
     // Parse URI: tcp://host:port or tcp://:port (for server)
     std::regex uri_regex("^tcp://([^:]*):([0-9]+)$");
@@ -303,10 +361,10 @@ std::unique_ptr<ChannelImpl> create_tcp_channel(
     
     if (host.empty()) {
         // Server mode - listen on all interfaces
-        return std::make_unique<TCPChannel>(uri, buffer_size, mode, type, port);
+        return std::make_unique<TCPChannel>(uri, buffer_size, mode, type, port, compression_config);
     } else {
         // Client mode - connect to host:port
-        return std::make_unique<TCPChannel>(uri, buffer_size, mode, type, host, port);
+        return std::make_unique<TCPChannel>(uri, buffer_size, mode, type, host, port, compression_config);
     }
 }
 

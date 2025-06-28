@@ -1,6 +1,7 @@
 #pragma once
 
 #include "channel_impl.hpp"
+#include "../compression/compression.hpp"
 #include <boost/asio.hpp>
 #include <thread>
 #include <queue>
@@ -13,12 +14,15 @@ namespace detail {
 namespace asio = boost::asio;
 using tcp = asio::ip::tcp;
 
-// TCP message frame header
+// TCP message frame header (16-byte aligned)
 struct TCPFrameHeader {
-    uint32_t length;      // Total message length (including this header)
-    uint32_t checksum;    // xxHash32 checksum of the payload
-    uint32_t type;        // Message type
-    uint32_t reserved;    // Reserved for future use
+    uint32_t length;              // Total message length (including this header)
+    uint32_t type;                // Message type
+    uint64_t checksum;            // xxHash64 checksum of the payload
+    uint32_t original_size;       // Original size before compression (0 if not compressed)
+    uint8_t compression_type;     // Compression algorithm used
+    uint8_t compression_level;    // Compression level used
+    uint16_t flags;               // Additional flags for future use
 };
 
 // TCP Channel implementation
@@ -26,12 +30,14 @@ class TCPChannel : public ChannelImpl {
 public:
     // Constructor for server (listening) mode
     TCPChannel(const std::string& uri, size_t buffer_size,
-               ChannelMode mode, ChannelType type, uint16_t port);
+               ChannelMode mode, ChannelType type, uint16_t port,
+               const compression::CompressionConfig& compression_config = {});
     
     // Constructor for client (connecting) mode  
     TCPChannel(const std::string& uri, size_t buffer_size,
                ChannelMode mode, ChannelType type,
-               const std::string& host, uint16_t port);
+               const std::string& host, uint16_t port,
+               const compression::CompressionConfig& compression_config = {});
     
     ~TCPChannel();
     
@@ -69,6 +75,10 @@ private:
     bool connected_;
     std::atomic<bool> stopping_;
     
+    // Compression support
+    compression::CompressionManager compression_manager_;
+    std::vector<uint8_t> compression_buffer_;
+    
     // Async operations
     void start_accept();
     void handle_accept(const boost::system::error_code& error);
@@ -85,13 +95,14 @@ private:
     void run_io_service();
     
     // Helper to calculate checksum
-    uint32_t calculate_checksum(const uint8_t* data, size_t size);
+    uint64_t calculate_checksum(const uint8_t* data, size_t size);
 };
 
 // Factory function to create TCP channels from URI
 std::unique_ptr<ChannelImpl> create_tcp_channel(
     const std::string& uri, size_t buffer_size,
-    ChannelMode mode, ChannelType type);
+    ChannelMode mode, ChannelType type,
+    const compression::CompressionConfig& compression_config = {});
 
 } // namespace detail
 } // namespace psyne

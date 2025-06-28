@@ -1,5 +1,5 @@
 #include "unix_channel.hpp"
-#include "../utils/xxhash32.h"
+#include "../utils/xxhash64.h"
 #include <iostream>
 #include <cstring>
 
@@ -119,7 +119,6 @@ void UnixChannel::commit_message(void* handle) {
     header->length = static_cast<uint32_t>(buffer->size());
     header->checksum = calculate_checksum(user_data, user_size);
     header->type = 0; // TODO: Get from message type system
-    header->reserved = 0;
     
     // Add to outgoing queue
     {
@@ -242,7 +241,7 @@ void UnixChannel::handle_connect(const boost::system::error_code& error) {
     // Store active socket
     {
         std::lock_guard<std::mutex> lock(socket_mutex_);
-        active_socket_ = std::static_pointer_cast<unix_socket::socket>(socket_);
+        active_socket_ = std::shared_ptr<unix_socket::socket>(socket_.release());
     }
     
     connected_ = true;
@@ -331,7 +330,7 @@ void UnixChannel::handle_receive_payload(std::shared_ptr<unix_socket::socket> so
     
     // Verify checksum
     const uint8_t* payload = buffer->data() + sizeof(UnixFrameHeader);
-    uint32_t calculated_checksum = calculate_checksum(payload, expected_payload);
+    uint64_t calculated_checksum = calculate_checksum(payload, expected_payload);
     
     if (calculated_checksum != header.checksum) {
         std::cerr << "Unix socket checksum mismatch" << std::endl;
@@ -398,8 +397,8 @@ void UnixChannel::handle_send(std::shared_ptr<unix_socket::socket> sock,
     start_send(sock);
 }
 
-uint32_t UnixChannel::calculate_checksum(const void* data, size_t size) {
-    return xxhash32(data, size, 0x12345678);
+uint64_t UnixChannel::calculate_checksum(const void* data, size_t size) {
+    return XXHash64::hash(data, size, 0x12345678);
 }
 
 void UnixChannel::cleanup_socket_file() {

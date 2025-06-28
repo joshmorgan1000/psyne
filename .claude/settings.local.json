@@ -28,7 +28,15 @@
       "Bash(./build/examples/ipc_test)",
       "Bash(timeout:*)",
       "Bash(./enhanced_types_demo)",
-      "Bash(./examples/enhanced_types_demo)"
+      "Bash(./examples/enhanced_types_demo)",
+      "Bash(./scripts/format.sh:*)",
+      "Bash(clang-format:*)",
+      "Bash(scripts/format.sh:*)",
+      "Bash(./examples/metrics_demo)",
+      "Bash(./examples/compression_demo)",
+      "Bash(./examples/simple_compression_demo)",
+      "Bash(./examples/debug_demo)",
+      "Bash(./examples/udp_multicast_demo:*)"
     ],
     "deny": []
   }

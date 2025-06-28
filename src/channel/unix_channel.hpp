@@ -14,12 +14,11 @@ namespace detail {
 namespace asio = boost::asio;
 using unix_socket = asio::local::stream_protocol;
 
-// Unix domain socket message frame header (same as TCP for consistency)
+// Unix domain socket message frame header (8-byte aligned)
 struct UnixFrameHeader {
     uint32_t length;      // Total message length (including this header)
-    uint32_t checksum;    // xxHash32 checksum of the payload
     uint32_t type;        // Message type
-    uint32_t reserved;    // Reserved for future use
+    uint64_t checksum;    // xxHash64 checksum of the payload
 };
 
 // Unix Domain Socket Channel implementation
@@ -91,7 +90,7 @@ private:
                     size_t bytes_transferred);
     
     // Utility
-    uint32_t calculate_checksum(const void* data, size_t size);
+    uint64_t calculate_checksum(const void* data, size_t size);
     void cleanup_socket_file();
     
     // Current active socket for communication

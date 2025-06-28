@@ -97,7 +97,7 @@
 ### Low Priority
 
 #### 7. Additional Transports
-- [ ] Unix domain sockets
+- [x] Unix domain sockets ✅
 - [ ] RDMA/InfiniBand support
 - [ ] UDP multicast channels
 - [ ] WebSocket channels

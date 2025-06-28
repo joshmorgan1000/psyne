@@ -64,36 +64,7 @@ if(NOT Threads_FOUND)
     message(FATAL_ERROR "Threads not found. Please ensure threading support is available.")
 endif()
 
-# ----------------------------------------------------------------------------------------
-# GPU Support (optional)
-# ----------------------------------------------------------------------------------------
-option(PSYNE_GPU_SUPPORT "Enable GPU support (Metal/Vulkan/CUDA)" ON)
-
-if(PSYNE_GPU_SUPPORT)
-    message(STATUS "GPU support enabled")
-    add_compile_definitions(PSYNE_GPU_SUPPORT)
-    
-    # Metal support on macOS
-    if(APPLE)
-        find_library(METAL_FRAMEWORK Metal)
-        find_library(FOUNDATION_FRAMEWORK Foundation)
-        if(METAL_FRAMEWORK AND FOUNDATION_FRAMEWORK)
-            message(STATUS "Metal framework found")
-            list(APPEND GPU_SOURCES "${CMAKE_SOURCE_DIR}/src/gpu/metal_backend.mm")
-            list(APPEND GPU_LIBRARIES ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
-        else()
-            message(WARNING "Metal framework not found on macOS")
-        endif()
-    endif()
-    
-    # Vulkan support (cross-platform)
-    if(Vulkan_FOUND)
-        message(STATUS "Vulkan support available")
-        # TODO: Add Vulkan backend when implemented
-    endif()
-else()
-    message(STATUS "GPU support disabled")
-endif()
+# GPU support has been removed to keep the library focused on transport
 
 # ----------------------------------------------------------------------------------------
 # Main Psyne library
@@ -103,36 +74,28 @@ add_library(psyne SHARED
     
     # Implementation files
     "${CMAKE_SOURCE_DIR}/src/channel/channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/channel_templates.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"
     "${CMAKE_SOURCE_DIR}/src/channel/ipc_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/ipc_channel.hpp"
     "${CMAKE_SOURCE_DIR}/src/channel/tcp_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/tcp_channel.hpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/unix_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/unix_channel.hpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.hpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/multicast_factory.cpp"
+    "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
+    "${CMAKE_SOURCE_DIR}/src/compression/compression.hpp"
     "${CMAKE_SOURCE_DIR}/src/core/message.cpp"
-    "${CMAKE_SOURCE_DIR}/src/gpu/gpu_message.cpp"
-    "${CMAKE_SOURCE_DIR}/src/types/fixed_matrices.cpp"
-    "${CMAKE_SOURCE_DIR}/src/types/quantized_vectors.cpp"
-    "${CMAKE_SOURCE_DIR}/src/types/complex_vectors.cpp"
-    "${CMAKE_SOURCE_DIR}/src/types/ml_tensor.cpp"
-    "${CMAKE_SOURCE_DIR}/src/types/sparse_matrix.cpp"
-    "${CMAKE_SOURCE_DIR}/src/reliability/acknowledgment.cpp"
-    "${CMAKE_SOURCE_DIR}/src/reliability/retry.cpp"
-    "${CMAKE_SOURCE_DIR}/src/reliability/heartbeat.cpp"
-    "${CMAKE_SOURCE_DIR}/src/reliability/replay_buffer.cpp"
-    "${CMAKE_SOURCE_DIR}/src/reliability/reliability.cpp"
-    "${CMAKE_SOURCE_DIR}/src/perf/simd_operations.cpp"
-    "${CMAKE_SOURCE_DIR}/src/perf/huge_pages.cpp"
-    "${CMAKE_SOURCE_DIR}/src/perf/cpu_affinity.cpp"
-    "${CMAKE_SOURCE_DIR}/src/perf/prefetch.cpp"
-    "${CMAKE_SOURCE_DIR}/src/perf/performance.cpp"
-    ${GPU_SOURCES}
+    "${CMAKE_SOURCE_DIR}/src/debug/metrics.hpp"
+    "${CMAKE_SOURCE_DIR}/src/debug/introspection.hpp"
+    "${CMAKE_SOURCE_DIR}/src/debug/introspection.cpp"
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer.cpp"
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer_impl.hpp"
     "${CMAKE_SOURCE_DIR}/src/utils/utils.hpp"
     "${CMAKE_SOURCE_DIR}/src/utils/xxhash32.h"
-    "${CMAKE_SOURCE_DIR}/src/psyne.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/tcp/tcp_protocol.cpp"
+    "${CMAKE_SOURCE_DIR}/src/psyne_impl.hpp"
+    "${CMAKE_SOURCE_DIR}/src/psyne_lib.cpp"
 )
 target_link_libraries(
     psyne
@@ -142,7 +105,6 @@ target_link_libraries(
     OpenSSL::Crypto
     Vulkan::Vulkan
     Threads::Threads
-    ${GPU_LIBRARIES}
 )
 target_include_directories(psyne
     PRIVATE
@@ -169,6 +131,14 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
 # Benchmarks
 # ------------------------------------------------------------------------------
 add_subdirectory(${CMAKE_SOURCE_DIR}/benchmarks)
+
+# ------------------------------------------------------------------------------
+# Python bindings (optional)
+# ------------------------------------------------------------------------------
+option(PSYNE_PYTHON_BINDINGS "Build Python bindings" OFF)
+if(PSYNE_PYTHON_BINDINGS)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/python)
+endif()
 
 # ------------------------------------------------------------------------------
 # Status
