@@ -1,4 +1,5 @@
 #include <psyne/psyne.hpp>
+#include <cstring>
 
 namespace psyne {
 
