@@ -85,7 +85,7 @@ int main() {
             config.max_retries = 2;
             
             // Test reliable channel guard creation
-            auto reliable_channel = psyne::create_reliable_channel(*channel, config);
+            auto reliable_channel = psyne::create_reliable_channel("memory://guard_test", 1024 * 1024, psyne::ChannelMode::SPSC, config);
             assert(reliable_channel != nullptr);
             
             std::cout << "✓ Reliable channel guard creation" << std::endl;

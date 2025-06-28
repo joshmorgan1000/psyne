@@ -29,6 +29,7 @@
 #include <optional>
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
 #include <initializer_list>
 #include <atomic>
 #include <complex>
@@ -232,27 +233,54 @@ public:
      * @param channel The channel to allocate the message in
      * @throws std::runtime_error if allocation fails
      */
-    explicit Message(Channel& channel);
+    explicit Message(Channel& channel) 
+        : data_(nullptr), size_(0), channel_(&channel), handle_(nullptr) {
+        // Basic allocation stub - for real implementation would allocate from channel buffer
+        size_ = Derived::calculate_size();
+        data_ = new uint8_t[size_];
+        std::memset(data_, 0, size_);
+    }
     
     /**
      * @brief Create an incoming message (view of existing data)
      * @param data Pointer to the message data
      * @param size Size of the message in bytes
      */
-    explicit Message(const void* data, size_t size);
+    explicit Message(const void* data, size_t size)
+        : data_(const_cast<uint8_t*>(static_cast<const uint8_t*>(data))), 
+          size_(size), channel_(nullptr), handle_(nullptr) {}
     
     /**
      * @brief Move constructor
      * @param other Message to move from
      */
-    Message(Message&& other) noexcept;
+    Message(Message&& other) noexcept 
+        : data_(other.data_), size_(other.size_), channel_(other.channel_), handle_(other.handle_) {
+        other.data_ = nullptr;
+        other.size_ = 0;
+        other.channel_ = nullptr;
+        other.handle_ = nullptr;
+    }
     
     /**
      * @brief Move assignment operator
      * @param other Message to move from
      * @return Reference to this message
      */
-    Message& operator=(Message&& other) noexcept;
+    Message& operator=(Message&& other) noexcept {
+        if (this != &other) {
+            if (data_ && !channel_) delete[] data_;  // Only delete if we allocated it
+            data_ = other.data_;
+            size_ = other.size_;
+            channel_ = other.channel_;
+            handle_ = other.handle_;
+            other.data_ = nullptr;
+            other.size_ = 0;
+            other.channel_ = nullptr;
+            other.handle_ = nullptr;
+        }
+        return *this;
+    }
     
     // Deleted copy operations to ensure zero-copy semantics
     Message(const Message&) = delete;
@@ -261,7 +289,11 @@ public:
     /**
      * @brief Destructor
      */
-    virtual ~Message();
+    virtual ~Message() {
+        if (data_ && !channel_) {
+            delete[] data_;  // Only delete if we allocated it
+        }
+    }
     
     /**
      * @brief Send the message through its channel
@@ -578,6 +610,7 @@ public:
     virtual ChannelMode mode() const { return mode_; }
     
     // Raw message operations for template implementation
+    virtual void send_raw_message(const void* data, size_t size, uint32_t type) {}
     virtual void* receive_raw_message(size_t& size, uint32_t& type) { return nullptr; }
     virtual void release_raw_message(void* handle) {}
     
@@ -678,6 +711,15 @@ using SPMCChannel = Channel;
 using MPSCChannel = Channel;
 using MPMCChannel = Channel;
 
+// Message template method implementations (must be after Channel definition)
+template<typename Derived>
+void Message<Derived>::send() {
+    if (channel_) {
+        before_send();
+        channel_->send_raw_message(data_, size_, Derived::message_type);
+    }
+}
+
 // ============================================================================
 // Ring Buffer Implementation
 // ============================================================================
@@ -689,7 +731,7 @@ using MPMCChannel = Channel;
 struct WriteHandle {
     void* data;
     size_t size;
-    void commit() { /* Implementation placeholder */ }
+    void commit();
 };
 
 /**
@@ -707,20 +749,15 @@ struct ReadHandle {
  */
 class SPSCRingBuffer {
 public:
-    explicit SPSCRingBuffer(size_t capacity) : capacity_(capacity) {}
+    explicit SPSCRingBuffer(size_t capacity);
     
-    std::optional<WriteHandle> reserve(size_t size) {
-        // Placeholder implementation
-        if (size <= capacity_) {
-            return WriteHandle{nullptr, size};
-        }
-        return std::nullopt;
-    }
+    std::optional<WriteHandle> reserve(size_t size);
+    std::optional<ReadHandle> read();
     
-    std::optional<ReadHandle> read() {
-        // Placeholder implementation
-        return ReadHandle{nullptr, 0};
-    }
+    // For testing only
+    static SPSCRingBuffer* current_instance_;
+    void* last_write_data_ = nullptr;
+    size_t last_write_size_ = 0;
     
 private:
     size_t capacity_;

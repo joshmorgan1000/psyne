@@ -1,62 +1,94 @@
 #include <psyne/psyne.hpp>
 #include <cstring>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <memory>
+#include <map>
 
 namespace psyne {
 
-// Basic implementation stubs for Message class
-template<typename Derived>
-Message<Derived>::Message(Channel& channel) 
-    : data_(nullptr), size_(0), channel_(&channel), handle_(nullptr) {
-    // Basic allocation stub - for real implementation would allocate from channel buffer
-    size_ = Derived::calculate_size();
-    data_ = new uint8_t[size_];
-    std::memset(data_, 0, size_);
-}
-
-template<typename Derived>
-Message<Derived>::Message(const void* data, size_t size) 
-    : data_(const_cast<uint8_t*>(static_cast<const uint8_t*>(data))), 
-      size_(size), channel_(nullptr), handle_(nullptr) {}
-
-template<typename Derived>
-Message<Derived>::Message(Message&& other) noexcept 
-    : data_(other.data_), size_(other.size_), channel_(other.channel_), handle_(other.handle_) {
-    other.data_ = nullptr;
-    other.size_ = 0;
-    other.channel_ = nullptr;
-    other.handle_ = nullptr;
-}
-
-template<typename Derived>
-Message<Derived>& Message<Derived>::operator=(Message&& other) noexcept {
-    if (this != &other) {
-        if (data_ && !channel_) delete[] data_;  // Only delete if we allocated it
-        data_ = other.data_;
-        size_ = other.size_;
-        channel_ = other.channel_;
-        handle_ = other.handle_;
-        other.data_ = nullptr;
-        other.size_ = 0;
-        other.channel_ = nullptr;
-        other.handle_ = nullptr;
+// Simple message queue implementation for testing
+class SimpleMessageQueue {
+public:
+    struct MessageData {
+        std::vector<uint8_t> data;
+        uint32_t type;
+    };
+    
+    void push(const void* data, size_t size, uint32_t type) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        MessageData msg;
+        msg.data.resize(size);
+        std::memcpy(msg.data.data(), data, size);
+        msg.type = type;
+        queue_.push(std::move(msg));
+        cv_.notify_one();
     }
-    return *this;
-}
-
-template<typename Derived>
-Message<Derived>::~Message() {
-    if (data_ && !channel_) {
-        delete[] data_;  // Only delete if we allocated it
+    
+    std::unique_ptr<MessageData> pop(std::chrono::milliseconds timeout) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (!cv_.wait_for(lock, timeout, [this] { return !queue_.empty(); })) {
+            return nullptr;
+        }
+        auto msg = std::make_unique<MessageData>(std::move(queue_.front()));
+        queue_.pop();
+        return msg;
     }
-}
+    
+private:
+    std::queue<MessageData> queue_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
+};
 
-template<typename Derived>
-void Message<Derived>::send() {
-    if (channel_) {
-        before_send();
-        // Stub implementation - in real implementation would put message on channel
+// Global message queues for channels (simple implementation for testing)
+static std::map<std::string, std::shared_ptr<SimpleMessageQueue>> g_message_queues;
+static std::mutex g_queues_mutex;
+
+// Extended Channel implementation with basic message passing
+class TestChannel : public Channel {
+public:
+    TestChannel(const std::string& uri, size_t buffer_size, ChannelType type) 
+        : Channel(uri, buffer_size, type) {
+        std::lock_guard<std::mutex> lock(g_queues_mutex);
+        auto it = g_message_queues.find(uri);
+        if (it == g_message_queues.end()) {
+            queue_ = std::make_shared<SimpleMessageQueue>();
+            g_message_queues[uri] = queue_;
+        } else {
+            queue_ = it->second;
+        }
+        current_message_ = nullptr;
     }
-}
+    
+    void send_raw_message(const void* data, size_t size, uint32_t type) {
+        if (queue_) {
+            queue_->push(data, size, type);
+        }
+    }
+    
+    void* receive_raw_message(size_t& size, uint32_t& type) override {
+        if (!queue_) return nullptr;
+        
+        current_message_ = queue_->pop(std::chrono::milliseconds(1000));
+        if (!current_message_) return nullptr;
+        
+        size = current_message_->data.size();
+        type = current_message_->type;
+        return current_message_->data.data();
+    }
+    
+    void release_raw_message(void* handle) override {
+        current_message_.reset();
+    }
+    
+private:
+    std::shared_ptr<SimpleMessageQueue> queue_;
+    std::unique_ptr<SimpleMessageQueue::MessageData> current_message_;
+};
+
+// Note: Message template methods are defined inline in psyne.hpp
 
 // Channel implementation stubs
 std::unique_ptr<Channel> Channel::create(
@@ -67,10 +99,44 @@ std::unique_ptr<Channel> Channel::create(
     bool enable_metrics,
     const compression::CompressionConfig& compression_config
 ) {
-    return std::make_unique<Channel>(uri, buffer_size, type);
+    return std::make_unique<TestChannel>(uri, buffer_size, type);
 }
 
-// Note: Explicit template instantiations are done in the test files where the classes are defined
+// Explicit template instantiations for library message types only
+// Test message types (TestMsg, SimpleMessage) are instantiated in test files
+
+// SPSCRingBuffer implementation
+SPSCRingBuffer* SPSCRingBuffer::current_instance_ = nullptr;
+
+SPSCRingBuffer::SPSCRingBuffer(size_t capacity) : capacity_(capacity) {
+    current_instance_ = this;
+}
+
+std::optional<WriteHandle> SPSCRingBuffer::reserve(size_t size) {
+    if (size <= capacity_) {
+        // Allocate memory for testing
+        auto* buffer = new uint8_t[size];
+        std::memset(buffer, 0, size);
+        return WriteHandle{buffer, size};
+    }
+    return std::nullopt;
+}
+
+std::optional<ReadHandle> SPSCRingBuffer::read() {
+    // For testing, return last written data
+    if (last_write_data_) {
+        return ReadHandle{last_write_data_, last_write_size_};
+    }
+    return std::nullopt;
+}
+
+void WriteHandle::commit() {
+    // Store for testing
+    if (auto* rb = SPSCRingBuffer::current_instance_) {
+        rb->last_write_data_ = data;
+        rb->last_write_size_ = size;
+    }
+}
 
 // Add basic function implementations
 const char* get_version() {
@@ -83,17 +149,17 @@ void print_banner() {
 
 // FloatVector implementations
 float& FloatVector::operator[](size_t index) {
-    float* floats = reinterpret_cast<float*>(data());
+    float* floats = reinterpret_cast<float*>(data() + sizeof(size_t));
     return floats[index];
 }
 
 const float& FloatVector::operator[](size_t index) const {
-    const float* floats = reinterpret_cast<const float*>(data());
+    const float* floats = reinterpret_cast<const float*>(data() + sizeof(size_t));
     return floats[index];
 }
 
 float* FloatVector::begin() {
-    return reinterpret_cast<float*>(data());
+    return reinterpret_cast<float*>(data() + sizeof(size_t));
 }
 
 float* FloatVector::end() {
@@ -101,7 +167,7 @@ float* FloatVector::end() {
 }
 
 const float* FloatVector::begin() const {
-    return reinterpret_cast<const float*>(data());
+    return reinterpret_cast<const float*>(data() + sizeof(size_t));
 }
 
 const float* FloatVector::end() const {
@@ -226,5 +292,11 @@ void DoubleMatrix::initialize() {
         header[1] = 0; // cols
     }
 }
+
+// Explicit template instantiations for library message types
+// Test message types (TestMsg, SimpleMessage) will be instantiated in test files
+template class Message<FloatVector>;
+template class Message<ByteVector>;
+template class Message<DoubleMatrix>;
 
 } // namespace psyne

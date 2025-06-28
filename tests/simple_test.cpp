@@ -32,6 +32,9 @@ public:
     void before_send() {}
 };
 
+// Explicit template instantiation for TestMsg
+template class psyne::Message<TestMsg>;
+
 int main() {
     std::cout << "Simple synchronous test..." << std::endl;
     

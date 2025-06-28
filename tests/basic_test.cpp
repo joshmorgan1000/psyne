@@ -40,6 +40,9 @@ public:
     void before_send() {}
 };
 
+// Explicit template instantiation for SimpleMessage
+template class psyne::Message<SimpleMessage>;
+
 // Test basic memory channel
 void test_memory_channel() {
     std::cout << "Testing memory channel..." << std::endl;

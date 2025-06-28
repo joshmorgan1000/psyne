@@ -6,7 +6,9 @@
       "Bash(mkdir:*)",
       "Bash(cmake:*)",
       "Bash(make:*)",
-      "Bash(./tests/channel_test)"
+      "Bash(./tests/channel_test)",
+      "Bash(grep:*)",
+      "Bash(ctest:*)"
     ],
     "deny": []
   }
