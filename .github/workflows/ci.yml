@@ -7,8 +7,6 @@ on:
   pull_request:
     branches: [ main ]
 
-# Disable all email notifications by default
-# Users can override in their GitHub notification settings
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -19,88 +17,99 @@ jobs:
       matrix:
         compiler: [gcc-11, clang-14]
         build_type: [Release]
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          cmake \
-          libeigen3-dev \
-          libssl-dev \
-          pkg-config
-          
-    - name: Configure CMake
-      run: |
-        mkdir build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DPSYNE_BUILD_TESTS=ON
-        
-    - name: Build
-      run: |
-        cd build
-        make -j$(nproc)
-        
-    - name: Run Tests (if available)
-      run: |
-        cd build
-        if [ -f Makefile ] && make help | grep -q test; then
-          make test || echo "Tests not available or failed - continuing"
-        else
-          echo "No tests configured - build successful"
-        fi
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libboost-system-dev \
+            libboost-thread-dev \
+            libeigen3-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DPSYNE_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -- -j$(nproc)
+
+      - name: Run Tests (if available)
+        run: |
+          cd build
+          if [ -f Makefile ] && make help | grep -q test; then
+            make test || echo "Tests not available or failed - continuing"
+          else
+            echo "No tests configured - build successful"
+          fi
 
   build-macos:
     runs-on: macos-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install dependencies
-      run: |
-        brew update
-        brew install cmake eigen openssl pkg-config
-        
-    - name: Configure CMake
-      run: |
-        mkdir build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DPSYNE_BUILD_TESTS=ON
-        
-    - name: Build
-      run: |
-        cd build
-        make -j$(sysctl -n hw.ncpu)
-        
-    - name: Run Tests (if available)
-      run: |
-        cd build
-        if [ -f Makefile ] && make help | grep -q test; then
-          make test || echo "Tests not available or failed - continuing"
-        else
-          echo "No tests configured - build successful"
-        fi
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # Minimal validation - just check basic compilation
+      - name: Install dependencies
+        run: |
+          brew update
+          brew install \
+            cmake \
+            eigen \
+            openssl \
+            pkg-config \
+            boost
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPSYNE_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -- -j$(sysctl -n hw.ncpu)
+
+      - name: Run Tests (if available)
+        run: |
+          cd build
+          if [ -f Makefile ] && make help | grep -q test; then
+            make test || echo "Tests not available or failed - continuing"
+          else
+            echo "No tests configured - build successful"
+          fi
+
   validate-examples:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake libeigen3-dev libssl-dev
-        
-    - name: Build with Examples
-      run: |
-        mkdir build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DPSYNE_BUILD_EXAMPLES=ON
-        make -j$(nproc) psyne  # Only build the library, not examples (they have warnings)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libboost-system-dev \
+            libboost-thread-dev \
+            libeigen3-dev \
+            libssl-dev
+
+      - name: Build with Examples
+        run: |
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPSYNE_BUILD_EXAMPLES=ON
+          cmake --build . --target psyne -j$(nproc)
