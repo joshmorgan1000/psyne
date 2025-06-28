@@ -1,0 +1,16 @@
+[package]
+name = "Psyne"
+uuid = "12345678-1234-5678-9abc-123456789abc"
+version = "0.1.1"
+authors = ["Psyne Contributors"]
+
+[deps]
+
+[compat]
+julia = "1.6"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

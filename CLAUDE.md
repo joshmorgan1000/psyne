@@ -1,8 +1,6 @@
 # Agent instructions for Psyne
 
-This project is intended to be a low-level C++20 RPC library that is optimized for AI/ML applications.
-
-Code may not be correct. When in doubt, refer to the [README.md](README.md) document for the latest architecture and design decisions.
+This project is intended to be a low-level C++20 RPC library that is optimized for AI/ML applications. I believe it could be the fastest and most efficient way to transport tensors between neural network layers in existence.
 
 ## Guidelines for Codex Agents
 
