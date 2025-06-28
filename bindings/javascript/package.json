@@ -1,6 +1,6 @@
 {
   "name": "psyne",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "High-performance zero-copy messaging library optimized for AI/ML applications",
   "main": "lib/index.js",
   "types": "types/index.d.ts",

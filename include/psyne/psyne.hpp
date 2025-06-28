@@ -34,8 +34,8 @@
 #include <complex>
 
 // Version information
-#define PSYNE_VERSION_MAJOR 0
-#define PSYNE_VERSION_MINOR 1
+#define PSYNE_VERSION_MAJOR 1
+#define PSYNE_VERSION_MINOR 0
 #define PSYNE_VERSION_PATCH 0
 
 /**
@@ -49,7 +49,7 @@ namespace psyne {
  * @return Version string in the format "major.minor.patch"
  */
 constexpr const char* version() {
-    return "0.1.0";
+    return "1.0.0";
 }
 
 /**
@@ -281,11 +281,20 @@ public:
      */
     static constexpr uint32_t type() { return Derived::message_type; }
     
-protected:
-    // Access to raw data for derived classes
+    /**
+     * @brief Get the raw data pointer
+     * @return Pointer to the message data
+     */
     uint8_t* data() { return data_; }
     const uint8_t* data() const { return data_; }
+    
+    /**
+     * @brief Get the size of the message data
+     * @return Size in bytes
+     */
     size_t size() const { return size_; }
+    
+protected:
     
     // Access to channel for derived classes
     Channel& channel() { return *channel_; }

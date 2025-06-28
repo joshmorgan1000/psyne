@@ -1,7 +1,7 @@
 [package]
 name = "Psyne"
 uuid = "12345678-1234-5678-9abc-123456789abc"
-version = "0.1.1"
+version = "1.0.0"
 authors = ["Psyne Contributors"]
 
 [deps]

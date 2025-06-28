@@ -208,52 +208,77 @@ const double &DoubleMatrix::at(size_t row, size_t col) const {
 
 // ByteVector implementation
 uint8_t& ByteVector::operator[](size_t index) {
-    return reinterpret_cast<uint8_t*>(data())[index];
+    if (index >= size()) {
+        throw std::out_of_range("ByteVector index out of range");
+    }
+    return data()[index];
 }
 
 const uint8_t& ByteVector::operator[](size_t index) const {
-    return reinterpret_cast<const uint8_t*>(data())[index];
+    if (index >= size()) {
+        throw std::out_of_range("ByteVector index out of range");
+    }
+    return data()[index];
 }
 
 uint8_t* ByteVector::begin() {
-    return reinterpret_cast<uint8_t*>(data());
+    return data();
 }
 
 uint8_t* ByteVector::end() {
-    return reinterpret_cast<uint8_t*>(data()) + size();
+    return data() + size();
 }
 
 const uint8_t* ByteVector::begin() const {
-    return reinterpret_cast<const uint8_t*>(data());
+    return data();
 }
 
 const uint8_t* ByteVector::end() const {
-    return reinterpret_cast<const uint8_t*>(data()) + size();
+    return data() + size();
 }
 
 uint8_t* ByteVector::data() {
-    return Message<ByteVector>::data();
+    // Return pointer after size header
+    return Message<ByteVector>::data() + sizeof(size_t);
 }
 
 const uint8_t* ByteVector::data() const {
-    return Message<ByteVector>::data();
+    // Return pointer after size header
+    return Message<ByteVector>::data() + sizeof(size_t);
 }
 
 size_t ByteVector::size() const {
-    return Message<ByteVector>::size();
+    if (!Message<ByteVector>::data())
+        return 0;
+    size_t stored_size = *reinterpret_cast<const size_t*>(Message<ByteVector>::data());
+    // Sanity check - if size is unreasonably large, it's probably uninitialized
+    if (stored_size > capacity()) {
+        return 0; // Return 0 for invalid size
+    }
+    return stored_size;
 }
 
 size_t ByteVector::capacity() const {
-    // Simple implementation - could be enhanced
-    return size();
+    if (!Message<ByteVector>::data())
+        return 0;
+    // Calculate based on total size minus header
+    return Message<ByteVector>::size() - sizeof(size_t);
 }
 
 void ByteVector::resize(size_t new_size) {
-    // TODO: Implement dynamic resizing
+    if (new_size > capacity()) {
+        throw std::runtime_error("Cannot resize ByteVector beyond allocated capacity");
+    }
+    if (Message<ByteVector>::data()) {
+        *reinterpret_cast<size_t*>(Message<ByteVector>::data()) = new_size;
+    }
 }
 
 void ByteVector::initialize() {
-    // Initialize as empty
+    // Initialize size to 0
+    if (Message<ByteVector>::data()) {
+        *reinterpret_cast<size_t*>(Message<ByteVector>::data()) = 0;
+    }
 }
 
 // Explicit template instantiations for basic message types

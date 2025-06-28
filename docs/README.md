@@ -1,53 +1,100 @@
 # Psyne Documentation
 
-Welcome to the Psyne documentation! This folder contains comprehensive guides and references for using the Psyne zero-copy messaging library.
+<div align="center">
+  <img src="assets/psyne_logo.png" alt="Psyne Logo" width="150"/>
+</div>
 
-## Documentation Structure
+Welcome to the Psyne documentation! This comprehensive guide will help you get started with Psyne, understand its architecture, and make the most of its high-performance messaging capabilities.
 
-### Getting Started
-- [Getting Started Guide](getting-started.md) - Quick introduction and basic examples
-- [Overview](overview.md) - High-level architecture and design principles
+## 📚 Documentation Structure
 
-### API Documentation
-- [API Reference](api-reference.md) - Complete API documentation for all classes and functions
+### 🚀 Getting Started
+- **[Overview](overview.md)** - Introduction to Psyne and its core concepts
+- **[Getting Started Guide](getting-started.md)** - Step-by-step tutorial for first-time users
+- **[Installation & Setup](../README.md#-installation)** - Build instructions and dependencies
 
-### Advanced Topics
-- [IPC and TCP Channels](channels.md) - Network and inter-process communication guide
+### 📖 Core Concepts
+- **[Channels](channels.md)** - Understanding different transport types and channel modes
+- **[Message Types](tutorials/02-message-types.md)** - Built-in and custom message types
+- **[Architecture](../README.md#️-architecture)** - System design and zero-copy principles
 
-### Examples
-The [examples](../examples/) directory contains working code examples:
-- `simple_messaging.cpp` - Basic zero-copy messaging demonstration
-- `producer_consumer.cpp` - Event-driven producer/consumer pattern
-- `multi_type_channel.cpp` - Using channels with multiple message types
+### 🎓 Tutorials (Step-by-Step)
+1. **[Getting Started](tutorials/01-getting-started.md)** - Your first Psyne application
+2. **[Message Types](tutorials/02-message-types.md)** - Working with different data types
+3. **[Inter-Process Communication](tutorials/03-inter-process-communication.md)** - Cross-process messaging
+4. **[Network Channels](tutorials/04-network-channels.md)** - TCP, UDP, and WebSocket communication
+5. **[Performance Optimization](tutorials/05-performance-optimization.md)** - Tuning for maximum performance
 
-## Quick Links
+### ⚡ Performance & Optimization
+- **[Performance Guide](performance.md)** - Benchmarks and performance characteristics
+- **[Performance Tuning](performance-tuning.md)** - Optimization techniques and best practices
+- **[Unix Sockets](unix_sockets.md)** - High-performance local communication
 
-### Core Concepts
-- **Zero-Copy Architecture**: Messages are views into pre-allocated buffers
-- **Event-Driven Processing**: Asynchronous callbacks for message handling
-- **Type Safety**: Compile-time type checking for messages
-- **Performance**: Lock-free algorithms for high throughput
+### 📋 Reference
+- **[API Reference](api-reference.md)** - Complete API documentation
+- **[Language Bindings](../bindings/)** - Language-specific guides
+  - [Python](../bindings/python/README.md)
+  - [JavaScript/TypeScript](../bindings/javascript/README.md)
+  - [Rust](../bindings/rust/README.md)
+  - [Go](../bindings/go/README.md)
+  - [Java](../bindings/java/README.md)
+  - [C#](../bindings/csharp/README.md)
+  - [Swift](../bindings/swift/README.md)
+  - [Julia](../bindings/julia/README.md)
 
-### Common Use Cases
-1. **High-frequency sensor data**: Use single-type SPSC channels
-2. **Multi-process pipelines**: Use IPC channels with appropriate sync modes
-3. **Distributed systems**: Use TCP channels for network transparency
-4. **GPU integration**: Messages can be directly mapped to GPU buffers
+### 🔧 Advanced Topics
+- **Compression & Encryption** - Data compression and security features
+- **Reliability Features** - Acknowledgments, retries, and fault tolerance
+- **Distributed Tracing** - Observability and debugging
+- **GPU Integration** - High-performance computing with GPU support
 
-### Performance Guidelines
-- Use single-type channels when possible (no overhead)
-- Choose the right synchronization mode (SPSC, SPMC, MPSC, MPMC)
-- Pre-size buffers appropriately to avoid contention
-- Use event-driven callbacks instead of polling
+### 💡 Examples
+- **[Basic Examples](../examples/)** - 37+ real-world usage examples
+- **[Benchmarks](../benchmarks/)** - Performance testing and measurement tools
 
-## Building and Installing
+## 🗺️ Quick Navigation
 
-See the main [README](../README.md) for build instructions.
+### For Beginners
+Start here if you're new to Psyne:
+1. Read the [Overview](overview.md)
+2. Follow the [Getting Started Guide](getting-started.md)
+3. Try the [first tutorial](tutorials/01-getting-started.md)
+4. Explore [examples](../examples/)
 
-## Contributing
+### For Developers
+Jump to specific topics:
+- **API Integration**: [API Reference](api-reference.md)
+- **Performance**: [Performance Guide](performance.md)
+- **Language Bindings**: [Bindings Directory](../bindings/)
+- **Advanced Features**: [Channels](channels.md)
 
-Contributions are welcome! Please read our contributing guidelines and submit pull requests to the main repository.
+### For System Architects
+Focus on design and optimization:
+- **Architecture**: [System Design](../README.md#️-architecture)
+- **Performance Tuning**: [Optimization Guide](performance-tuning.md)
+- **Transport Selection**: [Channels](channels.md)
 
-## License
+## 📝 Documentation Guidelines
 
-Psyne is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
+This documentation follows these principles:
+- **Progressive Disclosure**: Start simple, add complexity gradually
+- **Practical Examples**: Every concept includes working code
+- **Multiple Formats**: API reference, tutorials, and examples
+- **Cross-Referenced**: Easy navigation between related topics
+
+## 🤝 Contributing to Documentation
+
+Found an error or want to improve the docs?
+- **Issues**: Report documentation bugs on [GitHub Issues](https://github.com/yourusername/psyne/issues)
+- **Pull Requests**: Submit improvements via pull requests
+- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/yourusername/psyne/discussions)
+
+## 📞 Need Help?
+
+- **🐛 Bugs**: [GitHub Issues](https://github.com/yourusername/psyne/issues)
+- **💬 Questions**: [GitHub Discussions](https://github.com/yourusername/psyne/discussions)
+- **📧 Support**: support@psyne.io
+
+---
+
+**Happy coding with Psyne!** 🚀

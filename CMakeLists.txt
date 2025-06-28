@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(psyne VERSION 0.1.1 LANGUAGES C CXX)
+project(psyne VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "-fsanitize=address -fno-omit-frame-pointer -Wno-missing-template-arg-list-after-template-kw")
@@ -101,6 +101,8 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/utils/xxhash32.h"
     "${CMAKE_SOURCE_DIR}/src/psyne_impl.hpp"
     "${CMAKE_SOURCE_DIR}/src/psyne_lib.cpp"
+    "${CMAKE_SOURCE_DIR}/src/reliability/reliability_manager.cpp"
+    "${CMAKE_SOURCE_DIR}/src/performance/performance_manager.cpp"
 )
 target_link_libraries(
     psyne

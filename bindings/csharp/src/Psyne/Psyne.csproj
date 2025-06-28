@@ -10,7 +10,7 @@
     
     <!-- NuGet Package Info -->
     <PackageId>Psyne</PackageId>
-    <Version>0.1.1</Version>
+    <Version>1.0.0</Version>
     <Authors>Psyne Contributors</Authors>
     <Description>High-performance zero-copy messaging library for AI/ML applications</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

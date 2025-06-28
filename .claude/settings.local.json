@@ -43,7 +43,8 @@
       "Bash(./examples/routing_demo)",
       "Bash(./examples/routing_demo_simple)",
       "Bash(./examples/routing_demo_final)",
-      "Bash(./examples/test_bytevector)"
+      "Bash(./examples/test_bytevector)",
+      "Bash(./scripts/zero_copy_summary.sh:*)"
     ],
     "deny": []
   }
