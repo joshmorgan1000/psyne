@@ -551,7 +551,7 @@ public:
      */
     template<typename MessageType>
     std::optional<MessageType> receive(
-        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()
+        std::chrono::milliseconds /*timeout*/ = std::chrono::milliseconds::zero()
     ) {
         size_t size;
         uint32_t type_id;
@@ -610,9 +610,9 @@ public:
     virtual ChannelMode mode() const { return mode_; }
     
     // Raw message operations for template implementation
-    virtual void send_raw_message(const void* data, size_t size, uint32_t type) {}
-    virtual void* receive_raw_message(size_t& size, uint32_t& type) { return nullptr; }
-    virtual void release_raw_message(void* handle) {}
+    virtual void send_raw_message(const void* /*data*/, size_t /*size*/, uint32_t /*type*/) {}
+    virtual void* receive_raw_message(size_t& /*size*/, uint32_t& /*type*/) { return nullptr; }
+    virtual void release_raw_message(void* /*handle*/) {}
     
     // Debug metrics (optional)
     virtual bool has_metrics() const { return false; }

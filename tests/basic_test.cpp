@@ -80,6 +80,7 @@ void test_ring_buffer() {
     assert(read_handle.has_value());
     assert(read_handle->size == 64);
     assert(*static_cast<const uint8_t*>(read_handle->data) == 0xAB);
+    (void)read_handle; // Suppress unused variable warning
     
     std::cout << "✓ Ring buffer test passed!" << std::endl;
 }
@@ -105,6 +106,7 @@ void test_message_creation() {
         auto eigen_view = fv.as_eigen();
         assert(eigen_view.size() == 10);
         assert(eigen_view(5) == 7.5f);
+        (void)eigen_view; // Suppress unused variable warning
     }
     
     std::cout << "✓ Message creation test passed!" << std::endl;

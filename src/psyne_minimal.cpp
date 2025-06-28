@@ -62,7 +62,7 @@ public:
         current_message_ = nullptr;
     }
     
-    void send_raw_message(const void* data, size_t size, uint32_t type) {
+    void send_raw_message(const void* data, size_t size, uint32_t type) override {
         if (queue_) {
             queue_->push(data, size, type);
         }

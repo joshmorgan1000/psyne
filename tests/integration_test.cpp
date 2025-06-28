@@ -121,7 +121,7 @@ int main() {
             const int warmup_messages = 100;
             const int test_messages = 1000;
             
-            auto start_time = std::chrono::high_resolution_clock::now();
+            // auto start_time = std::chrono::high_resolution_clock::now(); // TODO: Use for performance measurements
             
             // Warmup
             for (int i = 0; i < warmup_messages; ++i) {
@@ -160,6 +160,7 @@ int main() {
                 caught_invalid_uri = true;
             }
             assert(caught_invalid_uri);
+            (void)caught_invalid_uri; // Suppress unused variable warning
             
             // Test message bounds checking
             auto channel = psyne::create_channel("memory://bounds_test", 1024 * 1024);
@@ -174,6 +175,7 @@ int main() {
                 caught_out_of_range = true;
             }
             assert(caught_out_of_range);
+            (void)caught_out_of_range; // Suppress unused variable warning
             
             std::cout << "✓ Error handling and bounds checking" << std::endl;
         }

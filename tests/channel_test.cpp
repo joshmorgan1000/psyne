@@ -39,6 +39,7 @@ int main() {
                 caught_exception = true;
             }
             assert(caught_exception);
+            (void)caught_exception; // Suppress unused variable warning
             std::cout << "✓ Invalid URI exception handling" << std::endl;
         }
         
@@ -51,6 +52,7 @@ int main() {
                 caught_exception = true;
             }
             assert(caught_exception);
+            (void)caught_exception; // Suppress unused variable warning
             std::cout << "✓ Zero buffer size exception handling" << std::endl;
         }
         

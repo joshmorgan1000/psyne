@@ -6,7 +6,7 @@
   [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/joshmorgan1000/psyne)
   [![C++ Standard](https://img.shields.io/badge/C++-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/joshmorgan1000/psyne/actions)
+  [![Build Status](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml/badge.svg)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   
   [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🛠️ Language Bindings](#️-language-bindings) • [⚡ Performance](#-performance) • [🤝 Contributing](#-contributing)
 </div>
