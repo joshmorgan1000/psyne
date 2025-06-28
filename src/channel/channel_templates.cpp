@@ -36,6 +36,9 @@ namespace types {
     class Vector3f;
     class Int8Vector;
     class UInt8Vector;
+    template<typename T> class ComplexVector;
+    template<typename T> class MLTensor;
+    template<typename T> class SparseMatrix;
 }
 
 // Explicit instantiations for common types
@@ -60,6 +63,32 @@ template std::optional<types::Int8Vector> Channel::receive<types::Int8Vector>(st
 template std::optional<types::UInt8Vector> Channel::receive<types::UInt8Vector>(std::chrono::milliseconds);
 template void Channel::send<types::Int8Vector>(types::Int8Vector&);
 template void Channel::send<types::UInt8Vector>(types::UInt8Vector&);
+
+// Complex vector template instantiations
+template std::optional<types::ComplexVector<float>> Channel::receive<types::ComplexVector<float>>(std::chrono::milliseconds);
+template std::optional<types::ComplexVector<double>> Channel::receive<types::ComplexVector<double>>(std::chrono::milliseconds);
+template void Channel::send<types::ComplexVector<float>>(types::ComplexVector<float>&);
+template void Channel::send<types::ComplexVector<double>>(types::ComplexVector<double>&);
+
+// ML tensor template instantiations
+template std::optional<types::MLTensor<float>> Channel::receive<types::MLTensor<float>>(std::chrono::milliseconds);
+template std::optional<types::MLTensor<double>> Channel::receive<types::MLTensor<double>>(std::chrono::milliseconds);
+template std::optional<types::MLTensor<int32_t>> Channel::receive<types::MLTensor<int32_t>>(std::chrono::milliseconds);
+template std::optional<types::MLTensor<int8_t>> Channel::receive<types::MLTensor<int8_t>>(std::chrono::milliseconds);
+template std::optional<types::MLTensor<uint8_t>> Channel::receive<types::MLTensor<uint8_t>>(std::chrono::milliseconds);
+template void Channel::send<types::MLTensor<float>>(types::MLTensor<float>&);
+template void Channel::send<types::MLTensor<double>>(types::MLTensor<double>&);
+template void Channel::send<types::MLTensor<int32_t>>(types::MLTensor<int32_t>&);
+template void Channel::send<types::MLTensor<int8_t>>(types::MLTensor<int8_t>&);
+template void Channel::send<types::MLTensor<uint8_t>>(types::MLTensor<uint8_t>&);
+
+// Sparse matrix template instantiations
+template std::optional<types::SparseMatrix<float>> Channel::receive<types::SparseMatrix<float>>(std::chrono::milliseconds);
+template std::optional<types::SparseMatrix<double>> Channel::receive<types::SparseMatrix<double>>(std::chrono::milliseconds);
+template std::optional<types::SparseMatrix<int32_t>> Channel::receive<types::SparseMatrix<int32_t>>(std::chrono::milliseconds);
+template void Channel::send<types::SparseMatrix<float>>(types::SparseMatrix<float>&);
+template void Channel::send<types::SparseMatrix<double>>(types::SparseMatrix<double>&);
+template void Channel::send<types::SparseMatrix<int32_t>>(types::SparseMatrix<int32_t>&);
 
 #ifdef PSYNE_GPU_SUPPORT
 // Forward declarations for GPU types

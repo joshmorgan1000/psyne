@@ -269,6 +269,12 @@ using MPMCChannel = Channel;
 // Enhanced Message Types
 #include "types/fixed_matrices.hpp"
 #include "types/quantized_vectors.hpp"
+#include "types/complex_vectors.hpp"
+#include "types/ml_tensor.hpp"
+#include "types/sparse_matrix.hpp"
+
+// Reliability Features
+#include "reliability/reliability.hpp"
 
 // GPU Support (optional - requires Metal/Vulkan/CUDA)
 #ifdef PSYNE_GPU_SUPPORT

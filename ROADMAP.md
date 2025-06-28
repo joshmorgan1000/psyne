@@ -16,10 +16,40 @@
   - `FloatVector`: Dynamic-size float arrays
   - `DoubleMatrix`: 2D double matrices
   - Template for custom message types
-- **Channel Factory**: URI-based channel creation (`memory://`, `ipc://`)
+- **Channel Factory**: URI-based channel creation (`memory://`, `ipc://`, `tcp://`)
 - **Dynamic Memory Management**:
   - `DynamicSlabAllocator`: Automatically grows/shrinks memory slabs
   - `DynamicRingBuffer`: Auto-resizing ring buffers based on usage
+
+#### IPC Channels ✅ 
+- Cross-platform IPC using Boost.Interprocess
+- Named shared memory management with semaphore signaling
+- Process cleanup and proper resource management
+- Complete integration with channel factory
+
+#### TCP Channels ✅
+- Full TCP implementation using Boost.Asio
+- Message framing protocol with length prefix and xxHash32 checksums
+- Connection management (connect, disconnect, reconnect)
+- Async send/receive operations
+- Client and server support via URI scheme
+
+#### GPU Integration ✅
+- GPU buffer abstraction interface for Metal/Vulkan/CUDA
+- Metal backend for Apple Silicon unified memory
+- Zero-copy GPU buffer mapping and synchronization
+- GPU-aware message types (GPUFloatVector, GPUMatrix, GPUTensor)
+- Compute pipeline integration
+
+#### Enhanced Message Types ✅
+- **Fixed-size matrix types**: `Matrix4x4f`, `Matrix3x3f`, `Matrix2x2f`
+- **Fixed-size vectors**: `Vector4f`, `Vector3f` with named accessors
+- **Quantized types**: `Int8Vector`, `UInt8Vector` for ML inference
+- **Complex number support**: `ComplexVector<T>` for signal processing
+- **ML tensor type**: `MLTensor<T>` with NCHW/NHWC layouts and activation functions
+- **Sparse matrices**: `SparseMatrix<T>` with CSR format for scientific computing
+- **Full Eigen integration** for mathematical operations
+- **Zero-copy compatible** in-place operations only
 
 #### Examples
 - Simple messaging demonstration
@@ -37,68 +67,27 @@
 
 ### 🚧 In Progress / Partially Implemented
 
-#### IPC Channels
-- Basic shared memory support exists but needs:
-  - Cross-platform semaphore implementation
-  - Proper cleanup on process termination
-  - Named shared memory management
-
-#### TCP Channels
-- Skeleton code exists (`tcp_echo_server.cpp`, `tcp_echo_client.cpp`)
-- `tcp_protocol.cpp` has hash function but no actual implementation
-- Needs:
-  - Boost.Asio integration
-  - Message framing protocol
-  - Connection management
-  - Async send/receive
+#### Performance Optimizations
+- SIMD optimizations for message operations
+- Huge page support for large buffers
+- NUMA-aware allocation
+- CPU affinity helpers
+- Memory prefetching hints
 
 ## TODO List
 
 ### High Priority
 
-#### 1. Complete IPC Implementation
-- [ ] Implement cross-platform IPC using Boost.Interprocess
-- [ ] Add proper semaphore/condition variable signaling
-- [ ] Handle process crashes and cleanup
-- [ ] Add IPC performance benchmarks
-- [ ] Create robust IPC examples
-
-#### 2. TCP Channel Implementation  
-- [ ] Remove standalone `tcp_protocol.cpp` or integrate properly
-- [ ] Implement TCP channel using Boost.Asio
-- [ ] Design message framing:
-  ```
-  [4 bytes: length][4 bytes: checksum][8 bytes: type header][payload]
-  ```
-- [ ] Add connection management (connect, disconnect, reconnect)
-- [ ] Implement async operations with coroutines
-- [ ] Add TCP benchmarks and examples
-
-#### 3. GPU Integration
-- [ ] Design GPU buffer abstraction interface
-- [ ] Metal support for macOS/iOS
-- [ ] Vulkan support for cross-platform
-- [ ] CUDA support for NVIDIA GPUs
-- [ ] Zero-copy GPU buffer mapping
-- [ ] GPU compute pipeline examples
+#### 1. Complete Enhanced Message Types ✅
+- [x] Fixed-size matrix types (e.g., `Matrix4x4f`)
+- [x] Quantized types (`Int8Vector`, `UInt8Vector`)  
+- [x] Complex number support (`ComplexVector<T>`)
+- [x] Enhanced tensor type for ML workloads (`MLTensor<T>`)
+- [x] Sparse matrix support (`SparseMatrix<T>` with CSR format)
 
 ### Medium Priority
 
-#### 4. Enhanced Message Types
-- [ ] Fixed-size matrix types (e.g., `Matrix4x4f`)
-- [ ] Quantized types (`Int8Vector`, `UInt8Vector`)
-- [ ] Complex number support
-- [ ] Tensor type for ML workloads
-- [ ] Sparse matrix support
-
-#### 5. Performance Optimizations
-- [ ] SIMD optimizations for message operations
-- [ ] Huge page support for large buffers
-- [ ] NUMA-aware allocation
-- [ ] CPU affinity helpers
-- [ ] Memory prefetching hints
-
-#### 6. Reliability Features
+#### 2. Reliability Features
 - [ ] Message acknowledgment system
 - [ ] Retry mechanisms for TCP
 - [ ] Heartbeat/keepalive for connections

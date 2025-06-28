@@ -113,6 +113,13 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/gpu/gpu_message.cpp"
     "${CMAKE_SOURCE_DIR}/src/types/fixed_matrices.cpp"
     "${CMAKE_SOURCE_DIR}/src/types/quantized_vectors.cpp"
+    "${CMAKE_SOURCE_DIR}/src/types/complex_vectors.cpp"
+    "${CMAKE_SOURCE_DIR}/src/types/ml_tensor.cpp"
+    "${CMAKE_SOURCE_DIR}/src/types/sparse_matrix.cpp"
+    "${CMAKE_SOURCE_DIR}/src/reliability/acknowledgment.cpp"
+    "${CMAKE_SOURCE_DIR}/src/reliability/retry.cpp"
+    "${CMAKE_SOURCE_DIR}/src/reliability/heartbeat.cpp"
+    "${CMAKE_SOURCE_DIR}/src/reliability/reliability.cpp"
     ${GPU_SOURCES}
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer.cpp"
     "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer_impl.hpp"

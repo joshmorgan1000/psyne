@@ -215,6 +215,9 @@ namespace types {
     class Vector3f;
     class Int8Vector;
     class UInt8Vector;
+    template<typename T> class ComplexVector;
+    template<typename T> class MLTensor;
+    template<typename T> class SparseMatrix;
 }
 
 // Explicit template instantiations
@@ -227,6 +230,16 @@ template class Message<types::Vector4f>;
 template class Message<types::Vector3f>;
 template class Message<types::Int8Vector>;
 template class Message<types::UInt8Vector>;
+template class Message<types::ComplexVector<float>>;
+template class Message<types::ComplexVector<double>>;
+template class Message<types::MLTensor<float>>;
+template class Message<types::MLTensor<double>>;
+template class Message<types::MLTensor<int32_t>>;
+template class Message<types::MLTensor<int8_t>>;
+template class Message<types::MLTensor<uint8_t>>;
+template class Message<types::SparseMatrix<float>>;
+template class Message<types::SparseMatrix<double>>;
+template class Message<types::SparseMatrix<int32_t>>;
 
 #ifdef PSYNE_GPU_SUPPORT
 // Forward declarations for GPU types

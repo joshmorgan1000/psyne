@@ -26,7 +26,9 @@
       "Bash(./build/examples/simple_messaging)",
       "Bash(true)",
       "Bash(./build/examples/ipc_test)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(./enhanced_types_demo)",
+      "Bash(./examples/enhanced_types_demo)"
     ],
     "deny": []
   }
