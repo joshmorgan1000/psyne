@@ -47,7 +47,8 @@ template class psyne::Message<SimpleMessage>;
 void test_memory_channel() {
     std::cout << "Testing memory channel..." << std::endl;
     
-    SPSCChannel channel("memory://test", 64 * 1024, ChannelType::SingleType);
+    auto channel_ptr = Channel::create("memory://test", 64 * 1024, ChannelMode::SPSC, ChannelType::SingleType);
+    auto& channel = *channel_ptr;
     
     // Test single message
     {
@@ -89,7 +90,8 @@ void test_ring_buffer() {
 void test_message_creation() {
     std::cout << "Testing message creation..." << std::endl;
     
-    SPSCChannel channel("memory://test", 64 * 1024);
+    auto channel_ptr = Channel::create("memory://test", 64 * 1024, ChannelMode::SPSC, ChannelType::SingleType);
+    auto& channel = *channel_ptr;
     
     // Test FloatVector
     {
@@ -138,7 +140,8 @@ void test_channel_factory() {
 void test_producer_consumer() {
     std::cout << "Testing producer-consumer..." << std::endl;
     
-    SPSCChannel channel("memory://pc_test", 64 * 1024);
+    auto channel_ptr = Channel::create("memory://pc_test", 64 * 1024, ChannelMode::SPSC, ChannelType::SingleType);
+    auto& channel = *channel_ptr;
     const int num_messages = 100;
     std::atomic<int> received_count{0};
     

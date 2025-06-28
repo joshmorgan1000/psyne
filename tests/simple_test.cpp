@@ -38,7 +38,8 @@ template class psyne::Message<TestMsg>;
 int main() {
     std::cout << "Simple synchronous test..." << std::endl;
     
-    SPSCChannel channel("memory://simple", 1024);
+    auto channel_ptr = Channel::create("memory://simple", 1024, ChannelMode::SPSC, ChannelType::SingleType);
+    auto& channel = *channel_ptr;
     
     // Send 3 messages
     for (int i = 0; i < 3; ++i) {

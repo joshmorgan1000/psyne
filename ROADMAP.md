@@ -1,164 +1,173 @@
-# Psyne Development Roadmap
+# Psyne Development Roadmap 🚀
 
-## Current Status (v0.1.0)
+## Current Status (v1.0.1)
 
-### ✅ Completed Features
+### ✅ Actually Completed Features
+- **Single Public Header**: Clean API with `psyne.hpp`
+- **Basic Message Framework**: Template-based message system with CRTP
+- **Core Message Types**: FloatVector, ByteVector, DoubleMatrix (basic implementations)
+- **Channel Factory**: URI-based channel creation framework
+- **Memory Transport**: Basic stub implementation for testing
+- **CI/CD Pipeline**: GitHub Actions for Linux/macOS builds
+- **Release Automation**: Automatic releases on version tags
 
-#### Core Architecture
-- **Single Public Header**: Clean API with just `psyne.hpp`
-- **Zero-Copy Messaging**: Messages are views into pre-allocated ring buffers
-- **Ring Buffer Implementations**: 
-  - SPSC (Single Producer, Single Consumer) - lock-free
-  - SPMC (Single Producer, Multiple Consumer) 
-  - MPSC (Multiple Producer, Single Consumer)
-  - MPMC (Multiple Producer, Multiple Consumer)
-- **Message Types**:
-  - `FloatVector`: Dynamic-size float arrays
-  - `DoubleMatrix`: 2D double matrices
-  - Template for custom message types
-- **Channel Factory**: URI-based channel creation (`memory://`, `ipc://`, `tcp://`)
-- **Dynamic Memory Management**:
-  - `DynamicSlabAllocator`: Automatically grows/shrinks memory slabs
-  - `DynamicRingBuffer`: Auto-resizing ring buffers based on usage
+### 🚧 Stub Implementations (Need Real Implementation)
+- Ring buffers (currently just allocate new memory each time)
+- Message queues (unbounded growth, no cleanup)
+- Channel implementations (minimal functionality)
+- Test suite (disabled due to crashes)
 
-#### IPC Channels ✅ 
-- Cross-platform IPC using Boost.Interprocess
-- Named shared memory management with semaphore signaling
-- Process cleanup and proper resource management
-- Complete integration with channel factory
+## Phase 1: Fix Critical Issues (Q1 2025) 🔥
 
-#### TCP Channels ✅
-- Full TCP implementation using Boost.Asio
-- Message framing protocol with length prefix and xxHash32 checksums
-- Connection management (connect, disconnect, reconnect)
-- Async send/receive operations
-- Client and server support via URI scheme
+### High Priority - From QA Report
+- [ ] **Fix memory leaks in SPSCRingBuffer**
+  - Currently allocates new memory on each reserve()
+  - Implement proper circular buffer with reusable memory
+- [ ] **Fix unbounded SimpleMessageQueue growth**
+  - Add maximum queue size limits
+  - Implement backpressure/flow control
+- [ ] **Fix global message queue cleanup**
+  - Add destructor to remove queues from global map
+  - Prevent memory leaks from destroyed channels
+- [ ] **Remove AddressSanitizer from release builds**
+  - Move to debug-only or CMake option
+  - Currently impacts performance
 
-#### GPU Integration ✅
-- GPU buffer abstraction interface for Metal/Vulkan/CUDA
-- Metal backend for Apple Silicon unified memory
-- Zero-copy GPU buffer mapping and synchronization
-- GPU-aware message types (GPUFloatVector, GPUMatrix, GPUTensor)
-- Compute pipeline integration
+### Test Suite Revival
+- [ ] Fix segfaults in basic_test
+- [ ] Fix message passing in simple_test
+- [ ] Implement proper test fixtures
+- [ ] Add memory leak detection tests
+- [ ] Enable tests in CI pipeline
 
-#### Enhanced Message Types ✅
-- **Fixed-size matrix types**: `Matrix4x4f`, `Matrix3x3f`, `Matrix2x2f`
-- **Fixed-size vectors**: `Vector4f`, `Vector3f` with named accessors
-- **Quantized types**: `Int8Vector`, `UInt8Vector` for ML inference
-- **Complex number support**: `ComplexVector<T>` for signal processing
-- **ML tensor type**: `MLTensor<T>` with NCHW/NHWC layouts and activation functions
-- **Sparse matrices**: `SparseMatrix<T>` with CSR format for scientific computing
-- **Full Eigen integration** for mathematical operations
-- **Zero-copy compatible** in-place operations only
+## Phase 2: Core Implementation (Q2 2025)
 
-#### Examples
-- Simple messaging demonstration
-- Producer/consumer patterns
-- Multi-type channels
-- Fixed-size messages
-- Dynamic allocation demo
-- Channel factory usage
+### Real Ring Buffer Implementation
+- [ ] Lock-free SPSC ring buffer
+- [ ] Proper memory reuse
+- [ ] Configurable buffer sizes
+- [ ] Buffer overflow handling
 
-#### Testing & Benchmarks
-- Basic unit tests
-- Throughput benchmark
-- Latency benchmark  
-- Dynamic allocation benchmark
+### Transport Implementations
+- [ ] **Memory Channel**: Proper shared memory with ring buffers
+- [ ] **IPC Channel**: Platform-specific implementations
+  - Linux: POSIX shared memory
+  - macOS: Mach ports
+  - Windows: Named pipes
+- [ ] **TCP Channel**: Socket-based networking
+  - Message framing
+  - Connection management
+  - Error recovery
 
-### 🚧 In Progress / Partially Implemented
+### Performance Benchmarks
+- [ ] Latency measurements
+- [ ] Throughput tests
+- [ ] Memory usage profiling
+- [ ] Comparison with other IPC libraries
 
-#### Performance Optimizations ✅
-- [x] SIMD optimizations for message operations
-- [x] Huge page support for large buffers
-- [x] NUMA-aware allocation
-- [x] CPU affinity helpers
-- [x] Memory prefetching hints
+## Phase 3: GPU Acceleration (Q3 2025) 🎮
 
-## TODO List
+### NVIDIA GPUDirect
+- [ ] CUDA IPC integration
+- [ ] GPUDirect RDMA support
+- [ ] Unified memory optimizations
+- [ ] Multi-GPU support
 
-### High Priority
+### AMD ROCm
+- [ ] DirectGMA integration
+- [ ] HIP compatibility layer
+- [ ] Cross-vendor abstractions
 
-#### 1. Complete Enhanced Message Types ✅
-- [x] Fixed-size matrix types (e.g., `Matrix4x4f`)
-- [x] Quantized types (`Int8Vector`, `UInt8Vector`)  
-- [x] Complex number support (`ComplexVector<T>`)
-- [x] Enhanced tensor type for ML workloads (`MLTensor<T>`)
-- [x] Sparse matrix support (`SparseMatrix<T>` with CSR format)
+### Apple Metal
+- [ ] Unified memory zero-copy
+- [ ] Metal Performance Shaders integration
+- [ ] Shared event synchronization
 
-### Medium Priority
+## Phase 4: Advanced Networking (Q4 2025)
 
-#### 2. Reliability Features ✅
-- [x] Message acknowledgment system
-- [x] Retry mechanisms for TCP
-- [x] Heartbeat/keepalive for connections  
-- [x] Circuit breaker pattern
-- [x] Message replay buffers
+### High-Performance Fabrics
+- [ ] **InfiniBand/RoCE**
+  - Verbs API integration
+  - RDMA operations
+  - Queue pair management
+- [ ] **Intel/AWS OFI (libfabric)**
+  - Provider abstraction
+  - Cloud-optimized transports
+- [ ] **UCX Integration**
+  - Unified communication framework
+  - Automatic transport selection
 
-### Low Priority
+### Collective Operations
+- [ ] Broadcast primitives
+- [ ] All-reduce algorithms
+- [ ] Scatter/gather operations
+- [ ] Ring algorithms
 
-#### 7. Additional Transports
-- [x] Unix domain sockets ✅
-- [x] RDMA/InfiniBand support ✅
-- [x] UDP multicast channels ✅
-- [x] WebSocket channels ✅
-- [x] gRPC compatibility layer ✅
-- [x] Apache Arrow integration for data interchange ✅
+## Phase 5: AI/ML Integration (2026)
 
-#### 8. Developer Experience
-- [x] Comprehensive API documentation ✅
-- [x] Tutorial series ✅
-- [x] Performance tuning guide ✅
-- [x] Debugging utilities ✅
-- [x] Channel introspection tools ✅
-- [x] Visual buffer usage monitor ✅
+### Framework Backends
+- [ ] **PyTorch Distributed**
+  - Custom ProcessGroup
+  - Tensor serialization
+  - Gradient compression
+- [ ] **JAX Collective Ops**
+  - XLA custom calls
+  - SPMD primitives
+- [ ] **TensorFlow DTensor**
+  - Mesh communication
+  - Layout optimizations
 
-#### 9. Advanced Features
-- [x] Message routing/filtering ✅
-- [x] Channel multiplexing ✅
-- [x] Compression support ✅
-- [x] Encryption support ✅
-- [x] Distributed tracing integration ✅
+### Optimizations
+- [ ] Gradient quantization
+- [ ] Sparse tensor support
+- [ ] Mixed precision communication
+- [ ] Tensor fusion
 
-#### 10. Language Bindings ✅
-- [x] C API for FFI ✅
-- [x] Rust bindings ✅
-- [x] Go bindings ✅
-- [x] Java bindings ✅
-- [x] C# bindings ✅
-- [x] Swift bindings ✅
-- [x] JavaScript/TypeScript bindings ✅
-- [x] Julia bindings ✅
-- [x] Python bindings (pybind11) ✅
+## Future Ideas & Research 🔮
 
-## Breaking Changes Planned
+### Cutting-Edge Transports
+- [ ] **CXL.mem**: Compute Express Link memory pooling
+- [ ] **NVLink/NVSwitch**: NVIDIA proprietary interconnects
+- [ ] **Silicon Photonics**: Optical interconnects
+- [ ] **Quantum Networks**: Post-quantum secure channels
 
-### v0.2.0
-- Remove legacy code in `src/tcp_protocol.cpp`
-- Standardize error handling (exceptions vs error codes)
-- Potential API changes for GPU buffer support
+### Advanced Features
+- [ ] **Smart Routing**: ML-based transport selection
+- [ ] **Predictive Prefetching**: Anticipate message patterns
+- [ ] **Compression**: LZ4, Zstd, custom ML compressors
+- [ ] **Encryption**: Hardware-accelerated crypto
+- [ ] **Time-series Optimization**: For streaming data
 
-### v1.0.0
-- Stable API commitment
-- ABI compatibility guarantees
-- Semantic versioning
+### Research Projects
+- [ ] **Distributed shared memory** abstractions
+- [ ] **Transactional messaging** with ACID guarantees
+- [ ] **Byzantine fault tolerance** for untrusted networks
+- [ ] **Homomorphic encryption** for secure computation
 
 ## Contributing
 
-Areas where contributions are especially welcome:
-1. TCP channel implementation
-2. Cross-platform IPC testing
-3. GPU integration (especially Vulkan/CUDA)
-4. Performance optimizations
-5. Documentation and examples
+Want to help? Priority areas:
+1. Fix memory management issues (see QA_REPORT.md)
+2. Implement real ring buffers
+3. Create comprehensive test suite
+4. Add transport implementations
+5. Performance benchmarking
 
-## Timeline Estimates
+## Success Metrics 🎯
 
-- **Q1 2024**: Complete IPC and TCP implementations
-- **Q2 2024**: GPU integration (Metal first, then Vulkan)
-- **Q3 2024**: Performance optimizations and reliability features
-- **Q4 2024**: Version 1.0 release with stable API
+### v2.0 Goals
+- Zero memory leaks (Valgrind clean)
+- < 1μs latency (same NUMA node)
+- > 10 GB/s throughput (memory transport)
+- 100% test coverage
+- Production deployments
 
-## Notes
+### Long-term Vision
+- Industry standard for AI/ML communication
+- Integration in major ML frameworks
+- Support for exotic accelerators
+- Microsecond-scale distributed training
 
-- Focus remains on maintaining zero-copy principles throughout all implementations
-- Apple Silicon (unified memory) remains the primary target, with x86_64 Linux as secondary
+---
+
+*"Move fast and fix things"* - The Psyne Way™

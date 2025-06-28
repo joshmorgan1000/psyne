@@ -234,7 +234,7 @@ public:
      * @throws std::runtime_error if allocation fails
      */
     explicit Message(Channel& channel) 
-        : data_(nullptr), size_(0), channel_(&channel), handle_(nullptr) {
+        : data_(nullptr), size_(0), channel_(&channel), handle_(nullptr), owns_data_(true) {
         // Basic allocation stub - for real implementation would allocate from channel buffer
         size_ = Derived::calculate_size();
         data_ = new uint8_t[size_];
@@ -248,18 +248,19 @@ public:
      */
     explicit Message(const void* data, size_t size)
         : data_(const_cast<uint8_t*>(static_cast<const uint8_t*>(data))), 
-          size_(size), channel_(nullptr), handle_(nullptr) {}
+          size_(size), channel_(nullptr), handle_(nullptr), owns_data_(false) {}
     
     /**
      * @brief Move constructor
      * @param other Message to move from
      */
     Message(Message&& other) noexcept 
-        : data_(other.data_), size_(other.size_), channel_(other.channel_), handle_(other.handle_) {
+        : data_(other.data_), size_(other.size_), channel_(other.channel_), handle_(other.handle_), owns_data_(other.owns_data_) {
         other.data_ = nullptr;
         other.size_ = 0;
         other.channel_ = nullptr;
         other.handle_ = nullptr;
+        other.owns_data_ = false;
     }
     
     /**
@@ -269,15 +270,17 @@ public:
      */
     Message& operator=(Message&& other) noexcept {
         if (this != &other) {
-            if (data_ && !channel_) delete[] data_;  // Only delete if we allocated it
+            if (data_ && owns_data_) delete[] data_;  // Only delete if we own it
             data_ = other.data_;
             size_ = other.size_;
             channel_ = other.channel_;
             handle_ = other.handle_;
+            owns_data_ = other.owns_data_;
             other.data_ = nullptr;
             other.size_ = 0;
             other.channel_ = nullptr;
             other.handle_ = nullptr;
+            other.owns_data_ = false;
         }
         return *this;
     }
@@ -290,8 +293,8 @@ public:
      * @brief Destructor
      */
     virtual ~Message() {
-        if (data_ && !channel_) {
-            delete[] data_;  // Only delete if we allocated it
+        if (data_ && owns_data_) {
+            delete[] data_;  // Only delete if we own the data
         }
     }
     
@@ -340,6 +343,7 @@ protected:
     size_t size_;
     Channel* channel_;
     void* handle_;  // Opaque handle to implementation
+    bool owns_data_;  // Whether this message owns the data memory
 };
 
 // ============================================================================
@@ -717,6 +721,8 @@ void Message<Derived>::send() {
     if (channel_) {
         before_send();
         channel_->send_raw_message(data_, size_, Derived::message_type);
+    } else {
+        // Debug: No channel available
     }
 }
 
@@ -754,13 +760,17 @@ public:
     std::optional<WriteHandle> reserve(size_t size);
     std::optional<ReadHandle> read();
     
-    // For testing only
+    // For testing only - TODO: Remove global instance in production
     static SPSCRingBuffer* current_instance_;
-    void* last_write_data_ = nullptr;
-    size_t last_write_size_ = 0;
     
 private:
     size_t capacity_;
+    std::unique_ptr<uint8_t[]> buffer_;
+    size_t write_pos_ = 0;
+    size_t read_pos_ = 0;
+    size_t current_message_size_ = 0;
+    
+    friend void WriteHandle::commit();
 };
 
 // ============================================================================

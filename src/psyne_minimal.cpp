@@ -5,10 +5,11 @@
 #include <condition_variable>
 #include <memory>
 #include <map>
+#include <iostream>
 
 namespace psyne {
 
-// Simple message queue implementation for testing
+// Simple message queue implementation for testing - Fixed unbounded growth
 class SimpleMessageQueue {
 public:
     struct MessageData {
@@ -16,14 +17,23 @@ public:
         uint32_t type;
     };
     
-    void push(const void* data, size_t size, uint32_t type) {
+    explicit SimpleMessageQueue(size_t max_size = 1000) : max_size_(max_size) {}
+    
+    bool push(const void* data, size_t size, uint32_t type) {
         std::lock_guard<std::mutex> lock(mutex_);
+        
+        // Enforce maximum queue size to prevent unbounded growth
+        if (queue_.size() >= max_size_) {
+            return false; // Queue full, message dropped
+        }
+        
         MessageData msg;
         msg.data.resize(size);
         std::memcpy(msg.data.data(), data, size);
         msg.type = type;
         queue_.push(std::move(msg));
         cv_.notify_one();
+        return true;
     }
     
     std::unique_ptr<MessageData> pop(std::chrono::milliseconds timeout) {
@@ -36,10 +46,16 @@ public:
         return msg;
     }
     
+    size_t size() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return queue_.size();
+    }
+    
 private:
     std::queue<MessageData> queue_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::condition_variable cv_;
+    const size_t max_size_;
 };
 
 // Global message queues for channels (simple implementation for testing)
@@ -62,30 +78,49 @@ public:
         current_message_ = nullptr;
     }
     
+    ~TestChannel() {
+        // Clean up queue from global map when this is the last reference
+        std::lock_guard<std::mutex> lock(g_queues_mutex);
+        auto it = g_message_queues.find(uri_);
+        if (it != g_message_queues.end() && it->second.use_count() <= 2) {
+            // use_count <= 2 means only the map and this channel hold references
+            g_message_queues.erase(it);
+        }
+    }
+    
     void send_raw_message(const void* data, size_t size, uint32_t type) override {
         if (queue_) {
-            queue_->push(data, size, type);
+            bool success = queue_->push(data, size, type);
+            (void)success; // Suppress unused variable warning in release builds
+            // In a real implementation, we might block or use backpressure when queue is full
         }
     }
     
     void* receive_raw_message(size_t& size, uint32_t& type) override {
         if (!queue_) return nullptr;
         
+        // Store the message so it doesn't get freed
         current_message_ = queue_->pop(std::chrono::milliseconds(1000));
         if (!current_message_) return nullptr;
         
         size = current_message_->data.size();
         type = current_message_->type;
-        return current_message_->data.data();
+        
+        // Create a copy of the data that will persist until release_raw_message
+        temp_buffer_.resize(size);
+        std::memcpy(temp_buffer_.data(), current_message_->data.data(), size);
+        return temp_buffer_.data();
     }
     
-    void release_raw_message(void* handle) override {
+    void release_raw_message(void* /*handle*/) override {
         current_message_.reset();
+        temp_buffer_.clear();
     }
     
 private:
     std::shared_ptr<SimpleMessageQueue> queue_;
     std::unique_ptr<SimpleMessageQueue::MessageData> current_message_;
+    std::vector<uint8_t> temp_buffer_;
 };
 
 // Note: Message template methods are defined inline in psyne.hpp
@@ -105,36 +140,47 @@ std::unique_ptr<Channel> Channel::create(
 // Explicit template instantiations for library message types only
 // Test message types (TestMsg, SimpleMessage) are instantiated in test files
 
-// SPSCRingBuffer implementation
+// SPSCRingBuffer implementation - Fixed memory management
 SPSCRingBuffer* SPSCRingBuffer::current_instance_ = nullptr;
 
 SPSCRingBuffer::SPSCRingBuffer(size_t capacity) : capacity_(capacity) {
     current_instance_ = this;
+    // Allocate a single buffer for the entire ring buffer
+    buffer_ = std::make_unique<uint8_t[]>(capacity);
+    write_pos_ = 0;
+    read_pos_ = 0;
+    current_message_size_ = 0;
 }
 
 std::optional<WriteHandle> SPSCRingBuffer::reserve(size_t size) {
-    if (size <= capacity_) {
-        // Allocate memory for testing
-        auto* buffer = new uint8_t[size];
-        std::memset(buffer, 0, size);
-        return WriteHandle{buffer, size};
+    if (size > capacity_) {
+        return std::nullopt; // Message too large
     }
-    return std::nullopt;
+    
+    // Simple implementation: use the entire buffer for one message at a time
+    // In a real implementation, this would handle multiple concurrent messages
+    if (write_pos_ != read_pos_) {
+        return std::nullopt; // Buffer busy
+    }
+    
+    write_pos_ = 0;
+    current_message_size_ = size;
+    return WriteHandle{buffer_.get(), size};
 }
 
 std::optional<ReadHandle> SPSCRingBuffer::read() {
-    // For testing, return last written data
-    if (last_write_data_) {
-        return ReadHandle{last_write_data_, last_write_size_};
+    if (write_pos_ == read_pos_) {
+        return std::nullopt; // No data available
     }
-    return std::nullopt;
+    
+    return ReadHandle{buffer_.get(), current_message_size_};
 }
 
 void WriteHandle::commit() {
-    // Store for testing
+    // Mark data as written
     if (auto* rb = SPSCRingBuffer::current_instance_) {
-        rb->last_write_data_ = data;
-        rb->last_write_size_ = size;
+        rb->write_pos_ = rb->current_message_size_;
+        rb->read_pos_ = 0; // Reset for next read
     }
 }
 
