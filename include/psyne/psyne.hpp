@@ -303,7 +303,7 @@ protected:
     // Called before sending
     virtual void before_send() {}
     
-private:
+    // Protected data members - accessible by derived classes
     uint8_t* data_;
     size_t size_;
     Channel* channel_;
@@ -363,6 +363,34 @@ public:
     
     // Initialize the message (called after allocation)
     void initialize();
+    
+    // Placeholder for Eigen integration (when PSYNE_ENABLE_EIGEN is defined)
+    #ifdef PSYNE_ENABLE_EIGEN
+    auto as_eigen() {
+        return Eigen::Map<Eigen::VectorXf>(begin(), size());
+    }
+    
+    auto as_eigen() const {
+        return Eigen::Map<const Eigen::VectorXf>(begin(), size());
+    }
+    #else
+    // Dummy implementation for tests
+    struct DummyEigenView {
+        float* data_;
+        size_t size_;
+        DummyEigenView(float* data, size_t size) : data_(data), size_(size) {}
+        size_t size() const { return size_; }
+        float operator()(size_t index) const { return data_[index]; }
+    };
+    
+    DummyEigenView as_eigen() {
+        return DummyEigenView(begin(), size());
+    }
+    
+    DummyEigenView as_eigen() const {
+        return DummyEigenView(const_cast<float*>(begin()), size());
+    }
+    #endif
 };
 
 /**
@@ -432,6 +460,20 @@ public:
 class Channel {
 public:
     /**
+     * @brief Default constructor
+     */
+    Channel() = default;
+    
+    /**
+     * @brief Constructor with URI and buffer size (for backward compatibility)
+     * @param uri Channel URI
+     * @param buffer_size Size of the internal buffer
+     * @param type Channel type (default: MultiType)
+     */
+    Channel(const std::string& uri, size_t buffer_size, ChannelType type = ChannelType::MultiType) 
+        : uri_(uri), buffer_size_(buffer_size), type_(type) {}
+    
+    /**
      * @brief Factory method to create channels
      * @param uri Channel URI (e.g., "memory://buffer1", "tcp://localhost:8080")
      * @param buffer_size Size of the internal buffer in bytes
@@ -498,6 +540,19 @@ public:
         return MessageType(data, size);
     }
     
+    /**
+     * @brief Receive a single message from the channel (blocking)
+     * @tparam MessageType Expected message type
+     * @param timeout Maximum time to wait (default: infinite)
+     * @return Optional containing the message if received, empty on timeout
+     */
+    template<typename MessageType>
+    std::optional<MessageType> receive_single(
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(1000)
+    ) {
+        return receive<MessageType>(timeout);
+    }
+    
     // Event-driven listening
     template<typename MessageType>
     std::unique_ptr<std::thread> listen(
@@ -514,33 +569,38 @@ public:
     }
     
     // Channel control
-    virtual void stop() = 0;
-    virtual bool is_stopped() const = 0;
+    virtual void stop() { stopped_ = true; }
+    virtual bool is_stopped() const { return stopped_; }
     
     // Properties
-    virtual const std::string& uri() const = 0;
-    virtual ChannelType type() const = 0;
-    virtual ChannelMode mode() const = 0;
+    virtual const std::string& uri() const { return uri_; }
+    virtual ChannelType type() const { return type_; }
+    virtual ChannelMode mode() const { return mode_; }
     
     // Raw message operations for template implementation
-    virtual void* receive_raw_message(size_t& size, uint32_t& type) = 0;
-    virtual void release_raw_message(void* handle) = 0;
+    virtual void* receive_raw_message(size_t& size, uint32_t& type) { return nullptr; }
+    virtual void release_raw_message(void* handle) {}
     
     // Debug metrics (optional)
-    virtual bool has_metrics() const = 0;
-    virtual debug::ChannelMetrics get_metrics() const = 0;
-    virtual void reset_metrics() = 0;
+    virtual bool has_metrics() const { return false; }
+    virtual debug::ChannelMetrics get_metrics() const { return debug::ChannelMetrics{}; }
+    virtual void reset_metrics() {}
     
     // Implementation access for Python bindings
     detail::ChannelImpl* get_impl() { return impl(); }
     const detail::ChannelImpl* get_impl() const { return impl(); }
     
 protected:
-    Channel() = default;
+    // Member variables for basic implementation
+    std::string uri_;
+    size_t buffer_size_ = 0;
+    ChannelType type_ = ChannelType::MultiType;
+    ChannelMode mode_ = ChannelMode::SPSC;
+    bool stopped_ = false;
     
     // Implementation pointer - protected so Message can access
-    virtual detail::ChannelImpl* impl() = 0;
-    virtual const detail::ChannelImpl* impl() const = 0;
+    virtual detail::ChannelImpl* impl() { return nullptr; }
+    virtual const detail::ChannelImpl* impl() const { return nullptr; }
     
     // Friend declaration to allow Message to access impl()
     template<typename Derived>
@@ -617,6 +677,86 @@ using SPSCChannel = Channel;  // These are now created via factory
 using SPMCChannel = Channel;
 using MPSCChannel = Channel;
 using MPMCChannel = Channel;
+
+// ============================================================================
+// Ring Buffer Implementation
+// ============================================================================
+
+/**
+ * @struct WriteHandle
+ * @brief Handle for writing data to ring buffer
+ */
+struct WriteHandle {
+    void* data;
+    size_t size;
+    void commit() { /* Implementation placeholder */ }
+};
+
+/**
+ * @struct ReadHandle
+ * @brief Handle for reading data from ring buffer
+ */
+struct ReadHandle {
+    const void* data;
+    size_t size;
+};
+
+/**
+ * @class SPSCRingBuffer
+ * @brief Single Producer Single Consumer ring buffer
+ */
+class SPSCRingBuffer {
+public:
+    explicit SPSCRingBuffer(size_t capacity) : capacity_(capacity) {}
+    
+    std::optional<WriteHandle> reserve(size_t size) {
+        // Placeholder implementation
+        if (size <= capacity_) {
+            return WriteHandle{nullptr, size};
+        }
+        return std::nullopt;
+    }
+    
+    std::optional<ReadHandle> read() {
+        // Placeholder implementation
+        return ReadHandle{nullptr, 0};
+    }
+    
+private:
+    size_t capacity_;
+};
+
+// ============================================================================
+// Channel Factory
+// ============================================================================
+
+/**
+ * @class ChannelFactory
+ * @brief Factory for creating different types of channels
+ */
+class ChannelFactory {
+public:
+    template<typename RingBufferType>
+    static std::unique_ptr<Channel> create(
+        const std::string& uri,
+        size_t buffer_size,
+        ChannelType type = ChannelType::MultiType
+    ) {
+        return std::make_unique<Channel>(uri, buffer_size, type);
+    }
+    
+    static bool is_memory_uri(const std::string& uri) {
+        return uri.substr(0, 9) == "memory://";
+    }
+    
+    static bool is_ipc_uri(const std::string& uri) {
+        return uri.substr(0, 6) == "ipc://";
+    }
+    
+    static bool is_tcp_uri(const std::string& uri) {
+        return uri.substr(0, 6) == "tcp://";
+    }
+};
 
 // ============================================================================
 // Enhanced Message Types
