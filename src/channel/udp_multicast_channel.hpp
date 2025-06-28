@@ -116,6 +116,7 @@ private:
     std::unique_ptr<udp::socket> socket_;
     udp::endpoint multicast_endpoint_;
     udp::endpoint local_endpoint_;
+    udp::endpoint sender_endpoint_tmp_;  // Temporary for async_receive_from
     std::thread io_thread_;
     
     // Message handling

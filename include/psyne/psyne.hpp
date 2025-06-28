@@ -558,6 +558,9 @@ protected:
  * - `tcp://:port` - TCP server (listens on port)
  * - `unix:///path/to/sock` - Unix domain socket client
  * - `unix://@/path/to/sock` - Unix domain socket server
+ * - `ws://host:port` - WebSocket client (connects to host:port)
+ * - `ws://:port` - WebSocket server (listens on port)
+ * - `wss://host:port` - Secure WebSocket client (TLS, not yet implemented)
  * 
  * @throws std::invalid_argument Invalid URI format
  * @throws std::runtime_error Channel creation failed

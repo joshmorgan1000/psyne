@@ -37,7 +37,13 @@
       "Bash(./examples/simple_compression_demo)",
       "Bash(./examples/debug_demo)",
       "Bash(./examples/udp_multicast_demo:*)",
-      "Bash(./examples/rdma_demo)"
+      "Bash(./examples/rdma_demo)",
+      "Bash(./examples/debug_multicast)",
+      "Bash(./examples/debug_multicast_simple:*)",
+      "Bash(./examples/routing_demo)",
+      "Bash(./examples/routing_demo_simple)",
+      "Bash(./examples/routing_demo_final)",
+      "Bash(./examples/test_bytevector)"
     ],
     "deny": []
   }

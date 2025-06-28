@@ -5,6 +5,7 @@
 #include "tcp_channel.hpp"
 #include "unix_channel.hpp"
 #include "udp_multicast_channel.hpp"
+#include "websocket_channel.hpp"
 #include <stdexcept>
 #include <regex>
 
@@ -150,6 +151,11 @@ std::unique_ptr<Channel> Channel::create(
         } else {
             impl = std::make_unique<detail::UnixChannel>(uri, buffer_size, mode, type, socket_path, true);
         }
+    } else if (scheme == "ws" || scheme == "wss") {
+        // Create WebSocket channel
+        // ws://host:port for client, ws://:port for server
+        bool is_server = path[0] == ':';
+        impl = std::make_unique<detail::WebSocketChannel>(uri, buffer_size, is_server);
     } else {
         throw std::invalid_argument("Unknown URI scheme: " + scheme);
     }

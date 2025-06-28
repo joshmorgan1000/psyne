@@ -1,4 +1,5 @@
 #include "udp_multicast_channel.hpp"
+#include "../memory/ring_buffer_impl.hpp"
 #include "../utils/xxhash64.h"
 #include <regex>
 #include <iostream>
@@ -36,6 +37,9 @@ UDPMulticastChannel::UDPMulticastChannel(const std::string& uri, size_t buffer_s
     if (role_ == MulticastRole::Subscriber) {
         join_group();
         start_receive();
+    } else {
+        // For publishers, enable loopback for local testing
+        set_loopback(true);
     }
 }
 
@@ -135,6 +139,8 @@ void UDPMulticastChannel::join_group() {
     joined_group_ = true;
     std::cout << "Joined multicast group " << multicast_endpoint_.address().to_string() 
               << " on port " << multicast_endpoint_.port() << std::endl;
+    std::cout << "Local socket bound to: " << socket_->local_endpoint().address().to_string() 
+              << ":" << socket_->local_endpoint().port() << std::endl;
 }
 
 void UDPMulticastChannel::leave_group() {
@@ -180,18 +186,32 @@ void* UDPMulticastChannel::reserve_space(size_t size) {
         return nullptr; // Only publishers can send
     }
     
-    send_buffer_.resize(sizeof(UDPMulticastHeader) + size);
-    return send_buffer_.data() + sizeof(UDPMulticastHeader);
+    // Allocate space for: UDPMulticastHeader + SlabHeader + user data
+    size_t total_size = sizeof(UDPMulticastHeader) + sizeof(SlabHeader) + size;
+    send_buffer_.resize(total_size);
+    
+    // Create a SlabHeader in the buffer after the UDPMulticastHeader
+    auto* slab_header = reinterpret_cast<SlabHeader*>(send_buffer_.data() + sizeof(UDPMulticastHeader));
+    slab_header->len = 0; // Will be set when message is committed
+    slab_header->reserved = 0;
+    
+    return slab_header; // Return SlabHeader pointer as expected by Message template
 }
 
 void UDPMulticastChannel::commit_message(void* handle) {
+    std::cout << "DEBUG: commit_message called, role=" << (int)role_ << ", handle=" << handle << std::endl;
+    
     if (role_ != MulticastRole::Publisher || !handle) {
+        std::cout << "DEBUG: commit_message early return" << std::endl;
         return;
     }
     
-    // Calculate payload size
-    uint8_t* payload_start = static_cast<uint8_t*>(handle);
-    size_t payload_size = send_buffer_.size() - sizeof(UDPMulticastHeader);
+    // Handle is a SlabHeader*
+    auto* slab_header = static_cast<SlabHeader*>(handle);
+    uint8_t* payload_start = static_cast<uint8_t*>(slab_header->data());
+    size_t payload_size = slab_header->len;
+    
+    std::cout << "DEBUG: payload_size=" << payload_size << std::endl;
     
     // Try compression if enabled
     size_t final_payload_size = payload_size;
@@ -313,15 +333,17 @@ void UDPMulticastChannel::start_receive() {
     
     socket_->async_receive_from(
         asio::buffer(recv_buffer_),
-        local_endpoint_,
+        sender_endpoint_tmp_,
         [this](const boost::system::error_code& error, size_t bytes_transferred) {
-            handle_receive(error, bytes_transferred, local_endpoint_);
+            handle_receive(error, bytes_transferred, sender_endpoint_tmp_);
         });
 }
 
 void UDPMulticastChannel::handle_receive(const boost::system::error_code& error, 
                                         size_t bytes_transferred, 
                                         udp::endpoint sender_endpoint) {
+    std::cout << "DEBUG: handle_receive called, bytes: " << bytes_transferred << std::endl;
+    
     if (error) {
         if (!stopping_) {
             std::cerr << "UDP receive error: " << error.message() << std::endl;
@@ -391,6 +413,9 @@ void UDPMulticastChannel::start_send() {
     
     auto& msg = send_queue_.front();
     
+    std::cout << "DEBUG: Sending " << msg.data.size() << " bytes to " 
+              << multicast_endpoint_.address().to_string() << ":" << multicast_endpoint_.port() << std::endl;
+    
     socket_->async_send_to(
         asio::buffer(msg.data),
         multicast_endpoint_,
@@ -401,9 +426,13 @@ void UDPMulticastChannel::start_send() {
 
 void UDPMulticastChannel::handle_send(const boost::system::error_code& error, 
                                      size_t bytes_transferred) {
+    std::cout << "DEBUG: handle_send called, bytes: " << bytes_transferred;
     if (error) {
+        std::cout << ", error: " << error.message() << std::endl;
         std::cerr << "UDP send error: " << error.message() << std::endl;
         return;
+    } else {
+        std::cout << " (success)" << std::endl;
     }
     
     update_stats_sent(bytes_transferred);

@@ -35,8 +35,9 @@ void test_multicast_basic() {
                 msg[j] = static_cast<float>(i * 10 + j);
             }
             
+            size_t msg_size = msg.size();
             publisher->send(msg);
-            std::cout << "Sent message " << (i + 1) << " with " << msg.size() << " floats" << std::endl;
+            std::cout << "Sent message " << (i + 1) << " with " << msg_size << " floats" << std::endl;
             
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -109,8 +110,9 @@ void test_multicast_with_compression() {
                 msg[j] = static_cast<float>(j % 10) * 0.1f; // Repeating pattern
             }
             
+            size_t msg_size = msg.size();
             publisher->send(msg);
-            std::cout << "Sent compressed message " << (i + 1) << " with " << msg.size() << " floats" << std::endl;
+            std::cout << "Sent compressed message " << (i + 1) << " with " << msg_size << " floats" << std::endl;
             
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
