@@ -1,6 +1,7 @@
 #include <psyne/psyne.hpp>
 #include <iostream>
 #include <memory>
+#include <cstring>
 
 using namespace psyne;
 
@@ -43,7 +44,8 @@ int main() {
             auto ipc_channel = Channel::create("ipc://memory_test", 1024 * 1024);
             ByteVector msg(*ipc_channel);
             std::string data = "IPC test message";
-            std::copy(data.begin(), data.end(), std::back_inserter(msg));
+            msg.resize(data.size());
+            std::memcpy(msg.data(), data.data(), data.size());
             msg.send();
             
             auto received = ipc_channel->receive_single<ByteVector>();
