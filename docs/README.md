@@ -93,7 +93,6 @@ Found an error or want to improve the docs?
 
 - **🐛 Bugs**: [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues)
 - **💬 Questions**: [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions)
-- **📧 Support**: support@psyne.io
 
 ---
 

@@ -224,7 +224,3 @@ cmake --build build --target multi_core_benchmark
 ---
 
 **Conclusion**: Psyne v1.2.0 demonstrates exceptional performance characteristics that make it suitable for the most demanding real-time applications. The combination of zero-copy architecture, lock-free data structures, and multi-core optimization delivers industry-leading performance metrics.
-
-*Last updated: December 28, 2024*
-*Benchmark suite version: v1.2.0*  
-*Test platform: Apple M4 (16-core)*

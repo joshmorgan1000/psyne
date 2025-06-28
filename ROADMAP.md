@@ -1,96 +1,6 @@
 # Psyne Development Roadmap 🚀
 
-## Current Status (v1.2.0)
-
-### ✅ Actually Completed Features
-- **Single Public Header**: Clean API with `psyne.hpp`
-- **Basic Message Framework**: Template-based message system with CRTP
-- **Core Message Types**: FloatVector, ByteVector, DoubleMatrix (basic implementations)
-- **Channel Factory**: URI-based channel creation framework
-- **Memory Transport**: Basic stub implementation for testing
-- **CI/CD Pipeline**: GitHub Actions for Linux/macOS builds
-- **Release Automation**: Automatic releases on version tags
-
-### 🚧 Stub Implementations (Need Real Implementation)
-- ~~Ring buffers (currently just allocate new memory each time)~~ ✅ **FIXED**
-- ~~Message queues (unbounded growth, no cleanup)~~ ✅ **FIXED**
-- Channel implementations (minimal functionality)
-- ~~Test suite (disabled due to crashes)~~ ✅ **ALL TESTS PASSING**
-
-## ✅ Phase 1: Fix Critical Issues (COMPLETED - v1.2.0) 🔥
-
-### High Priority - From QA Report ✅ **ALL COMPLETED**
-- [x] **Fix memory leaks in SPSCRingBuffer** ✅
-  - ~~Currently allocates new memory on each reserve()~~
-  - ~~Implement proper circular buffer with reusable memory~~
-  - **COMPLETED**: Now uses single pre-allocated buffer
-- [x] **Fix unbounded SimpleMessageQueue growth** ✅
-  - ~~Add maximum queue size limits~~
-  - ~~Implement backpressure/flow control~~
-  - **COMPLETED**: Added max_size parameter with queue full handling
-- [x] **Fix global message queue cleanup** ✅
-  - ~~Add destructor to remove queues from global map~~
-  - ~~Prevent memory leaks from destroyed channels~~
-  - **COMPLETED**: Added proper destructor with reference counting
-- [x] **Remove AddressSanitizer from release builds** ✅
-  - ~~Move to debug-only or CMake option~~
-  - ~~Currently impacts performance~~
-  - **COMPLETED**: AddressSanitizer now debug-only
-
-### Test Suite Revival ✅ **COMPLETED**
-- [x] Fix segfaults in basic_test ✅
-- [x] Fix message passing in simple_test ✅
-- [x] Fix heap-use-after-free errors ✅
-- [x] Fix exception handling in channel_test ✅
-- [x] Fix bounds checking in integration_test ✅
-- [x] **All 6 tests now passing!** 🎉
-- [x] Implement proper test fixtures ✅
-- [x] Add memory leak detection tests ✅
-- [x] Enable tests in CI pipeline ✅
-
-## ✅ Phase 2: Core Implementation (COMPLETED - v1.2.0) 🎉 
-
-### Real Ring Buffer Implementation
-- [x] **Lock-free SPSC ring buffer** ✅
-  - **COMPLETED**: Circular buffer with atomic operations
-  - **COMPLETED**: Proper memory reuse with single pre-allocated buffer
-  - **COMPLETED**: Configurable buffer sizes
-  - **COMPLETED**: Buffer overflow handling with backpressure
-- [x] **Message framing with size headers** ✅
-
-### Transport Implementations
-- [x] **Enhanced Memory Channel** ✅
-  - **COMPLETED**: Ring buffer-based implementation
-  - **COMPLETED**: Message type framing
-  - **COMPLETED**: Zero-copy semantics
-- [x] **Basic IPC Channel** ✅
-  - **COMPLETED**: POSIX shared memory implementation  
-  - **COMPLETED**: Cross-process communication
-  - Windows/Mach ports: Deferred to future releases
-- [x] **TCP Channel**: Socket-based networking ✅
-  - **COMPLETED**: Message framing with checksums
-  - **COMPLETED**: Connection management (client/server modes)
-  - **COMPLETED**: Error recovery with automatic retries
-  - **COMPLETED**: Compression support integrated
-
-### Performance Benchmarks ✅ **COMPLETED**
-- [x] **Latency measurements** ✅
-  - **ACHIEVED**: ~0.33μs average latency (memory channel)
-  - **ACHIEVED**: P99 latency < 0.5μs
-- [x] **Throughput tests** ✅
-  - **ACHIEVED**: Multi-size message benchmarks
-  - **ACHIEVED**: Producer-consumer pattern testing
-- [x] **Memory usage profiling** ✅
-  - **COMPLETED**: Platform-specific memory tracking (RSS, VMS, heap)
-  - **COMPLETED**: Real-time profiling during operations
-  - **COMPLETED**: Automated memory growth analysis
-- [x] **Comparison with other IPC libraries** ✅
-  - **COMPLETED**: Unix domain sockets comparison
-  - **COMPLETED**: TCP localhost comparison
-  - **COMPLETED**: Named pipes (FIFO) comparison
-  - **COMPLETED**: Comprehensive performance advantage analysis
-
-## Phase 1: GPU Acceleration (Q3 2025) 🎮
+## Phase 1: GPU Acceleration 🎮
 
 ### NVIDIA GPUDirect
 - [ ] CUDA IPC integration
@@ -108,7 +18,7 @@
 - [ ] Metal Performance Shaders integration
 - [ ] Shared event synchronization
 
-## Phase 2: Advanced Networking (Q4 2025)
+## Phase 2: Advanced Networking
 
 ### High-Performance Fabrics
 - [ ] **InfiniBand/RoCE**
@@ -128,7 +38,7 @@
 - [ ] Scatter/gather operations
 - [ ] Ring algorithms
 
-## Phase 3: AI/ML Integration (2026)
+## Phase 3: AI/ML Integration
 
 ### Framework Backends
 - [ ] **PyTorch Distributed**
