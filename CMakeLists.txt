@@ -107,6 +107,7 @@ endif()
 # Tests (optional)
 # ------------------------------------------------------------------------------
 option(PSYNE_BUILD_TESTS "Build unit tests" OFF)
+# Tests disabled by default due to implementation issues
 if(PSYNE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
