@@ -1,12 +1,12 @@
 # Psyne Overview
 
-Psyne is a zero-copy, event-driven message pipeline designed for high-performance computing on unified memory architectures. It enables the same binary payload to flow through CPU logic and GPU compute kernels without memory copies.
+Psyne is a zero-copy, event-driven message pipeline designed for high-performance computing. It enables the same binary payload to flow through CPU logic and GPU compute kernels.
 
 ## Core Design Principles
 
 ### 1. Zero-Copy Architecture
 - Messages are allocated directly in pre-allocated slabs (ring buffers)
-- Producers write directly into the buffer memory
+- Producers write directly into the buffer memory before the message is sent
 - Consumers receive views into the same memory
 - No serialization/deserialization overhead
 
@@ -15,8 +15,7 @@ Psyne is a zero-copy, event-driven message pipeline designed for high-performanc
 - Thread-safe producer/consumer patterns (SPSC, SPMC, MPSC, MPMC)
 - Efficient signaling mechanisms for IPC
 
-### 3. Unified Memory Model
-- Designed for Apple Silicon and other unified memory architectures
+### 3. Common Memory Model
 - Same memory can be accessed as:
   - CPU arrays (`std::span<float>`, `float*`)
   - Linear algebra structures (Eigen3 matrices)

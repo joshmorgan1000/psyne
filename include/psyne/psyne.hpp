@@ -9,9 +9,9 @@
  * 
  * @author Psyne Contributors
  * @version 1.2.0
- * @date 2024
+ * @date 2025
  * 
- * @copyright Copyright (c) 2024 Psyne Contributors
+ * @copyright Copyright (c) 2025 Psyne Contributors
  * 
  * @example simple_messaging.cpp
  * @example producer_consumer.cpp

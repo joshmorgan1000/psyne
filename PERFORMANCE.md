@@ -210,17 +210,3 @@ cmake --build build --target multi_core_benchmark
 # Run the focused performance benchmark
 ./build/tests/performance_benchmark
 ```
-
-### Hardware Requirements
-- **Minimum**: 4 CPU cores, 8GB RAM
-- **Recommended**: 16+ CPU cores, 32GB+ RAM
-- **Optimal**: Apple M4 or equivalent multi-core system
-
-### Software Requirements
-- **Compiler**: GCC 11+ or Clang 14+ with C++20 support
-- **OS**: macOS 13+, Linux 5.0+, or Windows 11+
-- **CMake**: 3.20 or higher
-
----
-
-**Conclusion**: Psyne v1.2.0 demonstrates exceptional performance characteristics that make it suitable for the most demanding real-time applications. The combination of zero-copy architecture, lock-free data structures, and multi-core optimization delivers industry-leading performance metrics.
