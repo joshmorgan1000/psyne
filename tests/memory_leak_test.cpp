@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
 #include "test_fixtures.hpp"
+#include <cassert>
+#include <iostream>
 #include <thread>
 #include <chrono>
 
@@ -9,7 +10,7 @@ using namespace psyne::test;
 /**
  * @brief Test fixture specifically for memory leak detection
  */
-class MemoryLeakTestFixture : public PsyneTestFixture {
+class MemoryLeakTestFixture : public psyne::test::PsyneTestFixture {
 protected:
     void SetUp() override {
         PsyneTestFixture::setup();
@@ -85,7 +86,8 @@ private:
 /**
  * @brief Test that channel creation and destruction doesn't leak memory
  */
-TEST_F(MemoryLeakTestFixture, ChannelCreationDestruction) {
+void test_channel_creation_destruction() {
+    MemoryLeakTestFixture fixture;
     const int num_iterations = 1000;
     
     for (int i = 0; i < num_iterations; ++i) {

@@ -737,6 +737,7 @@ void Message<Derived>::send() {
 struct WriteHandle {
     void* data;
     size_t size;
+    class SPSCRingBuffer* ring_buffer;  // Forward declaration
     void commit();
 };
 
@@ -747,6 +748,7 @@ struct WriteHandle {
 struct ReadHandle {
     const void* data;
     size_t size;
+    class SPSCRingBuffer* ring_buffer;  // Forward declaration
     
     /**
      * @brief Release the read handle and advance read position
@@ -769,7 +771,7 @@ public:
     std::optional<ReadHandle> read();
     
     // For testing only - TODO: Remove global instance in production
-    static SPSCRingBuffer* current_instance_;
+    // Removed global current_instance_ for thread safety
     
 private:
     size_t capacity_;

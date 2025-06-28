@@ -7,11 +7,12 @@
 #include <map>
 #include <iostream>
 #include <stdexcept>
+#include <optional>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "../src/channel/tcp_channel.hpp"
+#include "../src/channel/tcp_channel_stub.hpp"
 #include "../src/compression/compression.hpp"
 
 namespace psyne {
@@ -79,8 +80,8 @@ public:
         std::string name = uri.substr(6); // Skip "ipc://"
         shm_name_ = "/psyne_" + name;
         
-        // Try to create or open shared memory
-        shm_fd_ = shm_open(shm_name_.c_str(), O_CREAT | O_RDWR, 0666);
+        // Try to create or open shared memory with secure permissions
+        shm_fd_ = shm_open(shm_name_.c_str(), O_CREAT | O_RDWR, 0600); // Owner read/write only
         if (shm_fd_ == -1) {
             throw std::runtime_error("Failed to create/open shared memory: " + shm_name_);
         }
@@ -296,10 +297,7 @@ std::unique_ptr<Channel> Channel::create(
 // Test message types (TestMsg, SimpleMessage) are instantiated in test files
 
 // SPSCRingBuffer implementation - Enhanced circular buffer
-SPSCRingBuffer* SPSCRingBuffer::current_instance_ = nullptr;
-
 SPSCRingBuffer::SPSCRingBuffer(size_t capacity) : capacity_(capacity) {
-    current_instance_ = this;
     // Allocate buffer for circular ring buffer
     buffer_ = std::make_unique<uint8_t[]>(capacity);
     write_pos_.store(0);
@@ -350,7 +348,7 @@ std::optional<WriteHandle> SPSCRingBuffer::reserve(size_t size) {
     reserved_size_ = total_size;
     reserved_write_pos_ = current_write;
     
-    return WriteHandle{buffer_.get() + current_write + sizeof(uint64_t), size};
+    return WriteHandle{buffer_.get() + current_write + sizeof(uint64_t), size, this};
 }
 
 std::optional<ReadHandle> SPSCRingBuffer::read() {
@@ -365,12 +363,13 @@ std::optional<ReadHandle> SPSCRingBuffer::read() {
     uint64_t* size_header = reinterpret_cast<uint64_t*>(buffer_.get() + current_read);
     uint64_t message_size = *size_header;
     
-    return ReadHandle{buffer_.get() + current_read + sizeof(uint64_t), message_size};
+    return ReadHandle{buffer_.get() + current_read + sizeof(uint64_t), message_size, this};
 }
 
 void WriteHandle::commit() {
     // Mark data as written by updating write position
-    if (auto* rb = SPSCRingBuffer::current_instance_) {
+    if (ring_buffer) {
+        auto* rb = ring_buffer;
         size_t new_write_pos = rb->reserved_write_pos_ + rb->reserved_size_;
         
         // Handle wrap-around
@@ -384,7 +383,8 @@ void WriteHandle::commit() {
 
 void ReadHandle::release() {
     // Advance read position past this message
-    if (auto* rb = SPSCRingBuffer::current_instance_) {
+    if (ring_buffer) {
+        auto* rb = ring_buffer;
         size_t current_read = rb->read_pos_.load();
         size_t message_total_size = sizeof(uint64_t) + size;
         size_t new_read_pos = current_read + message_total_size;

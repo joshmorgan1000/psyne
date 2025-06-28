@@ -50,7 +50,8 @@ add_custom_target(run_benchmarks
     COMMAND throughput_benchmark
     COMMAND latency_benchmark  
     COMMAND dynamic_allocation_benchmark
-    DEPENDS throughput_benchmark latency_benchmark dynamic_allocation_benchmark
+    COMMAND ipc_comparison_benchmark
+    DEPENDS throughput_benchmark latency_benchmark dynamic_allocation_benchmark ipc_comparison_benchmark
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running all benchmarks..."
 )
@@ -62,8 +63,9 @@ add_custom_target(benchmark_report
     COMMAND throughput_benchmark > ${CMAKE_CURRENT_BINARY_DIR}/results/throughput_results.txt
     COMMAND latency_benchmark > ${CMAKE_CURRENT_BINARY_DIR}/results/latency_results.txt
     COMMAND dynamic_allocation_benchmark > ${CMAKE_CURRENT_BINARY_DIR}/results/dynamic_results.txt
+    COMMAND ipc_comparison_benchmark > ${CMAKE_CURRENT_BINARY_DIR}/results/ipc_comparison_results.txt
     COMMAND ${CMAKE_COMMAND} -E echo "Results saved to ${CMAKE_CURRENT_BINARY_DIR}/results/"
-    DEPENDS throughput_benchmark latency_benchmark dynamic_allocation_benchmark
+    DEPENDS throughput_benchmark latency_benchmark dynamic_allocation_benchmark ipc_comparison_benchmark
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating benchmark report..."
 )
