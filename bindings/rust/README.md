@@ -46,7 +46,7 @@ Add Psyne to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-psyne = "1.0.0"
+psyne = "1.2.0"
 tokio = { version = "1.35", features = ["full"] }  # For async support
 ```
 
@@ -488,7 +488,7 @@ let result = channel.receive_data(&mut buffer, 1000)?; // 1 second timeout
 
 ```toml
 [dependencies]
-psyne = { version = "1.0.0", features = ["debug"] }
+psyne = { version = "1.2.0", features = ["debug"] }
 ```
 
 ```rust

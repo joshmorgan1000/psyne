@@ -182,7 +182,7 @@ private:
 PYBIND11_MODULE(psyne, m) {
     m.doc() = "Psyne - High-performance zero-copy messaging library for Python";
     
-    m.attr("__version__") = "0.1.1";
+    m.attr("__version__") = "1.2.0";
     
     // Version functions
     m.def("version", &version, "Get library version string");

@@ -227,7 +227,7 @@ We value all contributions and recognize contributors:
 
 - **💬 Discussions**: [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions) - general questions
 - **🐛 Issues**: [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues) - bugs and feature requests
-- **📧 Email**: maintainers@psyne.io - sensitive issues or private communication
+- **📧 Email**: ... - sensitive issues or private communication
 - **🗣️ Chat**: Join our Discord/Slack (link in README) - real-time discussion
 
 ### 📜 Code of Conduct

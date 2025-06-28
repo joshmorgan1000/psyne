@@ -36,9 +36,13 @@ endfunction()
 # Add tests
 add_psyne_test(simple_test)
 add_psyne_test(basic_test)
-# add_psyne_test(tcp_test)  # Disabled: requires TCPChannel implementation
+add_psyne_test(tcp_test)
 add_psyne_test(message_test)
 add_psyne_test(channel_test)
 # add_psyne_test(performance_test)  # Disabled: requires PerformanceManager and ReliabilityManager implementation
 add_psyne_test(compression_encryption_test)
 add_psyne_test(integration_test)
+add_psyne_test(performance_benchmark)
+add_psyne_test(multi_core_benchmark)
+add_psyne_test(memory_leak_test)
+add_psyne_test(memory_profiling_benchmark)

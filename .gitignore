@@ -35,4 +35,5 @@ git_apply.sh
 build/
 
 CLAUDE.md
+AGENTS.md
 .claude/

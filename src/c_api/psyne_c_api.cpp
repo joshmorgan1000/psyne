@@ -94,7 +94,7 @@ void psyne_cleanup(void) {
 }
 
 const char* psyne_version(void) {
-    return "0.1.1";
+    return "1.2.0";
 }
 
 const char* psyne_error_string(psyne_error_t error) {

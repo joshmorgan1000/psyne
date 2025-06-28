@@ -8,7 +8,7 @@
  * Include this file to access all Psyne functionality.
  * 
  * @author Psyne Contributors
- * @version 0.1.1
+ * @version 1.2.0
  * @date 2024
  * 
  * @copyright Copyright (c) 2024 Psyne Contributors
@@ -36,7 +36,7 @@
 
 // Version information
 #define PSYNE_VERSION_MAJOR 1
-#define PSYNE_VERSION_MINOR 0
+#define PSYNE_VERSION_MINOR 2
 #define PSYNE_VERSION_PATCH 0
 
 /**
@@ -50,7 +50,7 @@ namespace psyne {
  * @return Version string in the format "major.minor.patch"
  */
 constexpr const char* version() {
-    return "1.0.0";
+    return "1.2.0";
 }
 
 /**
@@ -747,11 +747,19 @@ struct WriteHandle {
 struct ReadHandle {
     const void* data;
     size_t size;
+    
+    /**
+     * @brief Release the read handle and advance read position
+     */
+    void release();
 };
 
 /**
  * @class SPSCRingBuffer
- * @brief Single Producer Single Consumer ring buffer
+ * @brief Single Producer Single Consumer ring buffer with circular message storage
+ * 
+ * Enhanced implementation that supports multiple concurrent messages with proper
+ * circular buffer semantics and atomic operations for thread safety.
  */
 class SPSCRingBuffer {
 public:
@@ -766,11 +774,15 @@ public:
 private:
     size_t capacity_;
     std::unique_ptr<uint8_t[]> buffer_;
-    size_t write_pos_ = 0;
-    size_t read_pos_ = 0;
-    size_t current_message_size_ = 0;
+    std::atomic<size_t> write_pos_{0};
+    std::atomic<size_t> read_pos_{0};
+    
+    // Temporary state for reservation
+    size_t reserved_size_ = 0;
+    size_t reserved_write_pos_ = 0;
     
     friend void WriteHandle::commit();
+    friend void ReadHandle::release();
 };
 
 // ============================================================================

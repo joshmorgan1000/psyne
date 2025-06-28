@@ -44,9 +44,10 @@ jobs:
       - name: Build
         run: cmake --build build -- -j$(nproc)
 
-      - name: Run Tests (if available)
+      - name: Run Tests
         run: |
-          echo "Tests temporarily disabled - build successful"
+          cd build
+          ctest --output-on-failure -j$(nproc)
 
   build-macos:
     runs-on: macos-latest
@@ -75,9 +76,10 @@ jobs:
       - name: Build
         run: cmake --build build -- -j$(sysctl -n hw.ncpu)
 
-      - name: Run Tests (if available)
+      - name: Run Tests
         run: |
-          echo "Tests temporarily disabled - build successful"
+          cd build
+          ctest --output-on-failure -j$(sysctl -n hw.ncpu)
 
   validate-examples:
     runs-on: ubuntu-latest

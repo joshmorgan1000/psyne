@@ -449,7 +449,7 @@ This project is licensed under the same terms as the main Psyne library.
 
 ## Version History
 
-- **0.1.1**: Initial Julia bindings release
+- **1.2.0**: Current release
   - Core channel operations
   - Message types with Julia idioms
   - Compression support

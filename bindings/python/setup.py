@@ -42,7 +42,7 @@ ext_modules = [
 
 setup(
     name="psyne",
-    version="1.0.0",
+    version="1.2.0",
     author="Psyne Contributors",
     author_email="",
     description="High-performance zero-copy messaging library for Python",

@@ -43,6 +43,7 @@ endfunction()
 add_psyne_benchmark(throughput_benchmark)
 add_psyne_benchmark(latency_benchmark)
 add_psyne_benchmark(dynamic_allocation_benchmark)
+add_psyne_benchmark(ipc_comparison_benchmark)
 
 # Create a custom target to run all benchmarks
 add_custom_target(run_benchmarks

@@ -95,7 +95,7 @@
 /// For more examples and documentation, see the Examples/ directory and README.md
 public enum PsyneModule {
     /// The current version of the Psyne Swift bindings
-    public static let version = "1.0.0"
+    public static let version = "1.2.0"
     
     /// Information about the Swift bindings
     public static let info = """

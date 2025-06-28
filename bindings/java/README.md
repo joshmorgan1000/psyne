@@ -42,13 +42,13 @@ Once published to Maven Central:
 <dependency>
     <groupId>com.psyne</groupId>
     <artifactId>psyne-java</artifactId>
-    <version>0.1.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
 ```gradle
 // Gradle
-implementation 'com.psyne:psyne-java:0.1.1'
+implementation 'com.psyne:psyne-java:1.2.0'
 ```
 
 ## Quick Start

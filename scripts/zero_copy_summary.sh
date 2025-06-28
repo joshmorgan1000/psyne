@@ -72,7 +72,7 @@ if [ $CRITICAL_ISSUES -eq 0 ]; then
     echo "   • Proper move semantics implementation"
     echo "   • Direct .data() pointer access patterns"
     echo ""
-    echo -e "${GREEN}🚀 Psyne is ready for 1.0.0 with true zero-copy performance!${NC}"
+    echo -e "${GREEN}🚀 Psyne is ready for 1.2.0 with true zero-copy performance!${NC}"
 else
     echo -e "${RED}❌ Found $CRITICAL_ISSUES critical issues that should be reviewed${NC}"
 fi

@@ -97,9 +97,9 @@ int main() {
             assert(version != nullptr);
             assert(strlen(version) > 0);
             
-            // Should be version 1.0.0
+            // Should be version 1.2.0
             std::string version_str(version);
-            assert(version_str == "1.0.0");
+            assert(version_str == "1.2.0");
             
             std::cout << "✓ Version information correct: " << version << std::endl;
         }

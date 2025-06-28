@@ -7,6 +7,12 @@
 #include <map>
 #include <iostream>
 #include <stdexcept>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "../src/channel/tcp_channel.hpp"
+#include "../src/compression/compression.hpp"
 
 namespace psyne {
 
@@ -59,69 +65,194 @@ private:
     const size_t max_size_;
 };
 
-// Global message queues for channels (simple implementation for testing)
-static std::map<std::string, std::shared_ptr<SimpleMessageQueue>> g_message_queues;
-static std::mutex g_queues_mutex;
+// Global ring buffers for memory channels (enhanced implementation)
+static std::map<std::string, std::shared_ptr<SPSCRingBuffer>> g_ring_buffers;
+static std::mutex g_buffers_mutex;
 
-// Extended Channel implementation with basic message passing
-class TestChannel : public Channel {
+// Basic IPC Channel implementation using shared memory
+class IPCChannel : public Channel {
 public:
-    TestChannel(const std::string& uri, size_t buffer_size, ChannelType type) 
-        : Channel(uri, buffer_size, type) {
-        std::lock_guard<std::mutex> lock(g_queues_mutex);
-        auto it = g_message_queues.find(uri);
-        if (it == g_message_queues.end()) {
-            queue_ = std::make_shared<SimpleMessageQueue>();
-            g_message_queues[uri] = queue_;
-        } else {
-            queue_ = it->second;
+    IPCChannel(const std::string& uri, size_t buffer_size, ChannelType type)
+        : Channel(uri, buffer_size, type), shm_fd_(-1), shm_ptr_(nullptr) {
+        
+        // Extract name from IPC URI (ipc://name -> name)
+        std::string name = uri.substr(6); // Skip "ipc://"
+        shm_name_ = "/psyne_" + name;
+        
+        // Try to create or open shared memory
+        shm_fd_ = shm_open(shm_name_.c_str(), O_CREAT | O_RDWR, 0666);
+        if (shm_fd_ == -1) {
+            throw std::runtime_error("Failed to create/open shared memory: " + shm_name_);
         }
-        current_message_ = nullptr;
+        
+        // Set the size of shared memory
+        if (ftruncate(shm_fd_, buffer_size) == -1) {
+            close(shm_fd_);
+            throw std::runtime_error("Failed to set shared memory size");
+        }
+        
+        // Map shared memory into process address space
+        shm_ptr_ = mmap(nullptr, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd_, 0);
+        if (shm_ptr_ == MAP_FAILED) {
+            close(shm_fd_);
+            throw std::runtime_error("Failed to map shared memory");
+        }
+        
+        // Initialize ring buffer using the shared memory
+        ring_buffer_ = std::make_unique<SPSCRingBuffer>(buffer_size);
+        current_read_handle_ = std::nullopt;
     }
     
-    ~TestChannel() {
-        // Clean up queue from global map when this is the last reference
-        std::lock_guard<std::mutex> lock(g_queues_mutex);
-        auto it = g_message_queues.find(uri_);
-        if (it != g_message_queues.end() && it->second.use_count() <= 2) {
-            // use_count <= 2 means only the map and this channel hold references
-            g_message_queues.erase(it);
+    ~IPCChannel() {
+        if (shm_ptr_ && shm_ptr_ != MAP_FAILED) {
+            munmap(shm_ptr_, buffer_size_);
         }
+        if (shm_fd_ != -1) {
+            close(shm_fd_);
+        }
+        // Note: We don't unlink the shared memory here since other processes might be using it
     }
     
     void send_raw_message(const void* data, size_t size, uint32_t type) override {
-        if (queue_) {
-            bool success = queue_->push(data, size, type);
-            (void)success; // Suppress unused variable warning in release builds
-            // In a real implementation, we might block or use backpressure when queue is full
+        if (!ring_buffer_) return;
+        
+        // Reserve space for message type (4 bytes) + data
+        size_t total_size = sizeof(uint32_t) + size;
+        auto write_handle = ring_buffer_->reserve(total_size);
+        
+        if (write_handle) {
+            // Write message type first, then data
+            uint8_t* buffer = static_cast<uint8_t*>(write_handle->data);
+            *reinterpret_cast<uint32_t*>(buffer) = type;
+            std::memcpy(buffer + sizeof(uint32_t), data, size);
+            
+            write_handle->commit();
         }
     }
     
     void* receive_raw_message(size_t& size, uint32_t& type) override {
-        if (!queue_) return nullptr;
+        if (!ring_buffer_) return nullptr;
         
-        // Store the message so it doesn't get freed
-        current_message_ = queue_->pop(std::chrono::milliseconds(1000));
-        if (!current_message_) return nullptr;
+        // Release previous read handle if exists
+        if (current_read_handle_) {
+            current_read_handle_->release();
+            current_read_handle_ = std::nullopt;
+        }
         
-        size = current_message_->data.size();
-        type = current_message_->type;
+        // Try to read new message
+        auto read_handle = ring_buffer_->read();
+        if (!read_handle) return nullptr;
         
-        // Create a copy of the data that will persist until release_raw_message
-        temp_buffer_.resize(size);
-        std::memcpy(temp_buffer_.data(), current_message_->data.data(), size);
-        return temp_buffer_.data();
+        // Extract message type and data
+        const uint8_t* buffer = static_cast<const uint8_t*>(read_handle->data);
+        if (read_handle->size < sizeof(uint32_t)) return nullptr;
+        
+        type = *reinterpret_cast<const uint32_t*>(buffer);
+        size = read_handle->size - sizeof(uint32_t);
+        
+        // Store read handle for later release
+        current_read_handle_ = *read_handle;
+        
+        // Return pointer to actual message data (after type header)
+        return const_cast<uint8_t*>(buffer + sizeof(uint32_t));
     }
     
     void release_raw_message(void* /*handle*/) override {
-        current_message_.reset();
-        temp_buffer_.clear();
+        if (current_read_handle_) {
+            current_read_handle_->release();
+            current_read_handle_ = std::nullopt;
+        }
     }
     
 private:
-    std::shared_ptr<SimpleMessageQueue> queue_;
-    std::unique_ptr<SimpleMessageQueue::MessageData> current_message_;
-    std::vector<uint8_t> temp_buffer_;
+    std::string shm_name_;
+    int shm_fd_;
+    void* shm_ptr_;
+    std::unique_ptr<SPSCRingBuffer> ring_buffer_;
+    std::optional<ReadHandle> current_read_handle_;
+};
+
+// Enhanced Channel implementation using ring buffers
+class TestChannel : public Channel {
+public:
+    TestChannel(const std::string& uri, size_t buffer_size, ChannelType type) 
+        : Channel(uri, buffer_size, type) {
+        std::lock_guard<std::mutex> lock(g_buffers_mutex);
+        auto it = g_ring_buffers.find(uri);
+        if (it == g_ring_buffers.end()) {
+            ring_buffer_ = std::make_shared<SPSCRingBuffer>(buffer_size);
+            g_ring_buffers[uri] = ring_buffer_;
+        } else {
+            ring_buffer_ = it->second;
+        }
+        current_read_handle_ = std::nullopt;
+    }
+    
+    ~TestChannel() {
+        // Clean up ring buffer from global map when this is the last reference
+        std::lock_guard<std::mutex> lock(g_buffers_mutex);
+        auto it = g_ring_buffers.find(uri_);
+        if (it != g_ring_buffers.end() && it->second.use_count() <= 2) {
+            // use_count <= 2 means only the map and this channel hold references
+            g_ring_buffers.erase(it);
+        }
+    }
+    
+    void send_raw_message(const void* data, size_t size, uint32_t type) override {
+        if (!ring_buffer_) return;
+        
+        // Reserve space for message type (4 bytes) + data
+        size_t total_size = sizeof(uint32_t) + size;
+        auto write_handle = ring_buffer_->reserve(total_size);
+        
+        if (write_handle) {
+            // Write message type first, then data
+            uint8_t* buffer = static_cast<uint8_t*>(write_handle->data);
+            *reinterpret_cast<uint32_t*>(buffer) = type;
+            std::memcpy(buffer + sizeof(uint32_t), data, size);
+            
+            write_handle->commit();
+        }
+        // If reservation fails, message is dropped (backpressure)
+    }
+    
+    void* receive_raw_message(size_t& size, uint32_t& type) override {
+        if (!ring_buffer_) return nullptr;
+        
+        // Release previous read handle if exists
+        if (current_read_handle_) {
+            current_read_handle_->release();
+            current_read_handle_ = std::nullopt;
+        }
+        
+        // Try to read new message
+        auto read_handle = ring_buffer_->read();
+        if (!read_handle) return nullptr;
+        
+        // Extract message type and data
+        const uint8_t* buffer = static_cast<const uint8_t*>(read_handle->data);
+        if (read_handle->size < sizeof(uint32_t)) return nullptr;
+        
+        type = *reinterpret_cast<const uint32_t*>(buffer);
+        size = read_handle->size - sizeof(uint32_t);
+        
+        // Store read handle for later release
+        current_read_handle_ = *read_handle;
+        
+        // Return pointer to actual message data (after type header)
+        return const_cast<uint8_t*>(buffer + sizeof(uint32_t));
+    }
+    
+    void release_raw_message(void* /*handle*/) override {
+        if (current_read_handle_) {
+            current_read_handle_->release();
+            current_read_handle_ = std::nullopt;
+        }
+    }
+    
+private:
+    std::shared_ptr<SPSCRingBuffer> ring_buffer_;
+    std::optional<ReadHandle> current_read_handle_;
 };
 
 // Note: Message template methods are defined inline in psyne.hpp
@@ -146,65 +277,130 @@ std::unique_ptr<Channel> Channel::create(
     }
     
     std::string protocol = uri.substr(0, uri.find("://"));
-    std::cout << "DEBUG: Validating protocol: " << protocol << std::endl;
     if (protocol != "memory" && protocol != "ipc" && protocol != "unix" && protocol != "tcp" && protocol != "ws" && protocol != "wss") {
-        std::cout << "DEBUG: Throwing exception for unsupported protocol: " << protocol << std::endl;
         throw std::invalid_argument("Unsupported protocol: " + protocol);
     }
     
-    return std::make_unique<TestChannel>(uri, buffer_size, type);
+    // Route to appropriate channel implementation based on protocol
+    if (protocol == "ipc") {
+        return std::make_unique<IPCChannel>(uri, buffer_size, type);
+    } else if (protocol == "tcp") {
+        return detail::create_tcp_channel(uri, buffer_size, mode, type, compression_config);
+    } else {
+        // Default to memory channel for all other protocols (for now)
+        return std::make_unique<TestChannel>(uri, buffer_size, type);
+    }
 }
 
 // Explicit template instantiations for library message types only
 // Test message types (TestMsg, SimpleMessage) are instantiated in test files
 
-// SPSCRingBuffer implementation - Fixed memory management
+// SPSCRingBuffer implementation - Enhanced circular buffer
 SPSCRingBuffer* SPSCRingBuffer::current_instance_ = nullptr;
 
 SPSCRingBuffer::SPSCRingBuffer(size_t capacity) : capacity_(capacity) {
     current_instance_ = this;
-    // Allocate a single buffer for the entire ring buffer
+    // Allocate buffer for circular ring buffer
     buffer_ = std::make_unique<uint8_t[]>(capacity);
-    write_pos_ = 0;
-    read_pos_ = 0;
-    current_message_size_ = 0;
+    write_pos_.store(0);
+    read_pos_.store(0);
+    reserved_size_ = 0;
 }
 
 std::optional<WriteHandle> SPSCRingBuffer::reserve(size_t size) {
-    if (size > capacity_) {
-        return std::nullopt; // Message too large
+    // Need space for size header (8 bytes) + message data
+    size_t total_size = sizeof(uint64_t) + size;
+    
+    if (total_size > capacity_) {
+        return std::nullopt; // Message too large for buffer
     }
     
-    // Simple implementation: use the entire buffer for one message at a time
-    // In a real implementation, this would handle multiple concurrent messages
-    if (write_pos_ != read_pos_) {
-        return std::nullopt; // Buffer busy
+    size_t current_write = write_pos_.load();
+    size_t current_read = read_pos_.load();
+    
+    // Calculate available space in circular buffer
+    size_t available_space;
+    if (current_write >= current_read) {
+        // Write position is ahead of read position
+        size_t space_to_end = capacity_ - current_write;
+        size_t space_from_start = current_read;
+        
+        if (total_size <= space_to_end) {
+            // Fits in remaining space
+            available_space = space_to_end;
+        } else if (total_size <= space_from_start && current_read > 0) {
+            // Need to wrap around to beginning
+            current_write = 0;
+            available_space = space_from_start;
+        } else {
+            return std::nullopt; // Not enough space
+        }
+    } else {
+        // Read position is ahead of write position
+        available_space = current_read - current_write;
+        if (total_size > available_space) {
+            return std::nullopt; // Not enough space
+        }
     }
     
-    write_pos_ = 0;
-    current_message_size_ = size;
-    return WriteHandle{buffer_.get(), size};
+    // Reserve space and store size header
+    uint64_t* size_header = reinterpret_cast<uint64_t*>(buffer_.get() + current_write);
+    *size_header = size;
+    
+    reserved_size_ = total_size;
+    reserved_write_pos_ = current_write;
+    
+    return WriteHandle{buffer_.get() + current_write + sizeof(uint64_t), size};
 }
 
 std::optional<ReadHandle> SPSCRingBuffer::read() {
-    if (write_pos_ == read_pos_) {
+    size_t current_read = read_pos_.load();
+    size_t current_write = write_pos_.load();
+    
+    if (current_read == current_write) {
         return std::nullopt; // No data available
     }
     
-    return ReadHandle{buffer_.get(), current_message_size_};
+    // Read size header
+    uint64_t* size_header = reinterpret_cast<uint64_t*>(buffer_.get() + current_read);
+    uint64_t message_size = *size_header;
+    
+    return ReadHandle{buffer_.get() + current_read + sizeof(uint64_t), message_size};
 }
 
 void WriteHandle::commit() {
-    // Mark data as written
+    // Mark data as written by updating write position
     if (auto* rb = SPSCRingBuffer::current_instance_) {
-        rb->write_pos_ = rb->current_message_size_;
-        rb->read_pos_ = 0; // Reset for next read
+        size_t new_write_pos = rb->reserved_write_pos_ + rb->reserved_size_;
+        
+        // Handle wrap-around
+        if (new_write_pos >= rb->capacity_) {
+            new_write_pos = 0;
+        }
+        
+        rb->write_pos_.store(new_write_pos);
+    }
+}
+
+void ReadHandle::release() {
+    // Advance read position past this message
+    if (auto* rb = SPSCRingBuffer::current_instance_) {
+        size_t current_read = rb->read_pos_.load();
+        size_t message_total_size = sizeof(uint64_t) + size;
+        size_t new_read_pos = current_read + message_total_size;
+        
+        // Handle wrap-around
+        if (new_read_pos >= rb->capacity_) {
+            new_read_pos = 0;
+        }
+        
+        rb->read_pos_.store(new_read_pos);
     }
 }
 
 // Add basic function implementations
 const char* get_version() {
-    return "1.0.0";
+    return "1.2.0";
 }
 
 void print_banner() {
@@ -213,11 +409,17 @@ void print_banner() {
 
 // FloatVector implementations
 float& FloatVector::operator[](size_t index) {
+    if (index >= size()) {
+        throw std::out_of_range("FloatVector index out of range");
+    }
     float* floats = reinterpret_cast<float*>(data() + sizeof(size_t));
     return floats[index];
 }
 
 const float& FloatVector::operator[](size_t index) const {
+    if (index >= size()) {
+        throw std::out_of_range("FloatVector index out of range");
+    }
     const float* floats = reinterpret_cast<const float*>(data() + sizeof(size_t));
     return floats[index];
 }
