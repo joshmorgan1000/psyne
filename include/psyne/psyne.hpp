@@ -922,17 +922,13 @@ inline void disable_performance_optimizations() {
  * @brief Get a summary of current performance metrics
  * @return Human-readable performance summary
  */
-inline std::string get_performance_summary() {
-    return PerformanceManager::instance().get_summary();
-}
+std::string get_performance_summary();
 
 /**
  * @brief Get performance tuning recommendations
  * @return List of recommendations based on current system state
  */
-inline std::vector<std::string> get_performance_recommendations() {
-    return PerformanceManager::instance().get_recommendations();
-}
+std::vector<std::string> get_performance_recommendations();
 
 /**
  * @brief Run performance benchmarks on a channel
@@ -978,14 +974,14 @@ inline OptimizedMessage<T> create_optimized_message(Channel& channel) {
  * @param channel The channel to inspect
  * @return Complete diagnostic report
  */
-inline debug::ChannelDiagnostics inspect_channel(const Channel& channel);
+debug::ChannelDiagnostics inspect_channel(const Channel& channel);
 
 /**
  * @brief Get a human-readable status report for a channel
  * @param channel The channel to inspect
  * @return Formatted status report
  */
-inline std::string get_channel_status(const Channel& channel);
+std::string get_channel_status(const Channel& channel);
 
 /**
  * @brief Visualize channel buffer usage
@@ -993,40 +989,40 @@ inline std::string get_channel_status(const Channel& channel);
  * @param width Width of the visualization bar (default: 50)
  * @return ASCII art buffer visualization
  */
-inline std::string visualize_channel_buffer(const Channel& channel, size_t width = 50);
+std::string visualize_channel_buffer(const Channel& channel, size_t width = 50);
 
 /**
  * @brief Run health check on a channel
  * @param channel The channel to check
  * @return List of health issues found
  */
-inline std::vector<std::string> check_channel_health(const Channel& channel);
+std::vector<std::string> check_channel_health(const Channel& channel);
 
 /**
  * @brief Start performance profiling for a channel
  * @param channel The channel to profile
  * @return Performance profiler instance
  */
-inline std::unique_ptr<debug::PerformanceProfiler> start_profiling(const Channel& channel);
+std::unique_ptr<debug::PerformanceProfiler> start_profiling(const Channel& channel);
 
 /**
  * @brief Enable message tracing for a channel
  * @param channel_uri URI of the channel to trace
  */
-inline void enable_message_tracing(const std::string& channel_uri);
+void enable_message_tracing(const std::string& channel_uri);
 
 /**
  * @brief Get message trace report for a channel
  * @param channel_uri URI of the channel
  * @return Formatted trace report
  */
-inline std::string get_trace_report(const std::string& channel_uri);
+std::string get_trace_report(const std::string& channel_uri);
 
 /**
  * @brief Create a debugging dashboard showing all channels
  * @return ASCII art dashboard
  */
-inline std::string create_debug_dashboard();
+std::string create_debug_dashboard();
 
 // ============================================================================
 // UDP Multicast API
@@ -1463,6 +1459,7 @@ auto as_eigen_matrix(ByteVector& vec, size_t rows, size_t cols) {
 
 } // namespace psyne
 #endif // PSYNE_ENABLE_EIGEN
+
 
 /**
  * @mainpage Psyne Documentation

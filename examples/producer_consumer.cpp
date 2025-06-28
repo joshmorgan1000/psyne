@@ -7,8 +7,8 @@
 
 using namespace psyne;
 
-// Simulate sensor data production
-void sensor_producer(SPSCChannel& channel, std::atomic<bool>& running) {
+// Simulate sensor data production  
+void sensor_producer(Channel& channel, std::atomic<bool>& running) {
     std::cout << "[Producer] Starting sensor data generation...\n";
     
     const size_t num_sensors = 8;
@@ -50,7 +50,7 @@ void sensor_producer(SPSCChannel& channel, std::atomic<bool>& running) {
 }
 
 // Process sensor data with zero-copy
-void sensor_consumer(SPSCChannel& channel, std::atomic<bool>& running) {
+void sensor_consumer(Channel& channel, std::atomic<bool>& running) {
     std::cout << "[Consumer] Starting sensor data processing...\n";
     
     size_t samples_processed = 0;
@@ -107,7 +107,8 @@ int main() {
     std::cout << "===============================\n\n";
     
     // Create a high-performance channel
-    SPSCChannel channel("local://sensors", 10 * 1024 * 1024, ChannelType::SingleType);
+    auto channel = create_channel("memory://sensors", 10 * 1024 * 1024, 
+                                 ChannelMode::SPSC, ChannelType::SingleType);
     
     std::cout << "Channel created with 10MB buffer\n";
     std::cout << "Simulating 100Hz sensor data with 8 channels\n\n";
@@ -115,8 +116,8 @@ int main() {
     std::atomic<bool> running{true};
     
     // Start producer and consumer threads
-    std::thread producer(sensor_producer, std::ref(channel), std::ref(running));
-    std::thread consumer(sensor_consumer, std::ref(channel), std::ref(running));
+    std::thread producer(sensor_producer, std::ref(*channel), std::ref(running));
+    std::thread consumer(sensor_consumer, std::ref(*channel), std::ref(running));
     
     // Run for 5 seconds
     std::cout << "Running for 5 seconds...\n\n";

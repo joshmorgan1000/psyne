@@ -42,7 +42,7 @@ public:
 };
 
 // Coroutine that processes messages
-asio::awaitable<void> message_processor(SPSCChannel& channel) {
+asio::awaitable<void> message_processor(Channel& channel) {
     std::cout << "Starting message processor coroutine..." << std::endl;
     
     while (true) {
@@ -71,7 +71,7 @@ asio::awaitable<void> message_processor(SPSCChannel& channel) {
 }
 
 // Coroutine that sends messages
-asio::awaitable<void> message_sender(SPSCChannel& channel) {
+asio::awaitable<void> message_sender(Channel& channel) {
     std::vector<std::string> messages = {
         "Hello from coroutine!",
         "This is an async message",
@@ -103,13 +103,14 @@ int main() {
         
         // Create channel
         const size_t buffer_size = 64 * 1024;
-        SPSCChannel channel("memory://coroutine_demo", buffer_size, ChannelType::SingleType);
+        auto channel = create_channel("memory://coroutine_demo", buffer_size, 
+                                     ChannelMode::SPSC, ChannelType::SingleType);
         
         std::cout << "Starting coroutine example..." << std::endl;
         
         // Spawn coroutines
-        asio::co_spawn(io_context, message_processor(channel), asio::detached);
-        asio::co_spawn(io_context, message_sender(channel), asio::detached);
+        asio::co_spawn(io_context, message_processor(*channel), asio::detached);
+        asio::co_spawn(io_context, message_sender(*channel), asio::detached);
         
         // Run the io_context
         io_context.run();

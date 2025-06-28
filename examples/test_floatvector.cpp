@@ -8,11 +8,12 @@ void test_single_type_channel() {
     std::cout << "Testing FloatVector in single-type channel..." << std::endl;
     
     // Create a single-type channel
-    SPSCChannel channel("test://float_channel", 4096, ChannelType::SingleType);
+    auto channel = create_channel("memory://float_channel", 4096, 
+                                 ChannelMode::SPSC, ChannelType::SingleType);
     
     // Test 1: Create and send a message
     {
-        auto msg = channel.create_message<FloatVector>();
+        auto msg = channel->create_message<FloatVector>();
         assert(msg.is_valid());
         
         // Fill with data
@@ -21,12 +22,12 @@ void test_single_type_channel() {
         assert(msg[0] == 1.0f);
         assert(msg[4] == 5.0f);
         
-        channel.send(msg);
+        channel->send(msg);
     }
     
     // Test 2: Receive the message
     {
-        auto received = channel.receive_single<FloatVector>();
+        auto received = channel->receive_single<FloatVector>();
         assert(received.has_value());
         
         auto& msg = received.value();
@@ -42,7 +43,7 @@ void test_single_type_channel() {
     
     // Test 3: Resize functionality
     {
-        auto msg = channel.create_message<FloatVector>();
+        auto msg = channel->create_message<FloatVector>();
         msg.resize(10);
         assert(msg.size() == 10);
         
@@ -50,12 +51,12 @@ void test_single_type_channel() {
             msg[i] = static_cast<float>(i * i);
         }
         
-        channel.send(msg);
+        channel->send(msg);
     }
     
     // Test 4: Receive resized message
     {
-        auto received = channel.receive_single<FloatVector>();
+        auto received = channel->receive_single<FloatVector>();
         assert(received.has_value());
         
         auto& msg = received.value();
@@ -72,22 +73,23 @@ void test_multi_type_channel() {
     std::cout << "Testing FloatVector in multi-type channel..." << std::endl;
     
     // Create a multi-type channel
-    SPSCChannel channel("test://multi_channel", 4096, ChannelType::MultiType);
+    auto channel = create_channel("memory://multi_channel", 4096, 
+                                 ChannelMode::SPSC, ChannelType::MultiType);
     
     // Send a FloatVector
     {
-        auto msg = channel.create_message<FloatVector>();
+        auto msg = channel->create_message<FloatVector>();
         assert(msg.is_valid());
         
         msg = {10.0f, 20.0f, 30.0f};
         assert(msg.size() == 3);
         
-        channel.send(msg);
+        channel->send(msg);
     }
     
     // Receive as specific type
     {
-        auto received = channel.receive_as<FloatVector>();
+        auto received = channel->receive_as<FloatVector>();
         assert(received.has_value());
         
         auto& msg = received.value();

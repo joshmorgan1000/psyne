@@ -41,6 +41,14 @@ endif()
 
 
 # ----------------------------------------------------------------------------------------
+# Boost
+# ----------------------------------------------------------------------------------------
+find_package(Boost REQUIRED COMPONENTS system thread)
+if(NOT Boost_FOUND)
+    message(FATAL_ERROR "Boost not found. Please install Boost development libraries.")
+endif()
+
+# ----------------------------------------------------------------------------------------
 # Threads
 # ----------------------------------------------------------------------------------------
 find_package(Threads REQUIRED)
@@ -95,6 +103,8 @@ target_link_libraries(
     OpenSSL::SSL
     OpenSSL::Crypto
     Threads::Threads
+    Boost::system
+    Boost::thread
 )
 target_include_directories(psyne
     PRIVATE
@@ -102,7 +112,7 @@ target_include_directories(psyne
     ${CMAKE_SOURCE_DIR}/include/psyne
     ${CMAKE_SOURCE_DIR}/src/utils
     ${EIGEN3_INCLUDE_DIR}
-    $ENV{HOME}/boost
+    ${Boost_INCLUDE_DIRS}
 )
 
 # ------------------------------------------------------------------------------

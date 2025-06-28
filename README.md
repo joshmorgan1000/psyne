@@ -321,13 +321,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🤖 Development Attribution
 
-This project was developed with significant assistance from AI frameworks including **Claude** (Anthropic), which contributed to:
+This project was developed with significant assistance from AI frameworks including **Claude** (Anthropic), as well as **Codex** (OpenAI) which contributed to:
 - Architecture design and implementation
 - Code optimization and refactoring  
 - Documentation and examples
 - Testing and debugging
 
-While AI provided substantial development support, all design decisions, code review, and project direction remained under human oversight.
+While AI provided substantial development support, the initial design, all design decisions, code review, and project direction remained under human oversight.
 
 ---
 

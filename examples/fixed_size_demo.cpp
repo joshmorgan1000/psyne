@@ -9,12 +9,13 @@ int main() {
     std::cout << "=============================\n\n";
     
     // Create a single-type channel optimized for 64-dimensional float vectors
-    SPSCChannel channel("local://embeddings", 100 * 1024 * 1024, ChannelType::SingleType);
+    auto channel = create_channel("memory://embeddings", 100 * 1024 * 1024, 
+                                 ChannelMode::SPSC, ChannelType::SingleType);
     
     std::cout << "Channel created for Vec64f (64-dimensional float vectors)\n";
     
     // Create a fixed-size vector - no dynamic allocation!
-    Vec64f embedding(channel);
+    Vec64f embedding(*channel);
     
     if (!embedding.is_valid()) {
         std::cerr << "Failed to allocate message\n";
@@ -40,10 +41,10 @@ int main() {
     std::cout << "...\n";
     
     // Send the message
-    channel.send(embedding);
+    channel->send(embedding);
     
     // Receive and process
-    auto received = channel.receive_single<Vec64f>();
+    auto received = channel->receive_single<Vec64f>();
     if (received) {
         // Direct Eigen operations on received data
         auto recv_eigen = received->as_eigen();
@@ -60,7 +61,7 @@ int main() {
     // Demonstrate matrix operations
     std::cout << "\n--- Fixed-Size Matrix Demo ---\n";
     
-    FixedFloatMatrix<16, 16> attention_weights(channel);
+    FixedFloatMatrix<16, 16> attention_weights(*channel);
     if (attention_weights.is_valid()) {
         // Fill with identity matrix using Eigen
         auto matrix_eigen = attention_weights.as_eigen();
