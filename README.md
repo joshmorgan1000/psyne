@@ -10,7 +10,7 @@
   [![Linux GCC](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20GCC&logo=linux)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![Linux Clang](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20Clang&logo=llvm)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![macOS](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=macOS&logo=apple)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
-  [![Release](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/release.yml?branch=main&label=Release&logo=github)](https://github.com/joshmorgan1000/psyne/actions/workflows/release.yml)
+  [![Release](https://img.shields.io/github/v/release/joshmorgan1000/psyne?label=Release&logo=github)](https://github.com/joshmorgan1000/psyne/releases/latest)
   
   [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🛠️ Language Bindings](#️-language-bindings) • [⚡ Performance](#-performance) • [🤝 Contributing](#-contributing)
 </div>
