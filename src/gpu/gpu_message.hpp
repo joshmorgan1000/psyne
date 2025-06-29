@@ -11,8 +11,8 @@
 
 #pragma once
 
-#include <psyne/channel.hpp>
-#include <psyne/gpu/gpu_buffer.hpp>
+#include <psyne/psyne.hpp>
+#include "gpu_buffer.hpp"
 #include <Eigen/Core>
 #include <vector>
 #include <memory>
@@ -312,13 +312,15 @@ private:
 };
 
 /**
- * @brief Serialization support for GPU vectors
+ * @brief GPU vector serialization helpers
+ * 
+ * These helper functions can be used to serialize/deserialize GPU vectors
+ * when the MessageTraits system is available.
  */
 template<typename T>
-struct MessageTraits<GPUVector<T>> {
-    static constexpr bool is_trivial = false;
-    
-    static size_t size(const GPUVector<T>& vec) {
+class GPUVectorSerializer {
+public:
+    static size_t serialized_size(const GPUVector<T>& vec) {
         return sizeof(size_t) + vec.size() * sizeof(T);
     }
     

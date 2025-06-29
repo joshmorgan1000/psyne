@@ -6,7 +6,7 @@
  * @license MIT License
  */
 
-#include <psyne/memory/dynamic_slab_allocator.hpp>
+#include "dynamic_slab_allocator.hpp"
 #include <iostream>
 #include <cstdlib>
 #include <cstring>

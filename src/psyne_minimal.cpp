@@ -8,10 +8,15 @@
 #include <iostream>
 #include <stdexcept>
 #include <optional>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+#ifdef _WIN32
+    #include <windows.h>
+    #include <io.h>
+#else
+    #include <sys/mman.h>
+    #include <sys/stat.h>
+    #include <fcntl.h>
+    #include <unistd.h>
+#endif
 #include "../src/channel/tcp_channel_stub.hpp"
 #include "../src/compression/compression.hpp"
 #include "channel/webrtc_channel.hpp"

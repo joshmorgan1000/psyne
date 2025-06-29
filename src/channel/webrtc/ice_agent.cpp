@@ -1,14 +1,31 @@
 #include "ice_agent.hpp"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <random>
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <condition_variable>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <iphlpapi.h>
+    #pragma comment(lib, "ws2_32.lib")
+    #pragma comment(lib, "iphlpapi.lib")
+    #define close closesocket
+    #define ssize_t int
+    #define socklen_t int
+    // Windows byte order functions
+    #define htobe64(x) _byteswap_uint64(x)
+    #define be64toh(x) _byteswap_uint64(x)
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <ifaddrs.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <endian.h>
+#endif
 
 namespace psyne {
 namespace detail {
@@ -31,17 +48,33 @@ STUNClient::~STUNClient() {
     if (socket_fd_ >= 0) {
         close(socket_fd_);
     }
+#ifdef _WIN32
+    WSACleanup();
+#endif
 }
 
 void STUNClient::initialize_socket() {
+#ifdef _WIN32
+    // Initialize Winsock
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        throw std::runtime_error("Failed to initialize Winsock");
+    }
+#endif
+
     socket_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
     if (socket_fd_ < 0) {
         throw std::runtime_error("Failed to create UDP socket for STUN client");
     }
     
     // Set non-blocking
+#ifdef _WIN32
+    u_long mode = 1;
+    ioctlsocket(socket_fd_, FIONBIO, &mode);
+#else
     int flags = fcntl(socket_fd_, F_GETFL, 0);
     fcntl(socket_fd_, F_SETFL, flags | O_NONBLOCK);
+#endif
     
     // Start worker thread
     running_.store(true);
@@ -337,8 +370,24 @@ void ICEAgent::stop_connectivity_checks() {
 
 void ICEAgent::run_connectivity_checks() {
     while (checking_.load()) {
+        {
+            std::lock_guard<std::mutex> lock(pairs_mutex_);
+            
+            // Process candidate pairs in priority order
+            for (auto& pair : candidate_pairs_) {
+                if (pair.state == CandidatePair::Waiting) {
+                    perform_connectivity_check(pair);
+                    
+                    // Rate limit checks
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                }
+            }
+            
+            // Update connection state based on check results
+            update_connection_state();
+        }
+        
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        // TODO: Implement actual connectivity checks
     }
 }
 
@@ -428,6 +477,43 @@ void ICEAgent::gather_relay_candidates() {
 std::vector<NetworkAddress> ICEAgent::get_local_interfaces() {
     std::vector<NetworkAddress> interfaces;
     
+#ifdef _WIN32
+    // Windows implementation using GetAdaptersAddresses
+    ULONG bufferSize = 0;
+    GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+                        nullptr, nullptr, &bufferSize);
+    
+    std::vector<char> buffer(bufferSize);
+    PIP_ADAPTER_ADDRESSES adapters = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
+    
+    if (GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+                            nullptr, adapters, &bufferSize) == NO_ERROR) {
+        
+        for (PIP_ADAPTER_ADDRESSES adapter = adapters; adapter != nullptr; adapter = adapter->Next) {
+            if (adapter->OperStatus == IfOperStatusUp) {
+                for (PIP_ADAPTER_UNICAST_ADDRESS addr = adapter->FirstUnicastAddress; addr != nullptr; addr = addr->Next) {
+                    if (addr->Address.lpSockaddr->sa_family == AF_INET) {
+                        struct sockaddr_in* addr_in = reinterpret_cast<struct sockaddr_in*>(addr->Address.lpSockaddr);
+                        char addr_str[INET_ADDRSTRLEN];
+                        inet_ntop(AF_INET, &addr_in->sin_addr, addr_str, sizeof(addr_str));
+                        
+                        std::string addr_string(addr_str);
+                        
+                        // Skip loopback and other special addresses
+                        if (addr_string != "127.0.0.1" && addr_string.substr(0, 3) != "169") {
+                            NetworkAddress address;
+                            address.family = NetworkAddress::IPv4;
+                            address.address = addr_string;
+                            address.port = 0; // Will be assigned later
+                            interfaces.push_back(address);
+                        }
+                    }
+                }
+            }
+        }
+    }
+#else
+    // Unix implementation using getifaddrs
     struct ifaddrs* ifaddr;
     if (getifaddrs(&ifaddr) == -1) {
         return interfaces;
@@ -455,6 +541,7 @@ std::vector<NetworkAddress> ICEAgent::get_local_interfaces() {
     }
     
     freeifaddrs(ifaddr);
+#endif
     return interfaces;
 }
 
@@ -551,6 +638,212 @@ std::optional<CandidatePair> ICEAgent::get_selected_pair() const {
 bool ICEAgent::has_connection() const {
     return connection_state_ == RTCIceConnectionState::Connected ||
            connection_state_ == RTCIceConnectionState::Completed;
+}
+
+void ICEAgent::perform_connectivity_check(CandidatePair& pair) {
+    pair.state = CandidatePair::InProgress;
+    pair.last_check = std::chrono::system_clock::now();
+    
+    NetworkAddress local_addr{NetworkAddress::IPv4, pair.local.address, pair.local.port};
+    NetworkAddress remote_addr{NetworkAddress::IPv4, pair.remote.address, pair.remote.port};
+    
+    auto start_time = std::chrono::steady_clock::now();
+    
+    // Perform STUN connectivity check
+    bool success = send_stun_binding_request(local_addr, remote_addr);
+    
+    if (success) {
+        auto end_time = std::chrono::steady_clock::now();
+        pair.rtt_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        pair.state = CandidatePair::Succeeded;
+        
+        // Update selected pair if this is better
+        if (!selected_pair_ || pair.priority > selected_pair_->priority) {
+            selected_pair_ = pair;
+            
+            if (on_selected_pair_change) {
+                on_selected_pair_change(pair);
+            }
+        }
+    } else {
+        pair.state = CandidatePair::Failed;
+    }
+}
+
+bool ICEAgent::send_stun_binding_request(const NetworkAddress& local, const NetworkAddress& remote) {
+    // Create a socket for the connectivity check
+    int check_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (check_socket < 0) {
+        return false;
+    }
+    
+    // Bind to local address
+    struct sockaddr_in local_addr{};
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_port = htons(local.port);
+    inet_pton(AF_INET, local.address.c_str(), &local_addr.sin_addr);
+    
+    if (bind(check_socket, reinterpret_cast<struct sockaddr*>(&local_addr), sizeof(local_addr)) < 0) {
+        close(check_socket);
+        return false;
+    }
+    
+    // Create STUN binding request
+    std::string transaction_id = generate_transaction_id();
+    auto request = create_stun_check_request(transaction_id);
+    
+    // Send to remote address
+    struct sockaddr_in remote_addr{};
+    remote_addr.sin_family = AF_INET;
+    remote_addr.sin_port = htons(remote.port);
+    inet_pton(AF_INET, remote.address.c_str(), &remote_addr.sin_addr);
+    
+    ssize_t sent = sendto(check_socket, request.data(), request.size(), 0,
+                         reinterpret_cast<struct sockaddr*>(&remote_addr),
+                         sizeof(remote_addr));
+    
+    bool success = (sent > 0);
+    
+    // Set timeout for response
+#ifdef _WIN32
+    DWORD timeout = 1000; // 1 second in milliseconds
+    setsockopt(check_socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+#else
+    struct timeval timeout{};
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    setsockopt(check_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+#endif
+    
+    if (success) {
+        // Wait for response
+        std::vector<uint8_t> response(1500);
+        struct sockaddr_in from_addr{};
+        socklen_t from_len = sizeof(from_addr);
+        
+        ssize_t received = recvfrom(check_socket, response.data(), response.size(), 0,
+                                   reinterpret_cast<struct sockaddr*>(&from_addr),
+                                   &from_len);
+        
+        if (received > 0) {
+            response.resize(received);
+            success = validate_stun_response(response, transaction_id);
+        } else {
+            success = false;
+        }
+    }
+    
+    close(check_socket);
+    return success;
+}
+
+std::string ICEAgent::generate_transaction_id() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<uint8_t> dis(0, 255);
+    
+    std::string id(12, 0);
+    for (size_t i = 0; i < 12; ++i) {
+        id[i] = dis(gen);
+    }
+    return id;
+}
+
+std::vector<uint8_t> ICEAgent::create_stun_check_request(const std::string& transaction_id) {
+    std::vector<uint8_t> message;
+    
+    // STUN header for binding request
+    STUNHeader header{};
+    header.message_type = htons(static_cast<uint16_t>(STUNMessageType::BindingRequest));
+    header.message_length = 0; // Will be updated
+    header.magic_cookie = htonl(STUN_MAGIC_COOKIE);
+    std::memcpy(header.transaction_id, transaction_id.data(), 12);
+    
+    message.insert(message.end(), 
+                   reinterpret_cast<uint8_t*>(&header),
+                   reinterpret_cast<uint8_t*>(&header) + sizeof(header));
+    
+    // Add ICE-CONTROLLING or ICE-CONTROLLED attribute
+    STUNAttributeHeader ice_attr{};
+    ice_attr.type = htons(0x802A); // ICE-CONTROLLING
+    ice_attr.length = htons(8);
+    
+    message.insert(message.end(),
+                   reinterpret_cast<uint8_t*>(&ice_attr),
+                   reinterpret_cast<uint8_t*>(&ice_attr) + sizeof(ice_attr));
+    
+    // Add tie-breaker value
+    uint64_t tie_breaker = 0x1234567890ABCDEF;
+    tie_breaker = htobe64(tie_breaker);
+    message.insert(message.end(),
+                   reinterpret_cast<uint8_t*>(&tie_breaker),
+                   reinterpret_cast<uint8_t*>(&tie_breaker) + sizeof(tie_breaker));
+    
+    // Update message length
+    uint16_t length = message.size() - sizeof(STUNHeader);
+    reinterpret_cast<STUNHeader*>(message.data())->message_length = htons(length);
+    
+    return message;
+}
+
+bool ICEAgent::validate_stun_response(const std::vector<uint8_t>& data, const std::string& transaction_id) {
+    if (data.size() < sizeof(STUNHeader)) {
+        return false;
+    }
+    
+    const STUNHeader* header = reinterpret_cast<const STUNHeader*>(data.data());
+    
+    // Validate magic cookie
+    if (ntohl(header->magic_cookie) != STUN_MAGIC_COOKIE) {
+        return false;
+    }
+    
+    // Check transaction ID
+    if (std::memcmp(header->transaction_id, transaction_id.data(), 12) != 0) {
+        return false;
+    }
+    
+    // Check message type (should be binding response)
+    uint16_t msg_type = ntohs(header->message_type);
+    return (msg_type == static_cast<uint16_t>(STUNMessageType::BindingResponse));
+}
+
+void ICEAgent::update_connection_state() {
+    RTCIceConnectionState new_state = connection_state_;
+    
+    bool has_succeeded = false;
+    bool has_in_progress = false;
+    bool has_waiting = false;
+    
+    for (const auto& pair : candidate_pairs_) {
+        switch (pair.state) {
+            case CandidatePair::Succeeded:
+                has_succeeded = true;
+                break;
+            case CandidatePair::InProgress:
+                has_in_progress = true;
+                break;
+            case CandidatePair::Waiting:
+                has_waiting = true;
+                break;
+            default:
+                break;
+        }
+    }
+    
+    if (has_succeeded) {
+        if (selected_pair_) {
+            new_state = RTCIceConnectionState::Connected;
+        }
+    } else if (has_in_progress || has_waiting) {
+        new_state = RTCIceConnectionState::Checking;
+    } else {
+        new_state = RTCIceConnectionState::Failed;
+    }
+    
+    if (new_state != connection_state_) {
+        notify_connection_state_change(new_state);
+    }
 }
 
 } // namespace webrtc

@@ -6,13 +6,18 @@
  * @license MIT License
  */
 
-#include <psyne/gpu/gpu_buffer.hpp>
+#include "gpu_buffer.hpp"
 
 #ifdef __APPLE__
-#include <psyne/gpu/metal/metal_buffer.hpp>
+#include "metal/metal_buffer.hpp"
+#endif
+
+#ifdef PSYNE_CUDA_ENABLED
+#include "cuda/cuda_buffer.hpp"
 #endif
 
 #include <iostream>
+#include <vector>
 
 namespace psyne {
 namespace gpu {
@@ -38,9 +43,17 @@ std::unique_ptr<GPUContext> create_gpu_context(GPUBackend backend) {
 #endif
             
         case GPUBackend::CUDA:
-            // TODO: Implement CUDA support
-            std::cerr << "CUDA support not yet implemented" << std::endl;
+#ifdef PSYNE_CUDA_ENABLED
+            try {
+                return std::make_unique<cuda::CudaContext>();
+            } catch (const std::exception& e) {
+                std::cerr << "Failed to create CUDA context: " << e.what() << std::endl;
+                return nullptr;
+            }
+#else
+            std::cerr << "CUDA support not compiled in" << std::endl;
             return nullptr;
+#endif
             
         case GPUBackend::ROCm:
             // TODO: Implement ROCm support
@@ -72,8 +85,15 @@ std::vector<GPUBackend> detect_gpu_backends() {
     }
 #endif
     
-#ifdef __NVCC__
-    // TODO: Check for CUDA support
+#ifdef PSYNE_CUDA_ENABLED
+    // Check for CUDA support
+    try {
+        if (cuda::utils::is_cuda_available()) {
+            backends.push_back(GPUBackend::CUDA);
+        }
+    } catch (...) {
+        // CUDA not available
+    }
 #endif
     
 #ifdef __HIP__

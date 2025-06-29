@@ -204,6 +204,9 @@ private:
     std::vector<NetworkAddress> get_local_interfaces();
     RTCIceCandidate create_host_candidate(const NetworkAddress& address, uint8_t component);
     bool send_stun_binding_request(const NetworkAddress& local, const NetworkAddress& remote);
+    std::string generate_transaction_id();
+    std::vector<uint8_t> create_stun_check_request(const std::string& transaction_id);
+    bool validate_stun_response(const std::vector<uint8_t>& data, const std::string& transaction_id);
 };
 
 /**

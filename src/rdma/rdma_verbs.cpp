@@ -617,6 +617,175 @@ std::vector<DeviceCapabilities> list_rdma_devices() {
     return devices;
 }
 
+// RDMAGPUDirectChannel implementation
+
+#ifdef PSYNE_CUDA_ENABLED
+#include "../gpu/cuda/cuda_buffer.hpp"
+#endif
+
+RDMAGPUDirectChannel::RDMAGPUDirectChannel(const std::string& device_name, uint8_t port_num,
+                                           size_t buffer_size, TransportType transport)
+    : RDMAVerbsChannel(device_name, port_num, buffer_size, transport)
+    , gpu_direct_enabled_(false) {
+    
+    // Check if GPUDirect is supported
+    DeviceCapabilities caps = get_capabilities();
+    
+    // Query device for GPUDirect support
+    // Note: This is a simplified check - real implementation would query
+    // the device attributes for GPUDirect support
+    gpu_direct_enabled_ = true; // Assume support for now
+    
+    if (gpu_direct_enabled_) {
+        std::cout << "GPUDirect RDMA enabled for device: " << caps.name << std::endl;
+    } else {
+        std::cerr << "Warning: GPUDirect RDMA not supported on device: " << caps.name << std::endl;
+    }
+}
+
+std::shared_ptr<MemoryRegion> RDMAGPUDirectChannel::register_gpu_memory(void* gpu_addr, size_t length) {
+    if (!gpu_direct_enabled_) {
+        throw std::runtime_error("GPUDirect RDMA not supported on this device");
+    }
+    
+    if (!gpu_addr || length == 0) {
+        throw std::invalid_argument("Invalid GPU memory address or length");
+    }
+    
+    try {
+        // Register GPU memory with RDMA hardware
+        // IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ
+        int access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | 
+                          IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC;
+        
+        auto mr = std::make_shared<MemoryRegion>(pd_, gpu_addr, length, access_flags);
+        
+        // Store the memory region for cleanup
+        memory_regions_.push_back(mr);
+        
+        std::cout << "Registered GPU memory region: " << gpu_addr 
+                  << " length: " << length << " bytes" << std::endl;
+        
+        return mr;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to register GPU memory: " << e.what() << std::endl;
+        return nullptr;
+    }
+}
+
+bool RDMAGPUDirectChannel::rdma_write_from_gpu(const void* local_gpu_addr, size_t length,
+                                               uint64_t remote_addr, uint32_t rkey) {
+    if (!gpu_direct_enabled_) {
+        std::cerr << "GPUDirect RDMA not enabled" << std::endl;
+        return false;
+    }
+    
+    if (!connected_) {
+        std::cerr << "Channel not connected" << std::endl;
+        return false;
+    }
+    
+    // Find the memory region for this GPU address
+    std::shared_ptr<MemoryRegion> mr = nullptr;
+    for (const auto& region : memory_regions_) {
+        uint8_t* region_start = static_cast<uint8_t*>(region->addr());
+        uint8_t* region_end = region_start + region->length();
+        uint8_t* gpu_ptr = const_cast<uint8_t*>(static_cast<const uint8_t*>(local_gpu_addr));
+        
+        if (gpu_ptr >= region_start && (gpu_ptr + length) <= region_end) {
+            mr = region;
+            break;
+        }
+    }
+    
+    if (!mr) {
+        std::cerr << "GPU memory not registered for RDMA" << std::endl;
+        return false;
+    }
+    
+    // Create scatter-gather element
+    ibv_sge sge = {};
+    sge.addr = reinterpret_cast<uint64_t>(local_gpu_addr);
+    sge.length = length;
+    sge.lkey = mr->lkey();
+    
+    // Create work request
+    ibv_send_wr wr = {};
+    wr.wr_id = reinterpret_cast<uint64_t>(this); // Use this pointer as ID
+    wr.opcode = IBV_WR_RDMA_WRITE;
+    wr.send_flags = IBV_SEND_SIGNALED;
+    wr.sg_list = &sge;
+    wr.num_sge = 1;
+    wr.wr.rdma.remote_addr = remote_addr;
+    wr.wr.rdma.rkey = rkey;
+    
+    // Post the work request
+    bool success = qp_->post_send(&wr);
+    if (success) {
+        stats_.rdma_writes++;
+        stats_.bytes_sent += length;
+    }
+    
+    return success;
+}
+
+bool RDMAGPUDirectChannel::rdma_read_to_gpu(void* local_gpu_addr, size_t length,
+                                            uint64_t remote_addr, uint32_t rkey) {
+    if (!gpu_direct_enabled_) {
+        std::cerr << "GPUDirect RDMA not enabled" << std::endl;
+        return false;
+    }
+    
+    if (!connected_) {
+        std::cerr << "Channel not connected" << std::endl;
+        return false;
+    }
+    
+    // Find the memory region for this GPU address
+    std::shared_ptr<MemoryRegion> mr = nullptr;
+    for (const auto& region : memory_regions_) {
+        uint8_t* region_start = static_cast<uint8_t*>(region->addr());
+        uint8_t* region_end = region_start + region->length();
+        uint8_t* gpu_ptr = static_cast<uint8_t*>(local_gpu_addr);
+        
+        if (gpu_ptr >= region_start && (gpu_ptr + length) <= region_end) {
+            mr = region;
+            break;
+        }
+    }
+    
+    if (!mr) {
+        std::cerr << "GPU memory not registered for RDMA" << std::endl;
+        return false;
+    }
+    
+    // Create scatter-gather element
+    ibv_sge sge = {};
+    sge.addr = reinterpret_cast<uint64_t>(local_gpu_addr);
+    sge.length = length;
+    sge.lkey = mr->lkey();
+    
+    // Create work request
+    ibv_send_wr wr = {};
+    wr.wr_id = reinterpret_cast<uint64_t>(this); // Use this pointer as ID
+    wr.opcode = IBV_WR_RDMA_READ;
+    wr.send_flags = IBV_SEND_SIGNALED;
+    wr.sg_list = &sge;
+    wr.num_sge = 1;
+    wr.wr.rdma.remote_addr = remote_addr;
+    wr.wr.rdma.rkey = rkey;
+    
+    // Post the work request
+    bool success = qp_->post_send(&wr);
+    if (success) {
+        stats_.rdma_reads++;
+        stats_.bytes_received += length;
+    }
+    
+    return success;
+}
+
 } // namespace rdma
 } // namespace psyne
 

@@ -1784,3 +1784,74 @@ auto as_eigen_matrix(ByteVector& vec, size_t rows, size_t cols) {
  * - Documentation: https://github.com/joshmorgan1000/psyne/docs
  */
 
+// ============================================================================
+// GPU Support
+// ============================================================================
+
+#ifdef PSYNE_GPU_ENABLED
+
+namespace gpu {
+
+/**
+ * @brief Supported GPU backends
+ */
+enum class GPUBackend {
+    None,      ///< No GPU support
+    Metal,     ///< Apple Metal
+    CUDA,      ///< NVIDIA CUDA
+    ROCm,      ///< AMD ROCm
+    Vulkan     ///< Vulkan (future)
+};
+
+/**
+ * @brief GPU buffer usage patterns
+ */
+enum class BufferUsage {
+    Static,    ///< Buffer content rarely changes
+    Dynamic,   ///< Buffer content changes frequently
+    Stream     ///< Buffer content changes every frame
+};
+
+/**
+ * @brief Memory access modes
+ */
+enum class MemoryAccess {
+    DeviceOnly,    ///< GPU access only
+    HostOnly,      ///< CPU access only
+    Shared,        ///< Both CPU and GPU access (unified memory)
+    Managed        ///< Automatic migration between CPU/GPU
+};
+
+// Forward declarations
+class GPUBuffer;
+class GPUBufferFactory;
+class GPUContext;
+
+/**
+ * @brief Create a GPU context for the specified backend
+ * @param backend The GPU backend to use (or None for auto-detection)
+ * @return GPU context or nullptr if no suitable GPU found
+ */
+std::unique_ptr<GPUContext> create_gpu_context(GPUBackend backend = GPUBackend::None);
+
+/**
+ * @brief Detect available GPU backends
+ * @return Vector of available backends
+ */
+std::vector<GPUBackend> detect_gpu_backends();
+
+/**
+ * @brief Get the name of a GPU backend
+ */
+const char* gpu_backend_name(GPUBackend backend);
+
+// GPU-aware vector types (forward declarations)
+template<typename T> class GPUVector;
+using GPUFloatVector = GPUVector<float>;
+using GPUDoubleVector = GPUVector<double>;
+using GPUIntVector = GPUVector<int32_t>;
+
+} // namespace gpu
+
+#endif // PSYNE_GPU_ENABLED
+

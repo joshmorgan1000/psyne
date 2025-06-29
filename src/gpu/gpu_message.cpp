@@ -6,10 +6,15 @@
  * @license MIT License
  */
 
-#include <psyne/gpu/gpu_message.hpp>
+#include "gpu_message.hpp"
 
 #ifdef __APPLE__
-#include <psyne/gpu/metal/metal_buffer.hpp>
+#include "metal/metal_buffer.hpp"
+#endif
+
+#ifdef PSYNE_CUDA_ENABLED
+#include "cuda/cuda_buffer.hpp"
+#include <cuda_runtime.h>
 #endif
 
 namespace psyne {
@@ -65,6 +70,31 @@ void GPUVector<float>::gpu_scale(GPUContext& context, float scalar) {
         is_cpu_dirty_ = true;
     }
 #endif
+
+#ifdef PSYNE_CUDA_ENABLED
+    if (context.backend() == GPUBackend::CUDA) {
+        auto cuda_context = static_cast<cuda::CudaContext*>(&context);
+        
+        // Ensure data is on GPU
+        auto gpu_buffer = to_gpu_buffer(context);
+        auto cuda_buffer = static_cast<cuda::CudaBuffer*>(gpu_buffer.get());
+        
+        // Launch CUDA kernel for scaling
+        float* device_data = static_cast<float*>(cuda_buffer->device_ptr());
+        
+        // Simple CUDA kernel call (would need actual kernel implementation)
+        // For now, we'll use a host-side implementation with CUDA memory
+        float* host_data = static_cast<float*>(cuda_buffer->map());
+        for (size_t i = 0; i < size_; ++i) {
+            host_data[i] *= scalar;
+        }
+        cuda_buffer->unmap();
+        cuda_buffer->synchronize();
+        
+        // Mark CPU data as dirty
+        is_cpu_dirty_ = true;
+    }
+#endif
 }
 
 // GPU scale operation for double
@@ -107,6 +137,31 @@ void GPUVector<double>::gpu_scale(GPUContext& context, double scalar) {
         
         // Clean up
         pipeline->release();
+        
+        // Mark CPU data as dirty
+        is_cpu_dirty_ = true;
+    }
+#endif
+
+#ifdef PSYNE_CUDA_ENABLED
+    if (context.backend() == GPUBackend::CUDA) {
+        auto cuda_context = static_cast<cuda::CudaContext*>(&context);
+        
+        // Ensure data is on GPU
+        auto gpu_buffer = to_gpu_buffer(context);
+        auto cuda_buffer = static_cast<cuda::CudaBuffer*>(gpu_buffer.get());
+        
+        // Launch CUDA kernel for scaling
+        double* device_data = static_cast<double*>(cuda_buffer->device_ptr());
+        
+        // Simple CUDA kernel call (would need actual kernel implementation)
+        // For now, we'll use a host-side implementation with CUDA memory
+        double* host_data = static_cast<double*>(cuda_buffer->map());
+        for (size_t i = 0; i < size_; ++i) {
+            host_data[i] *= scalar;
+        }
+        cuda_buffer->unmap();
+        cuda_buffer->synchronize();
         
         // Mark CPU data as dirty
         is_cpu_dirty_ = true;
@@ -162,6 +217,35 @@ void GPUVector<float>::gpu_add(GPUContext& context, const GPUVector<float>& othe
         
         // Clean up
         pipeline->release();
+        
+        // Mark CPU data as dirty
+        is_cpu_dirty_ = true;
+    }
+#endif
+
+#ifdef PSYNE_CUDA_ENABLED
+    if (context.backend() == GPUBackend::CUDA) {
+        auto cuda_context = static_cast<cuda::CudaContext*>(&context);
+        
+        // Ensure both vectors are on GPU
+        auto gpu_buffer_a = to_gpu_buffer(context);
+        auto gpu_buffer_b = const_cast<GPUVector<float>&>(other).to_gpu_buffer(context);
+        
+        auto cuda_buffer_a = static_cast<cuda::CudaBuffer*>(gpu_buffer_a.get());
+        auto cuda_buffer_b = static_cast<cuda::CudaBuffer*>(gpu_buffer_b.get());
+        
+        // Simple CUDA kernel call (would need actual kernel implementation)
+        // For now, we'll use a host-side implementation with CUDA memory
+        float* host_data_a = static_cast<float*>(cuda_buffer_a->map());
+        float* host_data_b = static_cast<float*>(cuda_buffer_b->map());
+        
+        for (size_t i = 0; i < size_; ++i) {
+            host_data_a[i] += host_data_b[i];
+        }
+        
+        cuda_buffer_a->unmap();
+        cuda_buffer_b->unmap();
+        cuda_buffer_a->synchronize();
         
         // Mark CPU data as dirty
         is_cpu_dirty_ = true;
