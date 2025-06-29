@@ -1,5 +1,7 @@
 #include <psyne/psyne.hpp>
+#include <psyne/memory/dynamic_slab_allocator.hpp>
 #include <iostream>
+#include <iomanip>
 #include <thread>
 #include <chrono>
 #include <random>
@@ -66,16 +68,18 @@ private:
 void demonstrate_dynamic_slab() {
     std::cout << "\n=== Dynamic Slab Allocator Demo ===" << std::endl;
     
-    DynamicSlabAllocator::Config config;
-    config.initial_slab_size = 1024;  // Start small
-    config.max_slab_size = 64 * 1024;  // Max 64KB
-    config.growth_threshold = 0.5;     // Grow at 50% usage
+    memory::DynamicSlabConfig config;
+    config.initial_slab_size = 64 * 1024 * 1024;  // Start with 64MB
+    config.max_slab_size = 1024 * 1024 * 1024;    // Max 1GB
+    config.high_water_mark = 0.75;                // Grow at 75% usage
+    config.low_water_mark = 0.25;                 // Shrink below 25% usage
+    config.growth_factor = 2.0;                   // Double size when growing
     
-    DynamicSlabAllocator allocator(config);
+    memory::DynamicSlabAllocator allocator(config);
     
     // Allocate increasingly larger chunks
-    std::vector<void*> allocations;
-    size_t sizes[] = {64, 128, 256, 512, 1024, 2048};
+    std::vector<std::pair<void*, size_t>> allocations;
+    size_t sizes[] = {64 * 1024, 256 * 1024, 1024 * 1024, 4 * 1024 * 1024, 16 * 1024 * 1024, 64 * 1024 * 1024};
     
     for (int round = 0; round < 3; ++round) {
         std::cout << "\nRound " << (round + 1) << ":" << std::endl;
@@ -83,21 +87,42 @@ void demonstrate_dynamic_slab() {
         for (size_t size : sizes) {
             void* ptr = allocator.allocate(size);
             if (ptr) {
-                allocations.push_back(ptr);
+                allocations.push_back({ptr, size});
                 auto stats = allocator.get_stats();
-                std::cout << "  Allocated " << size << " bytes"
+                std::cout << "  Allocated " << (size / (1024 * 1024)) << " MB"
                          << " (slabs: " << stats.num_slabs
-                         << ", usage: " << (stats.usage_ratio * 100) << "%"
-                         << ", total: " << stats.total_allocated << " bytes)" << std::endl;
+                         << ", usage: " << std::fixed << std::setprecision(1) 
+                         << (stats.usage_ratio * 100) << "%"
+                         << ", capacity: " << (stats.total_capacity / (1024 * 1024)) << " MB)" << std::endl;
             }
         }
     }
     
-    auto final_stats = allocator.get_stats();
-    std::cout << "\nFinal statistics:" << std::endl;
-    std::cout << "  Total slabs: " << final_stats.num_slabs << std::endl;
-    std::cout << "  Total allocated: " << final_stats.total_allocated << " bytes" << std::endl;
-    std::cout << "  Total used: " << final_stats.total_used << " bytes" << std::endl;
+    auto peak_stats = allocator.get_stats();
+    std::cout << "\nPeak statistics:" << std::endl;
+    std::cout << "  Total slabs: " << peak_stats.num_slabs << std::endl;
+    std::cout << "  Total capacity: " << (peak_stats.total_capacity / (1024 * 1024)) << " MB" << std::endl;
+    std::cout << "  Total used: " << (peak_stats.total_used / (1024 * 1024)) << " MB" << std::endl;
+    std::cout << "  Smallest slab: " << (peak_stats.smallest_slab_size / (1024 * 1024)) << " MB" << std::endl;
+    std::cout << "  Largest slab: " << (peak_stats.largest_slab_size / (1024 * 1024)) << " MB" << std::endl;
+    
+    // Deallocate half to demonstrate shrinking
+    std::cout << "\nDeallocating half of allocations..." << std::endl;
+    size_t deallocated = 0;
+    for (size_t i = 0; i < allocations.size(); i += 2) {
+        allocator.deallocate(allocations[i].first, allocations[i].second);
+        deallocated++;
+    }
+    
+    allocator.perform_maintenance();
+    
+    auto after_dealloc_stats = allocator.get_stats();
+    std::cout << "\nAfter deallocation:" << std::endl;
+    std::cout << "  Total slabs: " << after_dealloc_stats.num_slabs << std::endl;
+    std::cout << "  Total capacity: " << (after_dealloc_stats.total_capacity / (1024 * 1024)) << " MB" << std::endl;
+    std::cout << "  Total used: " << (after_dealloc_stats.total_used / (1024 * 1024)) << " MB" << std::endl;
+    std::cout << "  Usage ratio: " << std::fixed << std::setprecision(1) 
+              << (after_dealloc_stats.usage_ratio * 100) << "%" << std::endl;
     std::cout << "  Number of growths: " << final_stats.num_growths << std::endl;
     std::cout << "  Recommended buffer size: " << allocator.get_recommended_buffer_size() << " bytes" << std::endl;
 }

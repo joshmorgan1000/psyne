@@ -1,5 +1,3 @@
-#ifdef PSYNE_GPU_SUPPORT
-
 #include <psyne/psyne.hpp>
 #include <psyne/gpu/gpu_buffer.hpp>
 #include <psyne/gpu/gpu_message.hpp>
@@ -17,6 +15,7 @@ int main() {
         auto gpu_context = create_gpu_context(GPUBackend::Metal);
         if (!gpu_context) {
             std::cout << "No compatible GPU found. This demo requires Metal support.\n";
+            std::cout << "Make sure you're running on macOS with Metal support.\n";
             return 1;
         }
         
@@ -136,17 +135,3 @@ int main() {
     
     return 0;
 }
-
-#else
-
-#include <iostream>
-
-int main() {
-    std::cout << "GPU Vector Demo\n";
-    std::cout << "===============\n\n";
-    std::cout << "This demo requires GPU support to be compiled.\n";
-    std::cout << "Please rebuild with -DPSYNE_GPU_SUPPORT=ON\n";
-    return 0;
-}
-
-#endif

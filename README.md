@@ -3,7 +3,7 @@
   
   **High-performance, zero-copy messaging library optimized for AI/ML applications**
   
-  [![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/joshmorgan1000/psyne)
+  [![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/joshmorgan1000/psyne)
   [![C++ Standard](https://img.shields.io/badge/C++-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
   
@@ -53,6 +53,17 @@ Psyne provides ultra-low latency inter-process communication with support for mu
 - **🛡️ Production Ready**: Comprehensive error handling, encryption, and monitoring
 - **📊 Built-in Observability**: Performance metrics, distributed tracing, debugging tools
 
+## 🎉 What's New in v1.2.1
+
+- **🔌 ZeroMQ-Style Patterns**: REQ/REP, PUB/SUB, PUSH/PULL, DEALER/ROUTER, PAIR
+- **🚀 Modern Protocols**: RUDP (Reliable UDP) and QUIC (HTTP/3) transport support
+- **🖥️ GPU Acceleration**: Apple Metal support with unified memory and compute kernels
+- **🌐 Advanced Networking**: Real InfiniBand/RDMA and libfabric integration
+- **🔄 Collective Operations**: Ring-based algorithms for distributed computing
+- **⚡ Ultra-Low Latency**: Sub-2μs with RDMA, 0-RTT with QUIC
+
+[See full release notes →](RELEASE_NOTES_v1.2.1.md)
+
 ## 📦 Supported Transports
 
 | Transport | URI Scheme | Use Case |
@@ -63,7 +74,11 @@ Psyne provides ultra-low latency inter-process communication with support for mu
 | **Unix Sockets** | `unix:///path/to/socket` | Local inter-process |
 | **UDP Multicast** | `multicast://239.255.0.1:8080` | One-to-many broadcasting |
 | **WebSocket** | `ws://host:port` | Web-compatible real-time |
+| **WebRTC** | `webrtc://peer-id` | P2P browser communication |
 | **RDMA/InfiniBand** | `rdma://host:port` | Ultra-low latency HPC |
+| **RUDP** | `rudp://host:port` | Reliable UDP transport |
+| **QUIC** | `quic://host:port` | HTTP/3, multiplexed streams |
+| **Libfabric** | `fabric://provider/address` | Unified fabric interface |
 
 ## 🛠️ Language Bindings
 

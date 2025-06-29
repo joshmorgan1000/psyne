@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeerJS WebRTC P2P Combat Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            color: #00ff41;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #gameCanvas {
+            background: #000;
+            border: 2px solid #00ff41;
+            cursor: crosshair;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 20px;
+            pointer-events: none;
+        }
+        
+        .ui-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ff41;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            pointer-events: auto;
+        }
+        
+        #connectionStatus {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .status-connecting { background: #ff6b00; }
+        .status-connected { background: #00aa00; }
+        .status-disconnected { background: #aa0000; }
+        
+        #stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        #chatPanel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ff41;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #chatMessages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+        
+        #chatInput {
+            background: #000;
+            border: none;
+            border-top: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 8px;
+            font-family: inherit;
+        }
+        
+        .menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+        
+        .menu-content {
+            background: #1a1a2e;
+            border: 2px solid #00ff41;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 500px;
+        }
+        
+        .menu-content h1 {
+            color: #00ff41;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        
+        .menu-content input, .menu-content button {
+            display: block;
+            width: 100%;
+            margin: 15px 0;
+            padding: 12px;
+            font-size: 16px;
+            background: #000;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            border-radius: 5px;
+            font-family: inherit;
+        }
+        
+        .menu-content button {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .menu-content button:hover {
+            background: #00ff41;
+            color: #000;
+            box-shadow: 0 0 20px #00ff41;
+        }
+        
+        #peerList {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #00ff41;
+            margin: 15px 0;
+            padding: 10px;
+        }
+        
+        .peer-item {
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .peer-item:hover {
+            background: rgba(0, 255, 65, 0.1);
+        }
+        
+        .peer-item:last-child {
+            border-bottom: none;
+        }
+        
+        #healthBar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 200px;
+            height: 20px;
+            background: #333;
+            border: 1px solid #00ff41;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #healthFill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+            transition: width 0.3s;
+            border-radius: 9px;
+        }
+        
+        .connection-indicator {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            font-size: 12px;
+        }
+        
+        .peer-connection {
+            display: block;
+            margin: 2px 0;
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 3px;
+        }
+        
+        .peer-connected { color: #00ff00; }
+        .peer-connecting { color: #ffaa00; }
+        .peer-disconnected { color: #ff0000; }
+
+        .peer-id-display {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 11px;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Main Menu -->
+        <div id="mainMenu" class="menu-screen">
+            <div class="menu-content">
+                <h1>⚔️ P2P COMBAT</h1>
+                <p>PeerJS WebRTC browser battle arena</p>
+                <br>
+                <input type="text" id="playerName" placeholder="Enter your warrior name" maxlength="20">
+                <input type="text" id="roomCode" placeholder="Room code (leave empty for random)" maxlength="10">
+                <button onclick="startGame()">🎮 Start Battle</button>
+                <button onclick="showPeerList()">👥 Join by Peer ID</button>
+                <br>
+                <p style="font-size: 12px; color: #666;">
+                    • WASD to move<br>
+                    • Click to attack<br>
+                    • 1/2/3 for weapons<br>
+                    • Direct P2P via PeerJS<br>
+                </p>
+            </div>
+        </div>
+        
+        <!-- Peer Selection -->
+        <div id="peerMenu" class="menu-screen" style="display: none;">
+            <div class="menu-content">
+                <h2>🔗 Connect to Peer</h2>
+                <p>Your Peer ID: <span id="myPeerId" style="color: #ffaa00;">Connecting...</span></p>
+                <input type="text" id="targetPeerId" placeholder="Enter peer ID to connect">
+                <button onclick="connectToPeer()">🤝 Connect</button>
+                <div id="peerList"></div>
+                <button onclick="showMainMenu()">⬅️ Back</button>
+            </div>
+        </div>
+        
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        
+        <!-- Game UI -->
+        <div id="ui">
+            <div id="connectionStatus" class="status-disconnected">CONNECTING...</div>
+            
+            <div id="healthBar">
+                <div id="healthFill" style="width: 100%"></div>
+            </div>
+            
+            <div class="connection-indicator" id="peerConnections"></div>
+            
+            <div class="peer-id-display">
+                <strong>Your ID:</strong><br>
+                <span id="yourPeerId">Connecting...</span>
+            </div>
+        </div>
+        
+        <!-- Stats Panel -->
+        <div id="stats">
+            <div>FPS: <span id="fpsCounter">60</span></div>
+            <div>Latency: <span id="latencyDisplay">0ms</span></div>
+            <div>Peers: <span id="peerCount">0</span></div>
+            <div>Room: <span id="currentRoom">None</span></div>
+        </div>
+        
+        <!-- Chat Panel -->
+        <div id="chatPanel">
+            <div id="chatMessages"></div>
+            <input type="text" id="chatInput" placeholder="Press Enter to chat..." maxlength="100">
+        </div>
+    </div>
+    
+    <!-- PeerJS Library -->
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    
+    <!-- Game Scripts -->
+    <script src="../public/js/game-engine.js"></script>
+    <script src="js/game-engine-fixed.js"></script>
+    <script src="../public/js/combat-system.js"></script>
+    <script src="js/peerjs-manager.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

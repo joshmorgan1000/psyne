@@ -1,0 +1,27 @@
+{
+  "name": "webrtc-streaming-example",
+  "version": "1.0.0",
+  "description": "WebRTC server-to-browser streaming example",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2",
+    "wrtc": "^0.4.7",
+    "canvas": "^2.11.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "webrtc",
+    "streaming",
+    "real-time",
+    "video"
+  ],
+  "author": "",
+  "license": "MIT"
+}

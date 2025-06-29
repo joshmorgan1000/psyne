@@ -51,13 +51,33 @@ class GameEngine {
     setupEventListeners() {
         // Keyboard input
         window.addEventListener('keydown', (e) => {
+            // Don't capture keys when typing in input fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
             this.keys[e.code] = true;
-            e.preventDefault();
+            
+            // Only prevent default for game control keys
+            if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 
+                 'Digit1', 'Digit2', 'Digit3', 'Space'].includes(e.code)) {
+                e.preventDefault();
+            }
         });
         
         window.addEventListener('keyup', (e) => {
+            // Don't capture keys when typing in input fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
             this.keys[e.code] = false;
-            e.preventDefault();
+            
+            // Only prevent default for game control keys
+            if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 
+                 'Digit1', 'Digit2', 'Digit3', 'Space'].includes(e.code)) {
+                e.preventDefault();
+            }
         });
         
         // Mouse input
