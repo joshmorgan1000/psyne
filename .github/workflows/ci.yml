@@ -81,6 +81,44 @@ jobs:
           cd build
           ctest --output-on-failure -j$(sysctl -n hw.ncpu)
 
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+        arch: [x64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Install vcpkg dependencies
+        run: |
+          vcpkg install eigen3:x64-windows
+          vcpkg install openssl:x64-windows
+          vcpkg integrate install
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DPSYNE_BUILD_TESTS=ON `
+            -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -A ${{ matrix.arch }}
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }} -- /m
+
+      - name: Run Tests
+        run: |
+          cd build
+          ctest --output-on-failure -C ${{ matrix.build_type }}
+
   validate-examples:
     runs-on: ubuntu-latest
     steps:

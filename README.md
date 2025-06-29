@@ -10,6 +10,7 @@
   [![Linux GCC](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20GCC&logo=linux)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![Linux Clang](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20Clang&logo=llvm)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![macOS](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=macOS&logo=apple)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
+  [![Windows MSVC](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Windows%20MSVC&logo=windows)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/joshmorgan1000/psyne?label=Release&logo=github)](https://github.com/joshmorgan1000/psyne/releases/latest)
   
   [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🛠️ Language Bindings](#️-language-bindings) • [⚡ Performance](#-performance) • [🤝 Contributing](#-contributing)
@@ -80,6 +81,8 @@ Psyne provides ultra-low latency inter-process communication with support for mu
 | **RUDP** | `rudp://host:port` | Reliable UDP transport |
 | **QUIC** | `quic://host:port` | HTTP/3, multiplexed streams |
 | **Libfabric** | `fabric://provider/address` | Unified fabric interface |
+
+> **Platform Notes**: Unix sockets, RDMA/InfiniBand, and libfabric are Linux/macOS only. Windows supports all other transports with equivalent functionality (named pipes for Unix sockets).
 
 ## 🛠️ Language Bindings
 
@@ -172,6 +175,7 @@ await channel.send({ type: 'prediction', data: [1, 2, 3, 4] });
 
 ### Build from Source
 
+#### Linux/macOS
 ```bash
 # Clone the repository
 git clone https://github.com/joshmorgan1000/psyne.git
@@ -184,6 +188,22 @@ make -j$(nproc)
 
 # Install system-wide
 sudo make install
+```
+
+#### Windows (Visual Studio)
+```powershell
+# Clone the repository
+git clone https://github.com/joshmorgan1000/psyne.git
+cd psyne
+
+# Install dependencies with vcpkg
+vcpkg install eigen3:x64-windows openssl:x64-windows
+
+# Build with CMake
+mkdir build
+cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -A x64
+cmake --build . --config Release
 ```
 
 ### Package Managers
