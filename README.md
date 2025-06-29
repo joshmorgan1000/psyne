@@ -60,6 +60,7 @@ Psyne provides ultra-low latency inter-process communication with support for mu
 - **🖥️ GPU Acceleration**: Apple Metal support with unified memory and compute kernels
 - **🌐 Advanced Networking**: Real InfiniBand/RDMA and libfabric integration
 - **🔄 Collective Operations**: Ring-based algorithms for distributed computing
+- **💾 Dynamic Memory**: Adaptive slab allocator with 64MB-1GB growth
 - **⚡ Ultra-Low Latency**: Sub-2μs with RDMA, 0-RTT with QUIC
 
 [See full release notes →](RELEASE_NOTES_v1.2.1.md)

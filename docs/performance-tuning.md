@@ -5,13 +5,14 @@ This guide provides recommendations for optimizing Psyne's performance in produc
 ## Table of Contents
 
 1. [Channel Mode Selection](#channel-mode-selection)
-2. [Buffer Size Optimization](#buffer-size-optimization)
-3. [CPU Affinity and NUMA](#cpu-affinity-and-numa)
-4. [Memory Alignment](#memory-alignment)
-5. [Compression Trade-offs](#compression-trade-offs)
-6. [Network Optimization](#network-optimization)
-7. [Profiling and Monitoring](#profiling-and-monitoring)
-8. [Best Practices](#best-practices)
+2. [Dynamic Memory Management](#dynamic-memory-management-v121)
+3. [Buffer Size Optimization](#buffer-size-optimization)
+4. [CPU Affinity and NUMA](#cpu-affinity-and-numa)
+5. [Memory Alignment](#memory-alignment)
+6. [Compression Trade-offs](#compression-trade-offs)
+7. [Network Optimization](#network-optimization)
+8. [Profiling and Monitoring](#profiling-and-monitoring)
+9. [Best Practices](#best-practices)
 
 ## Channel Mode Selection
 
@@ -50,6 +51,33 @@ for (int i = 0; i < num_workers; ++i) {
                                       1024*1024, ChannelMode::SPSC));
 }
 ```
+
+## Dynamic Memory Management (v1.2.1+)
+
+Psyne v1.2.1 introduces an adaptive slab allocator that automatically adjusts memory allocation based on usage patterns:
+
+```cpp
+memory::DynamicSlabConfig config;
+config.initial_slab_size = 64 * 1024 * 1024;  // Start with 64MB
+config.high_water_mark = 0.75;                // Grow at 75% usage
+config.low_water_mark = 0.25;                 // Shrink below 25%
+config.growth_factor = 2.0;                   // Double when growing
+config.max_slab_size = 1024 * 1024 * 1024;    // Cap at 1GB
+
+memory::DynamicSlabAllocator allocator(config);
+```
+
+### Key Benefits:
+- **Automatic Growth**: Slabs double in size when usage exceeds 75%
+- **Memory Reclamation**: Unused slabs are released when usage drops below 25%
+- **Thread-Local Option**: Reduce contention with per-thread allocators
+- **Optimal Starting Size**: 64MB default balances memory usage and performance
+
+### Tuning Guidelines:
+- **High-throughput workloads**: Start with larger slabs (128MB-256MB)
+- **Variable message sizes**: Enable adaptive growth with lower thresholds
+- **Memory-constrained systems**: Reduce max_slab_size and enable shrinking
+- **Many threads**: Use thread-local allocators to reduce contention
 
 ## Buffer Size Optimization
 

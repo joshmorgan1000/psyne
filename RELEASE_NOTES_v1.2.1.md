@@ -67,6 +67,14 @@ Optimized distributed computing primitives:
 - Broadcast, all-reduce, scatter/gather
 - Ready for large-scale ML training
 
+### 💾 Dynamic Memory Management
+Adaptive slab allocator for optimal memory usage:
+- Starts with 64MB slabs, grows to 1GB based on demand
+- Automatic growth at 75% usage threshold
+- Shrinking when usage drops below 25%
+- Thread-local allocators for reduced contention
+- Perfect for workloads with varying message sizes
+
 ## Performance Highlights
 
 - **RDMA Latency**: < 2μs for small messages
@@ -96,6 +104,17 @@ channel->send_gpu_buffer(gpu_buffer);  // Zero-copy send
 auto rdma_channel = rdma::create_rdma_client("10.0.0.1", 4791);
 auto mr = rdma_channel->register_memory(buffer, size);
 rdma_channel->rdma_write(buffer, size, remote_addr, remote_key);
+```
+
+### Dynamic Memory Management
+```cpp
+memory::DynamicSlabConfig config;
+config.initial_slab_size = 64 * 1024 * 1024;  // 64MB
+config.high_water_mark = 0.75;  // Grow at 75% usage
+
+memory::DynamicSlabAllocator allocator(config);
+// Allocator automatically grows slabs as needed
+void* ptr = allocator.allocate(size);
 ```
 
 ## What's Next (v1.2.2)

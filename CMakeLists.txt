@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(psyne VERSION 1.2.0 LANGUAGES C CXX)
+project(psyne VERSION 1.2.1 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
@@ -72,6 +72,9 @@ add_library(psyne SHARED
     "${CMAKE_SOURCE_DIR}/src/channel/webrtc_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/webrtc/ice_agent.cpp"
     "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
+    
+    # Memory management
+    "${CMAKE_SOURCE_DIR}/src/memory/dynamic_slab_allocator.cpp"
     
     # Header-only files
     "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"
