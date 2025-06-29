@@ -6,7 +6,7 @@
  * @license MIT License
  */
 
-#include <psyne/patterns/zmq_patterns.hpp>
+#include "zmq_patterns.hpp"
 #include <psyne/psyne.hpp>
 #include <iostream>
 #include <algorithm>

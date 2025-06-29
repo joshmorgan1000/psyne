@@ -139,7 +139,30 @@ public:
         std::string name = uri.substr(6); // Skip "ipc://"
         shm_name_ = "/psyne_" + name;
         
-        // Try to create or open shared memory with secure permissions
+#ifdef _WIN32
+        // Windows implementation using CreateFileMapping
+        HANDLE hMapFile = CreateFileMappingA(
+            INVALID_HANDLE_VALUE,
+            NULL,
+            PAGE_READWRITE,
+            0,
+            static_cast<DWORD>(buffer_size),
+            shm_name_.c_str()
+        );
+        
+        if (hMapFile == NULL) {
+            throw std::runtime_error("Failed to create file mapping: " + shm_name_);
+        }
+        
+        shm_ptr_ = MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, buffer_size);
+        if (shm_ptr_ == NULL) {
+            CloseHandle(hMapFile);
+            throw std::runtime_error("Failed to map view of file");
+        }
+        
+        shm_fd_ = reinterpret_cast<int>(hMapFile); // Store handle as int for simplicity
+#else
+        // Unix implementation using shm_open/mmap
         shm_fd_ = shm_open(shm_name_.c_str(), O_CREAT | O_RDWR, 0600); // Owner read/write only
         if (shm_fd_ == -1) {
             throw std::runtime_error("Failed to create/open shared memory: " + shm_name_);
@@ -157,6 +180,7 @@ public:
             close(shm_fd_);
             throw std::runtime_error("Failed to map shared memory");
         }
+#endif
         
         // Initialize ring buffer using the shared memory
         ring_buffer_ = std::make_unique<SPSCRingBuffer>(buffer_size);
@@ -164,12 +188,21 @@ public:
     }
     
     ~IPCChannel() {
+#ifdef _WIN32
+        if (shm_ptr_) {
+            UnmapViewOfFile(shm_ptr_);
+        }
+        if (shm_fd_ != -1) {
+            CloseHandle(reinterpret_cast<HANDLE>(shm_fd_));
+        }
+#else
         if (shm_ptr_ && shm_ptr_ != MAP_FAILED) {
             munmap(shm_ptr_, buffer_size_);
         }
         if (shm_fd_ != -1) {
             close(shm_fd_);
         }
+#endif
         // Note: We don't unlink the shared memory here since other processes might be using it
     }
     

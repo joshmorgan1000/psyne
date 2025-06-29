@@ -11,6 +11,7 @@
 #include "gpudirect_message.hpp"
 #include <iostream>
 #include <chrono>
+#include <atomic>
 
 namespace psyne {
 namespace gpu {
@@ -79,11 +80,11 @@ void GPUDirectChannel::update_stats(size_t bytes_transferred, double time_us) {
     stats_.bytes_transferred += bytes_transferred;
     
     // Update running average of transfer time
-    static uint64_t transfer_count = 0;
-    transfer_count++;
+    static std::atomic<uint64_t> transfer_count{0};
+    uint64_t count = transfer_count.fetch_add(1) + 1;
     
     stats_.avg_transfer_time_us = 
-        (stats_.avg_transfer_time_us * (transfer_count - 1) + time_us) / transfer_count;
+        (stats_.avg_transfer_time_us * (count - 1) + time_us) / count;
 }
 
 // Explicit template instantiations for common types

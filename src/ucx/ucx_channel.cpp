@@ -110,6 +110,8 @@ UCXEndpoint::UCXEndpoint(ucp_worker_t* worker, const std::string& peer_address)
         connected_ = true;
         std::cout << "UCX endpoint created for peer: " << peer_address << std::endl;
     } else {
+        std::cerr << "Failed to create UCX endpoint for " << peer_address 
+                  << ": " << ucs_status_string(status) << std::endl;
         throw std::runtime_error("Failed to create UCX endpoint: " + std::string(ucs_status_string(status)));
     }
 }
@@ -126,7 +128,11 @@ bool UCXEndpoint::send(const void* buffer, size_t length, ucp_tag_t tag) {
     ucp_request_t* request = ucp_tag_send_nb(endpoint_, buffer, length, ucp_dt_make_contig(1), tag, nullptr);
     
     if (UCS_PTR_IS_ERR(request)) {
-        std::cerr << "UCX send failed: " << ucs_status_string(UCS_PTR_STATUS(request)) << std::endl;
+        ucs_status_t error_status = UCS_PTR_STATUS(request);
+        std::cerr << "UCX send failed for tag " << tag << ": " << ucs_status_string(error_status) << std::endl;
+        
+        // Update error statistics
+        // stats_.send_errors++; // Would need to add error tracking
         return false;
     }
     
@@ -156,7 +162,11 @@ bool UCXEndpoint::receive(void* buffer, size_t length, ucp_tag_t tag, size_t* re
                                             tag, ~0UL, nullptr);
     
     if (UCS_PTR_IS_ERR(request)) {
-        std::cerr << "UCX receive failed: " << ucs_status_string(UCS_PTR_STATUS(request)) << std::endl;
+        ucs_status_t error_status = UCS_PTR_STATUS(request);
+        std::cerr << "UCX receive failed for tag " << tag << ": " << ucs_status_string(error_status) << std::endl;
+        
+        // Update error statistics  
+        // stats_.receive_errors++; // Would need to add error tracking
         return false;
     }
     
@@ -474,7 +484,10 @@ UCXChannel::UCXChannel(const std::string& name, TransportMode mode, size_t buffe
     , running_(true) {
     
     if (!init_ucx_context(mode, enable_gpu)) {
-        throw std::runtime_error("Failed to initialize UCX context");
+        std::cerr << "Failed to initialize UCX context for channel: " << name 
+                  << " mode: " << static_cast<int>(mode) 
+                  << " GPU: " << (enable_gpu ? "enabled" : "disabled") << std::endl;
+        throw std::runtime_error("Failed to initialize UCX context for channel: " + name);
     }
     
     try {
@@ -695,18 +708,25 @@ bool UCXChannel::atomic_fadd(uint64_t* result, uint64_t operand, const std::stri
 
 bool UCXChannel::connect(const std::string& peer_address) {
     if (!worker_) {
+        std::cerr << "UCX worker not initialized, cannot connect to: " << peer_address << std::endl;
         return false;
     }
     
     std::lock_guard<std::mutex> lock(peers_mutex_);
     
-    auto endpoint = worker_->create_endpoint(peer_address);
-    if (endpoint) {
-        peers_[peer_address] = endpoint;
-        std::cout << "UCX connected to peer: " << peer_address << std::endl;
-        return true;
+    try {
+        auto endpoint = worker_->create_endpoint(peer_address);
+        if (endpoint) {
+            peers_[peer_address] = endpoint;
+            std::cout << "UCX connected to peer: " << peer_address << std::endl;
+            return true;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Exception during UCX connection to " << peer_address << ": " << e.what() << std::endl;
+        return false;
     }
     
+    std::cerr << "Failed to create UCX endpoint for peer: " << peer_address << std::endl;
     return false;
 }
 

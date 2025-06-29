@@ -772,8 +772,11 @@ std::vector<uint8_t> ICEAgent::create_stun_check_request(const std::string& tran
                    reinterpret_cast<uint8_t*>(&ice_attr),
                    reinterpret_cast<uint8_t*>(&ice_attr) + sizeof(ice_attr));
     
-    // Add tie-breaker value
-    uint64_t tie_breaker = 0x1234567890ABCDEF;
+    // Add tie-breaker value (randomly generated for security)
+    static std::random_device rd;
+    static std::mt19937_64 gen(rd());
+    static std::uniform_int_distribution<uint64_t> dis;
+    uint64_t tie_breaker = dis(gen);
     tie_breaker = htobe64(tie_breaker);
     message.insert(message.end(),
                    reinterpret_cast<uint8_t*>(&tie_breaker),

@@ -35,6 +35,9 @@ namespace detail {
  * @struct RDMAHeader
  * @brief Header for RDMA messages with minimal overhead
  */
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
 struct RDMAHeader {
     uint32_t length;          ///< Message length in bytes
     uint32_t message_type;    ///< Message type identifier
@@ -42,7 +45,13 @@ struct RDMAHeader {
     uint64_t timestamp;       ///< Timestamp (nanoseconds)
     uint64_t checksum;        ///< xxHash64 checksum for validation
     uint32_t flags;           ///< Control flags
-} __attribute__((packed));
+}
+#ifdef _MSC_VER
+#pragma pack(pop)
+#else
+__attribute__((packed))
+#endif
+;
 
 static_assert(sizeof(RDMAHeader) == 36, "RDMAHeader must be 36 bytes for optimal alignment");
 

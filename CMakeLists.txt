@@ -159,9 +159,9 @@ set(PSYNE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/types/advanced_types.hpp"
     "${CMAKE_SOURCE_DIR}/src/psyne_impl.hpp"
     
-    # Messaging patterns
-    "${CMAKE_SOURCE_DIR}/src/patterns/zmq_patterns.cpp"
-    "${CMAKE_SOURCE_DIR}/src/patterns/nng_patterns.cpp"
+    # Messaging patterns (temporarily disabled due to API incompatibility)
+    # "${CMAKE_SOURCE_DIR}/src/patterns/zmq_patterns.cpp"
+    # "${CMAKE_SOURCE_DIR}/src/patterns/nng_patterns.cpp"
 )
 
 # Add GPU sources if enabled
@@ -314,7 +314,7 @@ endif()
 # CUDA Test (optional)
 # ------------------------------------------------------------------------------
 if(PSYNE_CUDA_ENABLED)
-    add_executable(test_cuda test_cuda.cpp)
+    add_executable(test_cuda examples/test_cuda.cpp)
     target_link_libraries(test_cuda PRIVATE psyne)
     target_include_directories(test_cuda PRIVATE ${CMAKE_SOURCE_DIR}/include)
     target_compile_definitions(test_cuda PRIVATE PSYNE_GPU_ENABLED PSYNE_CUDA_ENABLED)

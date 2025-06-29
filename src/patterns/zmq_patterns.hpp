@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include <psyne/channel.hpp>
+#include "../channel/channel_impl.hpp"
 #include <memory>
 #include <string>
 #include <vector>

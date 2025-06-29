@@ -7,7 +7,7 @@
  */
 
 #include "nng_patterns.hpp"
-#include <psyne/channel.hpp>
+#include "../channel/channel_impl.hpp"
 #include <iostream>
 #include <algorithm>
 #include <sstream>

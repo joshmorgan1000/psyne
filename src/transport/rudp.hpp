@@ -45,6 +45,9 @@ enum class RUDPPacketType : uint8_t {
 /**
  * @brief RUDP packet header
  */
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
 struct RUDPHeader {
     uint32_t sequence_number;       ///< Packet sequence number
     uint32_t ack_number;           ///< Acknowledgment number
@@ -54,7 +57,13 @@ struct RUDPHeader {
     uint16_t checksum;             ///< Header and data checksum
     uint16_t payload_length;       ///< Payload length in bytes
     uint32_t timestamp;            ///< Timestamp for RTT calculation
-} __attribute__((packed));
+}
+#ifdef _MSC_VER
+#pragma pack(pop)
+#else
+__attribute__((packed))
+#endif
+;
 
 static_assert(sizeof(RUDPHeader) == 20, "RUDPHeader must be 20 bytes");
 

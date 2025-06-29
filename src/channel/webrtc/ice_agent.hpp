@@ -45,20 +45,38 @@ enum class STUNAttributeType : uint16_t {
 /**
  * @brief STUN message header
  */
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
 struct STUNHeader {
     uint16_t message_type;
     uint16_t message_length;
     uint32_t magic_cookie;
     uint8_t transaction_id[12];
-} __attribute__((packed));
+}
+#ifdef _MSC_VER
+#pragma pack(pop)
+#else
+__attribute__((packed))
+#endif
+;
 
 /**
  * @brief STUN attribute header
  */
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
 struct STUNAttributeHeader {
     uint16_t type;
     uint16_t length;
-} __attribute__((packed));
+}
+#ifdef _MSC_VER
+#pragma pack(pop)
+#else
+__attribute__((packed))
+#endif
+;
 
 /**
  * @brief Network address representation

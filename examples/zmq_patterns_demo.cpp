@@ -14,7 +14,7 @@
  */
 
 #include <psyne/psyne.hpp>
-#include <psyne/patterns/zmq_patterns.hpp>
+#include "../src/patterns/zmq_patterns.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
