@@ -31,6 +31,7 @@
 #include <functional>
 #include <chrono>
 #include <random>
+#include <unordered_set>
 
 namespace psyne {
 namespace patterns {

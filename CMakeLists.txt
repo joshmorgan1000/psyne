@@ -159,9 +159,9 @@ set(PSYNE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/types/advanced_types.hpp"
     "${CMAKE_SOURCE_DIR}/src/psyne_impl.hpp"
     
-    # Messaging patterns (temporarily disabled due to API incompatibility)
-    # "${CMAKE_SOURCE_DIR}/src/patterns/zmq_patterns.cpp"
-    # "${CMAKE_SOURCE_DIR}/src/patterns/nng_patterns.cpp"
+    # Messaging patterns
+    "${CMAKE_SOURCE_DIR}/src/patterns/zmq_patterns.cpp"
+    "${CMAKE_SOURCE_DIR}/src/patterns/nng_patterns.cpp"
 )
 
 # Add GPU sources if enabled

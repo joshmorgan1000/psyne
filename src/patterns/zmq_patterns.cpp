@@ -12,9 +12,25 @@
 #include <algorithm>
 #include <chrono>
 #include <random>
+#include <cstring>
 
 namespace psyne {
 namespace patterns {
+
+// Helper function to send serialized data through a channel
+static bool send_serialized_data(const std::unique_ptr<Channel>& channel, const std::string& data) {
+    if (!channel) return false;
+    
+    try {
+        ByteVector byte_msg(*channel);
+        byte_msg.resize(data.size());
+        std::memcpy(byte_msg.data(), data.data(), data.size());
+        channel->send(byte_msg);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
 
 // MessageFrame implementation
 
@@ -328,7 +344,7 @@ bool RequestSocket::route_message(const Message& msg) {
     // REQ socket sends to the first available channel
     if (!channels_.empty()) {
         auto serialized = msg.to_string();
-        return channels_[0]->send(serialized.data(), serialized.size()) > 0;
+        return send_serialized_data(channels_[0], serialized);
     }
     return false;
 }
@@ -361,7 +377,7 @@ bool ReplySocket::route_message(const Message& msg) {
     // REP socket sends to the client that sent the last request
     if (!channels_.empty()) {
         auto serialized = msg.to_string();
-        return channels_[0]->send(serialized.data(), serialized.size()) > 0;
+        return send_serialized_data(channels_[0], serialized);
     }
     return false;
 }
@@ -395,9 +411,9 @@ bool PublisherSocket::publish(const std::string& topic, const std::string& data)
 bool PublisherSocket::route_message(const Message& msg) {
     // PUB socket sends to all connected channels
     bool success = true;
+    auto serialized = msg.to_string();
     for (auto& channel : channels_) {
-        auto serialized = msg.to_string();
-        if (channel->send(serialized.data(), serialized.size()) == 0) {
+        if (!send_serialized_data(channel, serialized)) {
             success = false;
         }
     }
@@ -493,7 +509,7 @@ bool PushSocket::route_message(const Message& msg) {
     
     size_t worker_idx = current_worker_++ % channels_.size();
     auto serialized = msg.to_string();
-    return channels_[worker_idx]->send(serialized.data(), serialized.size()) > 0;
+    return send_serialized_data(channels_[worker_idx], serialized);
 }
 
 bool PushSocket::handle_received_message(Message&& msg) {
@@ -551,7 +567,7 @@ bool DealerSocket::route_message(const Message& msg) {
     size_t idx = channel_idx++ % channels_.size();
     
     auto serialized = msg.to_string();
-    return channels_[idx]->send(serialized.data(), serialized.size()) > 0;
+    return send_serialized_data(channels_[idx], serialized);
 }
 
 bool DealerSocket::handle_received_message(Message&& msg) {
@@ -616,7 +632,7 @@ bool RouterSocket::route_message(const Message& msg) {
     // ROUTER socket routes based on client ID in first frame
     if (msg.frame_count() >= 2 && !channels_.empty()) {
         auto serialized = msg.to_string();
-        return channels_[0]->send(serialized.data(), serialized.size()) > 0;
+        return send_serialized_data(channels_[0], serialized);
     }
     return false;
 }
@@ -656,7 +672,7 @@ bool PairSocket::route_message(const Message& msg) {
     // PAIR socket sends to its exclusive peer
     if (!channels_.empty()) {
         auto serialized = msg.to_string();
-        return channels_[0]->send(serialized.data(), serialized.size()) > 0;
+        return send_serialized_data(channels_[0], serialized);
     }
     return false;
 }

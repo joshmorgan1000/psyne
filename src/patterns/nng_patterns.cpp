@@ -7,15 +7,31 @@
  */
 
 #include "nng_patterns.hpp"
-#include "../channel/channel_impl.hpp"
+#include <psyne/psyne.hpp>
 #include <iostream>
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <cstring>
 
 namespace psyne {
 namespace patterns {
 namespace nng {
+
+// Helper function to send serialized data through a channel
+static bool send_serialized_data(const std::unique_ptr<Channel>& channel, const std::vector<uint8_t>& data) {
+    if (!channel) return false;
+    
+    try {
+        ByteVector byte_msg(*channel);
+        byte_msg.resize(data.size());
+        std::memcpy(byte_msg.data(), data.data(), data.size());
+        channel->send(byte_msg);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
 
 // NNGMessage implementation
 
@@ -416,7 +432,7 @@ bool PipelinePush::route_outgoing_message(const NNGMessage& msg) {
     
     if (channel) {
         auto serialized = msg.serialize();
-        return channel->send(serialized.data(), serialized.size()) > 0;
+        return send_serialized_data(channel, serialized);
     }
     
     return false;
@@ -454,7 +470,7 @@ bool PipelinePull::route_outgoing_message(const NNGMessage& msg) {
         auto& channel = channels_[0]; // Send to first available channel
         if (channel) {
             auto serialized = msg.serialize();
-            return channel->send(serialized.data(), serialized.size()) > 0;
+            return send_serialized_data(channel, serialized);
         }
     }
     
@@ -554,7 +570,7 @@ bool SurveySurveyor::route_outgoing_message(const NNGMessage& msg) {
     for (auto& channel : channels_) {
         if (channel) {
             auto serialized = msg.serialize();
-            success &= (channel->send(serialized.data(), serialized.size()) > 0);
+            success &= send_serialized_data(channel, serialized);
         }
     }
     
@@ -625,7 +641,7 @@ bool SurveyRespondent::route_outgoing_message(const NNGMessage& msg) {
         auto& channel = channels_[0]; // Send response back through first channel
         if (channel) {
             auto serialized = msg.serialize();
-            return channel->send(serialized.data(), serialized.size()) > 0;
+            return send_serialized_data(channel, serialized);
         }
     }
     
@@ -750,7 +766,7 @@ bool BusSocket::route_outgoing_message(const NNGMessage& msg) {
     for (auto& channel : channels_) {
         if (channel) {
             auto serialized = msg.serialize();
-            success &= (channel->send(serialized.data(), serialized.size()) > 0);
+            success &= send_serialized_data(channel, serialized);
         }
     }
     
