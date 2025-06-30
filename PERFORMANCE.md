@@ -186,11 +186,6 @@ Stress testing memory subsystem with high-volume read/write operations:
 
 ## Future Performance Targets
 
-### v1.3.0 Goals
-- **Latency Target**: <0.2 μs average
-- **Throughput Target**: 5M+ msg/s on 32-core systems
-- **GPU Integration**: Direct GPU memory access via Metal/CUDA
-
 ### v2.0.0 Goals  
 - **RDMA Support**: Hardware-accelerated networking
 - **DPDK Integration**: Kernel bypass for networking

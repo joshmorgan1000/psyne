@@ -3,7 +3,7 @@
 /**
  * @file types.hpp
  * @brief Complete enhanced message types for Psyne
- * 
+ *
  * This header includes all enhanced message types:
  * - Fixed-size matrices and vectors
  * - Quantized types for ML inference
@@ -12,8 +12,8 @@
  * - Sparse matrices
  */
 
-#include "enhanced_types.hpp"
 #include "advanced_types.hpp"
+#include "enhanced_types.hpp"
 
 namespace psyne {
 namespace types {
@@ -31,6 +31,16 @@ using SparseMatrix = SparseMatrixF;
 // Quantized type aliases
 using QInt8 = Int8Vector;
 using QUInt8 = UInt8Vector;
+
+// Internal logging levels (prefixed to avoid conflict with public API)
+enum class InternalLogLevel : uint8_t {
+    TRACE = 0,
+    DEBUG = 1,
+    INFO = 2,
+    WARN = 3,
+    ERROR = 4,
+    CRITICAL = 5
+};
 
 } // namespace types
 } // namespace psyne

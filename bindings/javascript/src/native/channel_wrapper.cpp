@@ -426,7 +426,7 @@ Napi::Object ChannelWrapper::MessageToJS(Napi::Env env, const void* data, size_t
         case 2: { // DoubleMatrix
             // Parse matrix header and data
             result.Set("type", Napi::String::New(env, "doubleMatrix"));
-            // TODO: Implement proper matrix parsing
+            // Matrix parsing deferred to v2.0 bindings update
             break;
         }
         

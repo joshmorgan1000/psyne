@@ -1,35 +1,35 @@
 # Psyne Development Roadmap 🚀
 
-## Release v1.2.1 (Current) ✅
+## Release v1.3.0 (Currently In Progress) 🎯
 
-### Major Features Completed
-- ✅ **ZeroMQ-style Socket Patterns** - Complete messaging patterns (REQ/REP, PUB/SUB, PUSH/PULL, DEALER/ROUTER, PAIR)
-- ✅ **RUDP Transport** - Reliable UDP with configurable reliability/performance trade-offs
-- ✅ **QUIC Transport Protocol** - Modern HTTP/3 transport with 0-RTT, stream multiplexing, connection migration
-- ✅ **Apple Metal GPU Support** - Unified memory, compute kernels, zero-copy integration
-- ✅ **Collective Operations** - Ring-based algorithms for broadcast, all-reduce, scatter/gather
-- ✅ **InfiniBand/RDMA Support** - Real Verbs API with ultra-low latency
-- ✅ **Libfabric Integration** - Unified fabric interface for multiple high-performance networks
+### High Priority Performance Optimizations (NEW)
+- [ ] **SIMD Vectorization**
+  - AVX-512/NEON implementations for tensor operations
+  - Vectorized memory copy/fill operations
+  - SIMD-accelerated compression/checksumming
+  - Hardware-specific optimizations for x86/ARM
 
-## Release v1.2.2 (Next) 🎯
+- [ ] **Memory Management Enhancements**
+  - Huge page support for large tensor allocations
+  - Custom memory allocator bypassing malloc
+  - NUMA-aware allocation strategies
+  - Memory registration cache improvements
+
+- [ ] **IPC Channel Optimization**
+  - Replace Boost.Interprocess with custom lock-free implementation
+  - True zero-copy IPC using memory mapping
+  - Kernel bypass techniques (io_uring, DPDK)
+  - Eliminate mutex/condition variable bottlenecks
+
+- [ ] **Hardware Acceleration Integration**
+  - Platform-specific acceleration (AVX, NEON, etc.)
 
 ### GPU Acceleration
-- [ ] **NVIDIA GPUDirect**
-  - CUDA IPC integration
-  - GPUDirect RDMA support
-  - Unified memory optimizations
-  - Multi-GPU support
-
-- [ ] **AMD ROCm**
-  - DirectGMA integration
-  - HIP compatibility layer
-  - Cross-vendor abstractions
+- [ ] **Vulkan Compute** - Cross-platform GPU support
+  - Already partially implemented
+  - Needs testing and optimization
 
 ### Advanced Networking
-- [ ] **UCX Integration**
-  - Unified communication framework
-  - Automatic transport selection
-  
 - [ ] **Nanomsg/NNG Compatible Patterns**
   - Pipeline pattern
   - Survey pattern
@@ -48,6 +48,7 @@
   - Minimal signaling server
 
 ### Still Planned
+
 - [ ] **Advanced ICE/STUN/TURN**
   - Full NAT traversal implementation
   - TURN relay for symmetric NATs
@@ -69,33 +70,18 @@
   - GPU buffer abstraction
   - Vector operations
 
-### Planned (v1.2.2)
-- [ ] **NVIDIA GPUDirect**
-  - CUDA IPC integration
-  - GPUDirect RDMA support
-  - Unified memory optimizations
-  - Multi-GPU support
-
-- [ ] **AMD ROCm**
-  - DirectGMA integration
-  - HIP compatibility layer
-  - Cross-vendor abstractions
-
 ## Phase 2: Advanced Networking 🌐 (Mostly Complete)
 
 ### Completed ✅
-- ✅ **InfiniBand/RoCE**
-  - Verbs API integration
-  - RDMA operations
-  - Queue pair management
-  - Memory registration
-  - GPUDirect RDMA structure
+- ✅ **WebSocket Support**
+  - Binary and text messages
+  - Compression support
+  - Browser compatibility
 
-- ✅ **Intel/AWS OFI (libfabric)**
-  - Provider abstraction
-  - Multi-fabric support
-  - RMA operations
-  - Atomic operations
+- ✅ **QUIC Transport**
+  - 0-RTT connections
+  - Stream multiplexing
+  - Connection migration
 
 - ✅ **Collective Operations**
   - Broadcast primitives
@@ -104,60 +90,12 @@
   - Ring algorithms
   - Barrier synchronization
 
-### Planned (v1.2.2)
-- [ ] **UCX Integration**
-  - Unified communication framework
-  - Automatic transport selection
-  - Advanced tag matching
-
-## Phase 3: AI/ML Integration 🤖 (Future)
-
-### Framework Backends (Not Planned - Too Heavy)
-- ~~PyTorch Distributed~~ (Dependency too heavy)
-- Alternative: Direct tensor serialization support
-- Alternative: Custom collective operations API
-
-### Optimizations (Future Consideration)
-- [ ] Gradient quantization
-- [ ] Sparse tensor support
-- [ ] Mixed precision communication
-- [ ] Tensor fusion
-
-## Future Ideas & Research 🔮
-
-### Cutting-Edge Transports
-- [ ] **CXL.mem**: Compute Express Link memory pooling
-- [ ] **NVLink/NVSwitch**: NVIDIA proprietary interconnects
-- [ ] **Silicon Photonics**: Optical interconnects
-- [ ] **Quantum Networks**: Post-quantum secure channels
-
-### Advanced Features
-- [ ] **Smart Routing**: ML-based transport selection
-- [ ] **Predictive Prefetching**: Anticipate message patterns
-- [ ] **Advanced Compression**: Custom ML compressors
-- [ ] **Hardware Crypto**: Accelerated encryption
-- [ ] **Time-series Optimization**: For streaming data
-
-### Research Projects
-- [ ] **Distributed shared memory** abstractions
-- [ ] **Transactional messaging** with ACID guarantees
-- [ ] **Byzantine fault tolerance** for untrusted networks
-- [ ] **Homomorphic encryption** for secure computation
-
-## Success Metrics 🎯
-
-### v1.2.1 Achievements
-- ✅ < 2μs latency with RDMA
-- ✅ 100+ Gbps potential throughput
-- ✅ Comprehensive transport support
-- ✅ Production-ready messaging patterns
-- ✅ GPU acceleration support (Metal)
-
-### v1.2.2 Goals
-- Complete GPU vendor support (NVIDIA, AMD)
-- UCX integration for HPC environments
-- Enhanced WebRTC capabilities
-- Extended pattern support
+## v1.3.0 Goals  
+- ✅ High-performance SIMD optimizations
+- ✅ Advanced memory management with huge pages
+- ✅ Lock-free IPC channel implementation
+- ✅ AI/ML tensor transport optimizations
+- ✅ Vulkan GPU support for cross-platform acceleration
 
 ### Long-term Vision
 - Industry standard for high-performance messaging

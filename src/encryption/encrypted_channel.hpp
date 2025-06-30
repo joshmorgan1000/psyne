@@ -1,14 +1,14 @@
 #pragma once
 
-#include <psyne/psyne.hpp>
+#include <memory>
+#include <openssl/aes.h>
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
-#include <openssl/pem.h>
-#include <openssl/aes.h>
-#include <memory>
-#include <vector>
+#include <psyne/psyne.hpp>
 #include <string>
+#include <vector>
 
 namespace psyne {
 namespace encryption {
@@ -23,20 +23,20 @@ struct EncryptionConfig {
         AES_256_GCM,
         ChaCha20_Poly1305
     };
-    
+
     Algorithm algorithm = Algorithm::AES_256_GCM;
-    std::vector<uint8_t> key;      // Symmetric key
-    std::vector<uint8_t> iv;       // Initialization vector
+    std::vector<uint8_t> key;       // Symmetric key
+    std::vector<uint8_t> iv;        // Initialization vector
     bool generate_random_iv = true; // Generate new IV for each message
-    
+
     // For key exchange
-    std::string public_key_pem;    // RSA public key for key exchange
-    std::string private_key_pem;   // RSA private key
+    std::string public_key_pem;  // RSA public key for key exchange
+    std::string private_key_pem; // RSA private key
 };
 
 /**
  * @brief Encrypted channel wrapper providing transparent encryption/decryption
- * 
+ *
  * Wraps any Psyne channel to add encryption support. Messages are encrypted
  * before sending and decrypted after receiving.
  */
@@ -48,17 +48,17 @@ public:
      * @param config Encryption configuration
      */
     EncryptedChannel(std::shared_ptr<Channel> underlying,
-                    const EncryptionConfig& config);
+                     const EncryptionConfig &config);
     ~EncryptedChannel() override;
 
     // Channel interface
     void stop() override;
     bool is_stopped() const override;
-    const std::string& uri() const override;
+    const std::string &uri() const override;
     ChannelType type() const override;
     ChannelMode mode() const override;
-    void* receive_raw_message(size_t& size, uint32_t& type) override;
-    void release_raw_message(void* handle) override;
+    void *receive_raw_message(size_t &size, uint32_t &type) override;
+    void release_raw_message(void *handle) override;
     bool has_metrics() const override;
     debug::ChannelMetrics get_metrics() const override;
     void reset_metrics() override;
@@ -86,37 +86,41 @@ public:
     EncryptionStats GetEncryptionStats() const;
 
 protected:
-    detail::ChannelImpl* impl() override;
-    const detail::ChannelImpl* impl() const override;
+    detail::ChannelImpl *impl() override;
+    const detail::ChannelImpl *impl() const override;
 
 private:
     class EncryptedMessage;
-    
+
     std::shared_ptr<Channel> underlying_;
     EncryptionConfig config_;
-    
+
     // OpenSSL contexts
-    EVP_CIPHER_CTX* encrypt_ctx_;
-    EVP_CIPHER_CTX* decrypt_ctx_;
-    
+    EVP_CIPHER_CTX *encrypt_ctx_;
+    EVP_CIPHER_CTX *decrypt_ctx_;
+
     // Key material
     std::vector<uint8_t> session_key_;
     std::vector<uint8_t> current_iv_;
-    
+
     // Statistics
     mutable EncryptionStats stats_;
     mutable std::mutex stats_mutex_;
-    
+
     // Methods
     bool InitializeCrypto();
     void CleanupCrypto();
-    std::vector<uint8_t> Encrypt(const void* data, size_t size);
-    std::vector<uint8_t> Decrypt(const void* data, size_t size);
+    std::vector<uint8_t> Encrypt(const void *data, size_t size);
+    std::vector<uint8_t> Decrypt(const void *data, size_t size);
+
+    // Zero-copy decryption directly into output buffer
+    size_t DecryptInPlace(const void *encrypted_data, size_t encrypted_size,
+                          void *output_buffer, size_t output_capacity);
 };
 
 /**
  * @brief Secure key exchange protocol
- * 
+ *
  * Implements Diffie-Hellman key exchange with RSA signatures for
  * establishing shared session keys.
  */
@@ -129,8 +133,8 @@ public:
      * @param public_key_pem RSA public key in PEM format
      */
     KeyExchange(std::shared_ptr<Channel> channel,
-               const std::string& private_key_pem,
-               const std::string& public_key_pem);
+                const std::string &private_key_pem,
+                const std::string &public_key_pem);
     ~KeyExchange();
 
     /**
@@ -138,7 +142,8 @@ public:
      * @param peer_public_key_pem Peer's public key
      * @return Shared session key, or empty on failure
      */
-    std::vector<uint8_t> InitiateExchange(const std::string& peer_public_key_pem);
+    std::vector<uint8_t>
+    InitiateExchange(const std::string &peer_public_key_pem);
 
     /**
      * @brief Respond to key exchange (server side)
@@ -148,27 +153,27 @@ public:
 
 private:
     std::shared_ptr<Channel> channel_;
-    EVP_PKEY* private_key_;
-    EVP_PKEY* public_key_;
-    
+    EVP_PKEY *private_key_;
+    EVP_PKEY *public_key_;
+
     // DH parameters
-    DH* dh_params_;
-    BIGNUM* dh_private_;
-    BIGNUM* dh_public_;
+    DH *dh_params_;
+    BIGNUM *dh_private_;
+    BIGNUM *dh_public_;
 };
 
 /**
  * @brief Certificate-based authentication for channels
- * 
+ *
  * Provides mutual TLS-style authentication for Psyne channels.
  */
 class ChannelAuthenticator {
 public:
     struct AuthConfig {
-        std::string ca_cert_path;        // CA certificate for verification
-        std::string client_cert_path;    // Client certificate
-        std::string client_key_path;     // Client private key
-        bool verify_peer = true;         // Verify peer certificate
+        std::string ca_cert_path;         // CA certificate for verification
+        std::string client_cert_path;     // Client certificate
+        std::string client_key_path;      // Client private key
+        bool verify_peer = true;          // Verify peer certificate
         bool require_client_cert = false; // Require client certificate (server)
     };
 
@@ -176,7 +181,7 @@ public:
      * @brief Create an authenticator
      * @param config Authentication configuration
      */
-    explicit ChannelAuthenticator(const AuthConfig& config);
+    explicit ChannelAuthenticator(const AuthConfig &config);
     ~ChannelAuthenticator();
 
     /**
@@ -186,9 +191,8 @@ public:
      * @param timeout_ms Timeout in milliseconds
      * @return true if authentication successful
      */
-    bool Authenticate(std::shared_ptr<Channel> channel, 
-                     bool is_server,
-                     int timeout_ms = 5000);
+    bool Authenticate(std::shared_ptr<Channel> channel, bool is_server,
+                      int timeout_ms = 5000);
 
     /**
      * @brief Get peer certificate info after authentication
@@ -205,26 +209,27 @@ public:
 
 private:
     AuthConfig config_;
-    X509* ca_cert_;
-    X509* client_cert_;
-    EVP_PKEY* client_key_;
-    X509* peer_cert_;
-    
+    X509 *ca_cert_;
+    X509 *client_cert_;
+    EVP_PKEY *client_key_;
+    X509 *peer_cert_;
+
     bool LoadCertificates();
-    bool VerifyPeerCertificate(X509* cert);
+    bool VerifyPeerCertificate(X509 *cert);
 };
 
 /**
  * @brief End-to-end encrypted channel with perfect forward secrecy
- * 
+ *
  * Combines encryption and authentication for secure communication.
  */
 class SecureChannel {
 public:
     struct SecureConfig {
-        EncryptionConfig::Algorithm encryption = EncryptionConfig::Algorithm::AES_256_GCM;
+        EncryptionConfig::Algorithm encryption =
+            EncryptionConfig::Algorithm::AES_256_GCM;
         ChannelAuthenticator::AuthConfig auth;
-        bool enable_compression = true;    // Compress before encryption
+        bool enable_compression = true;       // Compress before encryption
         bool enable_replay_protection = true; // Detect replay attacks
         int key_rotation_interval_s = 3600;   // Rotate keys every hour
     };
@@ -235,9 +240,8 @@ public:
      * @param config Security configuration
      * @param is_server true for server, false for client
      */
-    SecureChannel(const std::string& uri,
-                 const SecureConfig& config,
-                 bool is_server);
+    SecureChannel(const std::string &uri, const SecureConfig &config,
+                  bool is_server);
     ~SecureChannel();
 
     /**
@@ -250,7 +254,9 @@ public:
     /**
      * @brief Get the underlying secure channel
      */
-    std::shared_ptr<Channel> GetChannel() const { return secure_channel_; }
+    std::shared_ptr<Channel> GetChannel() const {
+        return secure_channel_;
+    }
 
     /**
      * @brief Get security status
@@ -274,12 +280,12 @@ private:
     std::shared_ptr<EncryptedChannel> secure_channel_;
     std::unique_ptr<ChannelAuthenticator> authenticator_;
     std::unique_ptr<KeyExchange> key_exchange_;
-    
+
     // Security state
     SecurityStatus status_;
     std::thread key_rotation_thread_;
     std::atomic<bool> running_{false};
-    
+
     void KeyRotationLoop();
 };
 
@@ -302,9 +308,8 @@ std::vector<uint8_t> GenerateRandomBytes(size_t size);
  * @param[out] private_key_pem Private key in PEM format
  * @return true if successful
  */
-bool GenerateRSAKeyPair(int key_size,
-                       std::string& public_key_pem,
-                       std::string& private_key_pem);
+bool GenerateRSAKeyPair(int key_size, std::string &public_key_pem,
+                        std::string &private_key_pem);
 
 /**
  * @brief Derive key from password using PBKDF2
@@ -314,10 +319,10 @@ bool GenerateRSAKeyPair(int key_size,
  * @param iterations PBKDF2 iterations (default: 100000)
  * @return Derived key
  */
-std::vector<uint8_t> DeriveKeyFromPassword(const std::string& password,
-                                          const std::vector<uint8_t>& salt,
-                                          size_t key_size,
-                                          int iterations = 100000);
+std::vector<uint8_t> DeriveKeyFromPassword(const std::string &password,
+                                           const std::vector<uint8_t> &salt,
+                                           size_t key_size,
+                                           int iterations = 100000);
 
 /**
  * @brief Calculate message authentication code (HMAC-SHA256)
@@ -326,9 +331,8 @@ std::vector<uint8_t> DeriveKeyFromPassword(const std::string& password,
  * @param size Data size
  * @return HMAC bytes (32 bytes)
  */
-std::vector<uint8_t> CalculateHMAC(const std::vector<uint8_t>& key,
-                                  const void* data,
-                                  size_t size);
+std::vector<uint8_t> CalculateHMAC(const std::vector<uint8_t> &key,
+                                   const void *data, size_t size);
 
 /**
  * @brief Constant-time comparison for cryptographic values
@@ -337,7 +341,7 @@ std::vector<uint8_t> CalculateHMAC(const std::vector<uint8_t>& key,
  * @param size Size to compare
  * @return true if equal
  */
-bool ConstantTimeCompare(const void* a, const void* b, size_t size);
+bool ConstantTimeCompare(const void *a, const void *b, size_t size);
 
 } // namespace crypto_utils
 

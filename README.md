@@ -3,7 +3,7 @@
   
   **High-performance, zero-copy messaging library optimized for AI/ML applications**
   
-  [![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/joshmorgan1000/psyne)
+  [![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/joshmorgan1000/psyne)
   [![C++ Standard](https://img.shields.io/badge/C++-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
   
@@ -47,24 +47,24 @@ Psyne provides ultra-low latency inter-process communication with support for mu
 ## 🌟 Key Features
 
 - **🔥 Zero-Copy Performance**: Messages are views into pre-allocated ring buffers
-- **🚀 Ultra-Low Latency**: Sub-microsecond message passing with RDMA support
-- **🔗 Multiple Transports**: Memory, IPC, TCP, Unix sockets, UDP multicast, WebSocket, RDMA
+- **🚀 Ultra-Low Latency**: Sub-microsecond message passing
+- **🔗 Multiple Transports**: Memory, IPC, TCP, Unix sockets, UDP multicast, WebSocket
 - **🎯 AI/ML Optimized**: Built-in support for tensors, matrices, and ML data types
 - **🌍 Universal Language Support**: Bindings for 8+ programming languages
 - **🛡️ Production Ready**: Comprehensive error handling, encryption, and monitoring
 - **📊 Built-in Observability**: Performance metrics, distributed tracing, debugging tools
 
-## 🎉 What's New in v1.2.1
+## 🎉 What's New in v1.3.0
 
-- **🔌 ZeroMQ-Style Patterns**: REQ/REP, PUB/SUB, PUSH/PULL, DEALER/ROUTER, PAIR
-- **🚀 Modern Protocols**: RUDP (Reliable UDP) and QUIC (HTTP/3) transport support
-- **🖥️ GPU Acceleration**: Apple Metal support with unified memory and compute kernels
-- **🌐 Advanced Networking**: Real InfiniBand/RDMA and libfabric integration
-- **🔄 Collective Operations**: Ring-based algorithms for distributed computing
-- **💾 Dynamic Memory**: Adaptive slab allocator with 64MB-1GB growth
-- **⚡ Ultra-Low Latency**: Sub-2μs with RDMA, 0-RTT with QUIC
+- **⚡ SIMD Vectorization**: AVX-512/NEON implementations for tensor operations
+- **🧠 AI/ML Tensor Optimizations**: Specialized transport for neural network data
+- **🚀 Custom Memory Allocator**: Huge page support for large tensor allocations
+- **🔒 Lock-Free IPC Channels**: True zero-copy using lock-free ring buffers
+- **🖥️ Vulkan GPU Support**: Cross-platform GPU acceleration
+- **🍎 Apple Metal Unified Memory**: Zero-copy GPU operations on Apple Silicon
+- **📊 Enhanced Performance**: Sub-microsecond messaging with hardware optimizations
 
-[See full release notes →](RELEASE_NOTES_v1.2.1.md)
+[See full release notes →](RELEASE_NOTES_v1.3.0.md)
 
 ## 📦 Supported Transports
 
@@ -77,12 +77,10 @@ Psyne provides ultra-low latency inter-process communication with support for mu
 | **UDP Multicast** | `multicast://239.255.0.1:8080` | One-to-many broadcasting |
 | **WebSocket** | `ws://host:port` | Web-compatible real-time |
 | **WebRTC** | `webrtc://peer-id` | P2P browser communication |
-| **RDMA/InfiniBand** | `rdma://host:port` | Ultra-low latency HPC |
 | **RUDP** | `rudp://host:port` | Reliable UDP transport |
 | **QUIC** | `quic://host:port` | HTTP/3, multiplexed streams |
-| **Libfabric** | `fabric://provider/address` | Unified fabric interface |
 
-> **Platform Notes**: Unix sockets, RDMA/InfiniBand, and libfabric are Linux/macOS only. Windows supports all other transports with equivalent functionality (named pipes for Unix sockets).
+> **Platform Notes**: Unix sockets are Linux/macOS only. Windows supports all other transports with equivalent functionality (named pipes for Unix sockets).
 
 ## 🛠️ Language Bindings
 
@@ -291,9 +289,9 @@ std::cout << "Latency P99: " << metrics.latency_p99() << " μs" << std::endl;
 
 ## 📊 Performance
 
-**Psyne v1.2.0 delivers INSANE performance that DESTROYS the competition:**
+**Psyne v1.3.0 delivers INSANE performance that DESTROYS the competition:**
 
-| Metric | **Psyne v1.2.0** | **Industry Leaders** | **Advantage** |
+| Metric | **Psyne v1.3.0** | **Industry Leaders** | **Advantage** |
 |--------|------------------|---------------------|---------------|
 | **Latency** | **0.29 μs** | Redis: ~50μs, TCP: ~50μs | **170x faster** |
 | **Throughput** | **122+ GB/s** | Kafka: ~1GB/s | **120x faster** |  
@@ -331,9 +329,12 @@ cmake --build build --target multi_core_benchmark
 - **[🌍 Language Bindings](bindings/)** - Multi-language support
 
 ### Learning Path
-1. **Start Here**: [Overview](docs/overview.md) → [Getting Started](docs/getting-started.md)
-2. **Core Concepts**: [Channels](docs/channels.md) → [Message Types](docs/tutorials/02-message-types.md)
+1. **Start Here**: [Core Design Principles](CORE_DESIGN.md) → [Overview](docs/overview.md) → [Getting Started](docs/getting-started.md)
+2. **Core Concepts**: [Channels](docs/channels.md) → [Message Types](docs/tutorials/02-message-types.md)  
 3. **Advanced**: [Performance Tuning](docs/performance-tuning.md) → [Examples](examples/)
+
+### 🎯 **REQUIRED READING**: [Core Design Principles](CORE_DESIGN.md)
+**Every contributor MUST read and understand the [Core Design Document](CORE_DESIGN.md) before making changes.** This document preserves the fundamental zero-copy philosophy that makes Psyne fast.
 
 ## 🤝 Contributing
 

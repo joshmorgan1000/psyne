@@ -1,14 +1,15 @@
 #pragma once
 
+#include "channel_impl.hpp"
+#include <atomic>
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/websocket.hpp>
+#include <condition_variable>
 #include <memory>
 #include <queue>
 #include <thread>
-#include <atomic>
-#include <condition_variable>
-#include "channel_impl.hpp"
+#include <span>
 
 namespace psyne {
 namespace detail {
@@ -19,7 +20,8 @@ namespace net = boost::asio;
 using tcp = net::ip::tcp;
 
 /**
- * @brief WebSocket channel implementation for browser/web application integration
+ * @brief WebSocket channel implementation for browser/web application
+ * integration
  *
  * Provides zero-copy messaging over WebSocket protocol, enabling web clients
  * to communicate with Psyne-based services.
@@ -32,15 +34,32 @@ public:
      * @param buffer_size Size of internal buffers
      * @param is_server Whether this is server (true) or client (false)
      */
-    WebSocketChannel(const std::string& uri, size_t buffer_size, bool is_server);
+    WebSocketChannel(const std::string &uri, size_t buffer_size,
+                     bool is_server);
     ~WebSocketChannel() override;
 
-    // ChannelImpl interface
-    void* reserve_space(size_t size) override;
-    void commit_message(void* handle) override;
-    void* receive_message(size_t& size, uint32_t& type) override;
-    void release_message(void* message) override;
+    // Zero-copy interface
+    uint32_t reserve_write_slot(size_t size) noexcept override;
+    void notify_message_ready(uint32_t offset, size_t size) noexcept override;
+    std::span<uint8_t> get_write_span(size_t size) noexcept override;
+    std::span<const uint8_t> buffer_span() const noexcept override;
+    void advance_read_pointer(size_t size) noexcept override;
     
+    // Legacy interface (deprecated)
+    [[deprecated("Use reserve_write_slot() instead")]]
+    void *reserve_space(size_t size) override;
+    [[deprecated("Data is committed when written")]]
+    void commit_message(void *handle) override;
+    void *receive_message(size_t &size, uint32_t &type) override;
+    void release_message(void *message) override;
+
+private:
+    /**
+     * @brief Zero-copy WebSocket frame sending
+     */
+    void send_websocket_frame(std::span<const uint8_t> data);
+
+public:
     debug::ChannelMetrics get_metrics() const override {
         debug::ChannelMetrics metrics;
         metrics.messages_sent = messages_sent_.load();
@@ -53,7 +72,7 @@ public:
     }
 
 private:
-    void run_client(const std::string& host, uint16_t port);
+    void run_client(const std::string &host, uint16_t port);
     void run_server(uint16_t port);
     void handle_connection(tcp::socket socket);
     void process_messages();
@@ -70,7 +89,7 @@ private:
     std::unique_ptr<websocket::stream<tcp::socket>> ws_stream_;
     std::unique_ptr<tcp::acceptor> acceptor_;
     std::thread io_thread_;
-    
+
     // Message queues
     std::queue<PendingMessage> send_queue_;
     std::queue<std::vector<uint8_t>> receive_queue_;
@@ -78,17 +97,17 @@ private:
     std::mutex receive_mutex_;
     std::condition_variable send_cv_;
     std::condition_variable receive_cv_;
-    
+
     // Buffers
     std::vector<uint8_t> send_buffer_;
     std::vector<uint8_t> receive_buffer_;
     size_t buffer_size_;
-    
+
     // State
     std::atomic<bool> stopped_{false};
     std::atomic<bool> connected_{false};
     bool is_server_;
-    
+
     // Metrics
     std::atomic<uint64_t> messages_sent_{0};
     std::atomic<uint64_t> bytes_sent_{0};
@@ -96,9 +115,10 @@ private:
     std::atomic<uint64_t> bytes_received_{0};
     std::atomic<uint64_t> send_blocks_{0};
     std::atomic<uint64_t> receive_blocks_{0};
-    
+
     // Protocol constants
-    static constexpr size_t HEADER_SIZE = sizeof(uint32_t) + sizeof(uint32_t); // size + type
+    static constexpr size_t HEADER_SIZE =
+        sizeof(uint32_t) + sizeof(uint32_t); // size + type
 };
 
 } // namespace detail

@@ -34,8 +34,8 @@
 git_apply.sh
 build/
 
-CLAUDE.md
-AGENTS.md
 .claude/
+CLAUDE.md
+.vscode/
 node_modules/
 package-lock.json

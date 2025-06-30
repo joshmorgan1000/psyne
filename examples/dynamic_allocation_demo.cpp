@@ -1,268 +1,287 @@
-#include <psyne/psyne.hpp>
-#include <psyne/memory/dynamic_slab_allocator.hpp>
-#include <iostream>
-#include <iomanip>
-#include <thread>
 #include <chrono>
-#include <random>
 #include <cstring>
+#include <iomanip>
+#include <iostream>
+#include <psyne/psyne.hpp>
+#include <random>
+#include <thread>
 
 using namespace psyne;
 using namespace std::chrono_literals;
 
-void demonstrate_dynamic_slab() {
-    std::cout << "\n=== Dynamic Slab Allocator Demo ===" << std::endl;
+// Dynamic-size message for variable data
+class DynamicDataMessage : public Message<DynamicDataMessage> {
+public:
+    static constexpr uint32_t message_type = 300;
     
-    memory::DynamicSlabConfig config;
-    config.initial_slab_size = 64 * 1024 * 1024;  // Start with 64MB
-    config.max_slab_size = 1024 * 1024 * 1024;    // Max 1GB
-    config.high_water_mark = 0.75;                // Grow at 75% usage
-    config.low_water_mark = 0.25;                 // Shrink below 25% usage
-    config.growth_factor = 2.0;                   // Double size when growing
+    using Message<DynamicDataMessage>::Message;
     
-    memory::DynamicSlabAllocator allocator(config);
+    // Header structure for dynamic messages
+    struct Header {
+        uint32_t data_size;
+        uint32_t sequence_number;
+        uint64_t timestamp;
+    };
     
-    // Allocate increasingly larger chunks
-    std::vector<std::pair<void*, size_t>> allocations;
-    size_t sizes[] = {64 * 1024, 256 * 1024, 1024 * 1024, 4 * 1024 * 1024, 16 * 1024 * 1024, 64 * 1024 * 1024};
+    // Calculate size includes header + dynamic data
+    static size_t calculate_size() {
+        // Default allocation for dynamic messages
+        return sizeof(Header) + 1024;  // 1KB default
+    }
     
-    for (int round = 0; round < 3; ++round) {
-        std::cout << "\nRound " << (round + 1) << ":" << std::endl;
+    void initialize(uint32_t seq, size_t data_size) {
+        if (!data_) return;
         
-        for (size_t size : sizes) {
-            void* ptr = allocator.allocate(size);
-            if (ptr) {
-                allocations.push_back({ptr, size});
-                auto stats = allocator.get_stats();
-                std::cout << "  Allocated " << (size / (1024 * 1024)) << " MB"
-                         << " (slabs: " << stats.num_slabs
-                         << ", usage: " << std::fixed << std::setprecision(1) 
-                         << (stats.usage_ratio * 100) << "%"
-                         << ", capacity: " << (stats.total_capacity / (1024 * 1024)) << " MB)" << std::endl;
-            }
+        auto* header = reinterpret_cast<Header*>(data_);
+        header->data_size = static_cast<uint32_t>(data_size);
+        header->sequence_number = seq;
+        header->timestamp = std::chrono::system_clock::now().time_since_epoch().count();
+        
+        // Initialize data area
+        uint8_t* data_area = data_ + sizeof(Header);
+        for (size_t i = 0; i < data_size && i < (size_ - sizeof(Header)); ++i) {
+            data_area[i] = static_cast<uint8_t>((seq + i) % 256);
         }
     }
     
-    auto peak_stats = allocator.get_stats();
-    std::cout << "\nPeak statistics:" << std::endl;
-    std::cout << "  Total slabs: " << peak_stats.num_slabs << std::endl;
-    std::cout << "  Total capacity: " << (peak_stats.total_capacity / (1024 * 1024)) << " MB" << std::endl;
-    std::cout << "  Total used: " << (peak_stats.total_used / (1024 * 1024)) << " MB" << std::endl;
-    std::cout << "  Smallest slab: " << (peak_stats.smallest_slab_size / (1024 * 1024)) << " MB" << std::endl;
-    std::cout << "  Largest slab: " << (peak_stats.largest_slab_size / (1024 * 1024)) << " MB" << std::endl;
-    
-    // Deallocate half to demonstrate shrinking
-    std::cout << "\nDeallocating half of allocations..." << std::endl;
-    for (size_t i = 0; i < allocations.size(); i += 2) {
-        allocator.deallocate(allocations[i].first, allocations[i].second);
+    Header get_header() const {
+        if (!data_) return {};
+        return *reinterpret_cast<const Header*>(data_);
     }
     
-    allocator.perform_maintenance();
-    
-    auto after_dealloc_stats = allocator.get_stats();
-    std::cout << "\nAfter deallocation:" << std::endl;
-    std::cout << "  Total slabs: " << after_dealloc_stats.num_slabs << std::endl;
-    std::cout << "  Total capacity: " << (after_dealloc_stats.total_capacity / (1024 * 1024)) << " MB" << std::endl;
-    std::cout << "  Total used: " << (after_dealloc_stats.total_used / (1024 * 1024)) << " MB" << std::endl;
-    std::cout << "  Usage ratio: " << std::fixed << std::setprecision(1) 
-              << (after_dealloc_stats.usage_ratio * 100) << "%" << std::endl;
-    std::cout << "  Number of growths: " << after_dealloc_stats.slab_growths << std::endl;
-    std::cout << "  Number of shrinks: " << after_dealloc_stats.slab_shrinks << std::endl;
-}
+    std::span<const uint8_t> get_data() const {
+        if (!data_ || size_ <= sizeof(Header)) return {};
+        const uint8_t* data_start = data_ + sizeof(Header);
+        return std::span<const uint8_t>(data_start, size_ - sizeof(Header));
+    }
+};
 
-void demonstrate_thread_local_allocator() {
-    std::cout << "\n=== Thread-Local Allocator Demo ===" << std::endl;
+void demonstrate_dynamic_messages() {
+    std::cout << "\n=== Dynamic Message Allocation Demo ===\n";
     
-    memory::DynamicSlabConfig config;
-    config.initial_slab_size = 8 * 1024 * 1024;  // 8MB per thread
-    config.high_water_mark = 0.8;
-    config.enable_shrinking = false;  // Disable shrinking for thread-local
+    // Create channel with large buffer for dynamic allocation
+    auto channel = create_channel("memory://dynamic_demo", 
+                                  64 * 1024 * 1024,  // 64MB buffer
+                                  ChannelMode::SPSC,
+                                  ChannelType::SingleType,
+                                  true);  // Enable metrics
     
-    const int num_threads = 4;
-    std::vector<std::thread> threads;
-    std::atomic<size_t> total_allocated{0};
+    std::cout << "Created channel with 64MB buffer for dynamic allocations\n\n";
     
-    auto worker = [&config, &total_allocated](int thread_id) {
-        memory::ThreadLocalSlabAllocator allocator(config);
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<size_t> size_dist(1024, 64 * 1024);
+    // Random size generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<size_t> size_dist(64, 4096);  // 64B to 4KB
+    
+    // Producer thread - sends messages of varying sizes
+    std::thread producer([&]() {
+        uint32_t sequence = 0;
+        size_t total_sent = 0;
         
-        size_t local_allocated = 0;
-        std::vector<std::pair<void*, size_t>> allocations;
-        
-        // Perform allocations
         for (int i = 0; i < 100; ++i) {
-            size_t size = size_dist(gen);
-            void* ptr = allocator.allocate(size);
-            if (ptr) {
-                allocations.push_back({ptr, size});
-                local_allocated += size;
-                // Write pattern
-                std::memset(ptr, thread_id, size);
-            }
+            size_t data_size = size_dist(gen);
             
-            // Occasionally deallocate
-            if (i % 10 == 5 && !allocations.empty()) {
-                size_t idx = gen() % allocations.size();
-                allocator.deallocate(allocations[idx].first, allocations[idx].second);
-                allocations.erase(allocations.begin() + idx);
+            try {
+                // Allocate message with specific size
+                DynamicDataMessage msg(*channel);
+                msg.initialize(sequence++, data_size);
+                
+                auto header = msg.get_header();
+                std::cout << "[Producer] Sending seq=" << header.sequence_number 
+                          << ", size=" << data_size << " bytes\n";
+                
+                msg.send();
+                total_sent += data_size;
+                
+                // Vary sending rate
+                if (i % 10 == 0) {
+                    std::this_thread::sleep_for(10ms);
+                }
+            } catch (const std::runtime_error& e) {
+                std::cout << "[Producer] Buffer full, waiting...\n";
+                std::this_thread::sleep_for(50ms);
+                i--; // Retry
             }
         }
         
-        auto stats = allocator.get_stats();
-        std::cout << "  Thread " << thread_id << ": "
-                  << "allocated " << (local_allocated / 1024) << " KB, "
-                  << "slabs: " << stats.num_slabs << ", "
-                  << "usage: " << std::fixed << std::setprecision(1)
-                  << (stats.usage_ratio * 100) << "%" << std::endl;
+        std::cout << "[Producer] Total sent: " << total_sent / 1024.0 << " KB\n";
+    });
+    
+    // Consumer thread - receives and validates messages
+    std::thread consumer([&]() {
+        size_t total_received = 0;
+        uint32_t expected_seq = 0;
         
-        total_allocated += local_allocated;
-        
-        // Clean up
-        for (auto& [ptr, size] : allocations) {
-            allocator.deallocate(ptr, size);
+        for (int i = 0; i < 100; ++i) {
+            size_t msg_size;
+            uint32_t msg_type;
+            void* msg_data = channel->receive_message(msg_size, msg_type);
+            
+            if (msg_data && msg_type == DynamicDataMessage::message_type) {
+                DynamicDataMessage msg(msg_data, msg_size);
+                auto header = msg.get_header();
+                auto data = msg.get_data();
+                
+                // Validate sequence
+                if (header.sequence_number != expected_seq) {
+                    std::cout << "[Consumer] Sequence error! Expected " << expected_seq 
+                              << ", got " << header.sequence_number << "\n";
+                }
+                expected_seq = header.sequence_number + 1;
+                
+                // Validate data
+                bool valid = true;
+                for (size_t j = 0; j < header.data_size && j < data.size(); ++j) {
+                    if (data[j] != static_cast<uint8_t>((header.sequence_number + j) % 256)) {
+                        valid = false;
+                        break;
+                    }
+                }
+                
+                if (!valid) {
+                    std::cout << "[Consumer] Data validation failed for seq=" 
+                              << header.sequence_number << "\n";
+                }
+                
+                total_received += header.data_size;
+                
+                if (i % 20 == 0) {
+                    std::cout << "[Consumer] Received seq=" << header.sequence_number 
+                              << ", size=" << header.data_size << " bytes\n";
+                }
+                
+                channel->release_message(msg_data);
+            } else {
+                std::this_thread::sleep_for(10ms);
+                i--; // Retry
+            }
         }
-    };
+        
+        std::cout << "[Consumer] Total received: " << total_received / 1024.0 << " KB\n";
+    });
     
-    // Launch worker threads
-    for (int i = 0; i < num_threads; ++i) {
-        threads.emplace_back(worker, i);
+    producer.join();
+    consumer.join();
+    
+    // Show final metrics
+    if (channel->has_metrics()) {
+        auto metrics = channel->get_metrics();
+        std::cout << "\nFinal channel metrics:\n";
+        std::cout << "  Messages sent: " << metrics.messages_sent << "\n";
+        std::cout << "  Messages received: " << metrics.messages_received << "\n";
+        std::cout << "  Bytes sent: " << metrics.bytes_sent / 1024.0 << " KB\n";
+        std::cout << "  Bytes received: " << metrics.bytes_received / 1024.0 << " KB\n";
     }
-    
-    // Wait for completion
-    for (auto& t : threads) {
-        t.join();
-    }
-    
-    std::cout << "\nTotal allocated across all threads: " 
-              << (total_allocated.load() / (1024 * 1024)) << " MB" << std::endl;
 }
 
-void demonstrate_scoped_allocator() {
-    std::cout << "\n=== Scoped Allocator Demo ===" << std::endl;
-    std::cout << "Demonstrates automatic cleanup with RAII pattern" << std::endl;
+void demonstrate_buffer_management() {
+    std::cout << "\n=== Buffer Management Demo ===\n";
     
-    memory::DynamicSlabConfig config;
-    config.initial_slab_size = 16 * 1024 * 1024;  // 16MB
-    
-    memory::DynamicSlabAllocator main_allocator(config);
-    
-    {
-        // Scoped allocator automatically cleans up
-        memory::ScopedSlabAllocator scoped(main_allocator);
-        
-        std::cout << "\nAllocating within scope..." << std::endl;
-        
-        // Allocate various sizes
-        void* small = scoped.allocate(1024);
-        void* medium = scoped.allocate(64 * 1024);
-        void* large = scoped.allocate(1024 * 1024);
-        
-        if (small && medium && large) {
-            std::cout << "  Successfully allocated 1KB, 64KB, and 1MB" << std::endl;
-            
-            // Use the memory
-            std::memset(small, 0xAA, 1024);
-            std::memset(medium, 0xBB, 64 * 1024);
-            std::memset(large, 0xCC, 1024 * 1024);
-        }
-        
-        auto stats = main_allocator.get_stats();
-        std::cout << "  Main allocator usage: " << (stats.total_used / 1024) << " KB" << std::endl;
-        
-        // Manual deallocation is possible but not required
-        if (medium) {
-            scoped.deallocate(medium, 64 * 1024);
-            std::cout << "  Manually deallocated 64KB" << std::endl;
-        }
-        
-    } // Automatic cleanup happens here
-    
-    auto final_stats = main_allocator.get_stats();
-    std::cout << "\nAfter scope exit:" << std::endl;
-    std::cout << "  Main allocator usage: " << final_stats.total_used << " bytes" << std::endl;
-    std::cout << "  All memory automatically cleaned up!" << std::endl;
-}
-
-void demonstrate_global_allocator() {
-    std::cout << "\n=== Global Allocator Demo ===" << std::endl;
-    
-    // Configure the global allocator
-    memory::DynamicSlabConfig config;
-    config.initial_slab_size = 64 * 1024 * 1024;  // 64MB
-    config.high_water_mark = 0.75;
-    config.low_water_mark = 0.25;
-    
-    memory::GlobalSlabAllocator::instance().configure(config);
-    
-    // Multiple threads using the global allocator
-    const int num_threads = 3;
-    std::vector<std::thread> threads;
-    
-    auto worker = [](int thread_id) {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<size_t> size_dist(1024, 256 * 1024);
-        
-        for (int i = 0; i < 50; ++i) {
-            size_t size = size_dist(gen);
-            void* ptr = memory::GlobalSlabAllocator::instance().allocate(size);
-            
-            if (ptr) {
-                // Use the memory
-                std::memset(ptr, thread_id, size);
-                
-                // Simulate work
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
-                
-                // Deallocate
-                memory::GlobalSlabAllocator::instance().deallocate(ptr, size);
-            }
-            
-            if (i % 10 == 0) {
-                auto stats = memory::GlobalSlabAllocator::instance().get_stats();
-                std::cout << "  Thread " << thread_id << " at iteration " << i 
-                          << ": " << stats.num_slabs << " slabs, "
-                          << (stats.usage_ratio * 100) << "% usage" << std::endl;
-            }
-        }
+    // Create multiple channels with different buffer sizes
+    struct ChannelConfig {
+        std::string name;
+        size_t buffer_size;
+        std::string description;
     };
     
-    // Launch threads
-    for (int i = 0; i < num_threads; ++i) {
-        threads.emplace_back(worker, i);
-    }
+    std::vector<ChannelConfig> configs = {
+        {"small", 1 * 1024 * 1024, "1MB buffer for small messages"},
+        {"medium", 16 * 1024 * 1024, "16MB buffer for medium workload"},
+        {"large", 128 * 1024 * 1024, "128MB buffer for large data"}
+    };
     
-    // Wait for completion
-    for (auto& t : threads) {
-        t.join();
+    for (const auto& config : configs) {
+        std::cout << "\nTesting " << config.description << ":\n";
+        
+        auto channel = create_channel("memory://" + config.name,
+                                      config.buffer_size,
+                                      ChannelMode::SPSC);
+        
+        // Calculate how many 64KB messages fit
+        size_t message_size = 64 * 1024;
+        size_t max_messages = config.buffer_size / message_size;
+        
+        std::cout << "  Can hold approximately " << max_messages 
+                  << " messages of 64KB each\n";
+        
+        // Fill the buffer
+        size_t sent = 0;
+        while (true) {
+            try {
+                FloatVector msg(*channel);
+                msg.resize(message_size / sizeof(float));
+                msg.send();
+                sent++;
+            } catch (const std::runtime_error& e) {
+                break;  // Buffer full
+            }
+        }
+        
+        std::cout << "  Actually sent " << sent << " messages before buffer full\n";
+        std::cout << "  Efficiency: " << (sent * 100.0 / max_messages) << "%\n";
     }
+}
+
+void demonstrate_zero_copy_benefits() {
+    std::cout << "\n=== Zero-Copy Benefits Demo ===\n";
     
-    auto final_stats = memory::GlobalSlabAllocator::instance().get_stats();
-    std::cout << "\nFinal global allocator statistics:" << std::endl;
-    std::cout << "  Total allocations: " << final_stats.allocations << std::endl;
-    std::cout << "  Total deallocations: " << final_stats.deallocations << std::endl;
-    std::cout << "  Slab growths: " << final_stats.slab_growths << std::endl;
-    std::cout << "  Slab shrinks: " << final_stats.slab_shrinks << std::endl;
+    auto channel = create_channel("memory://zerocopy", 
+                                  32 * 1024 * 1024,
+                                  ChannelMode::SPSC);
+    
+    // Large message (1MB)
+    const size_t large_size = 1024 * 1024;
+    
+    std::cout << "Sending 1MB message with zero-copy...\n";
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    try {
+        FloatVector msg(*channel);
+        msg.resize(large_size / sizeof(float));
+        
+        // Fill with data
+        for (size_t i = 0; i < msg.size(); ++i) {
+            msg[i] = static_cast<float>(i);
+        }
+        
+        // Get pointer before sending
+        void* send_ptr = msg.data();
+        
+        msg.send();
+        
+        // Receive
+        size_t msg_size;
+        uint32_t msg_type;
+        void* recv_data = channel->receive_message(msg_size, msg_type);
+        
+        if (recv_data) {
+            auto elapsed = std::chrono::high_resolution_clock::now() - start;
+            auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+            
+            std::cout << "  Time: " << microseconds << " µs\n";
+            std::cout << "  Throughput: " << (large_size / 1024.0 / 1024.0) / (microseconds / 1e6) 
+                      << " MB/s\n";
+            std::cout << "  Send pointer: " << send_ptr << "\n";
+            std::cout << "  Recv pointer: " << recv_data << "\n";
+            std::cout << "  Same memory? " << (send_ptr == recv_data ? "YES (zero-copy!)" : "NO") << "\n";
+            
+            channel->release_message(recv_data);
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+    }
 }
 
 int main() {
-    std::cout << "Dynamic Memory Allocation Demo" << std::endl;
-    std::cout << "==============================" << std::endl;
-    std::cout << "Demonstrating Psyne's adaptive slab allocator with 64MB-1GB growth" << std::endl;
-    
-    try {
-        demonstrate_dynamic_slab();
-        demonstrate_thread_local_allocator();
-        demonstrate_scoped_allocator();
-        demonstrate_global_allocator();
-        
-        std::cout << "\nDemo completed successfully!" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        return 1;
-    }
-    
+    std::cout << "Psyne Dynamic Allocation Demo\n";
+    std::cout << "=============================\n";
+    std::cout << "Demonstrating dynamic message sizes and buffer management\n";
+
+    demonstrate_dynamic_messages();
+    demonstrate_buffer_management();
+    demonstrate_zero_copy_benefits();
+
+    std::cout << "\nDemo completed successfully!\n";
     return 0;
 }

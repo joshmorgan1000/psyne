@@ -331,7 +331,6 @@ julia -e "using Pkg; Pkg.develop(path=\"bindings/julia\")"
 
 ### Planned Features
 
-1. **Additional Transports**: WebSocket, RDMA support
 2. **Advanced Compression**: Custom compression algorithms
 3. **Streaming Interface**: Iterator-based message streaming
 4. **Async/Await**: Native async support for Julia

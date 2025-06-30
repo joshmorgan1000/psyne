@@ -1,18 +1,18 @@
 #pragma once
 
-#include <psyne/psyne.hpp>
-#include <unordered_map>
-#include <mutex>
-#include <thread>
-#include <queue>
 #include <condition_variable>
+#include <mutex>
+#include <psyne/psyne.hpp>
+#include <queue>
+#include <thread>
+#include <unordered_map>
 
 namespace psyne {
 namespace multiplexing {
 
 /**
  * @brief Multiplexes multiple logical channels over a single physical channel
- * 
+ *
  * This allows efficient use of resources by sharing a single high-bandwidth
  * channel among multiple logical streams. Each logical channel is identified
  * by a channel ID.
@@ -25,7 +25,7 @@ public:
      * @param max_logical_channels Maximum number of logical channels
      */
     ChannelMultiplexer(std::shared_ptr<Channel> physical_channel,
-                      size_t max_logical_channels = 256);
+                       size_t max_logical_channels = 256);
     ~ChannelMultiplexer();
 
     /**
@@ -60,27 +60,28 @@ public:
 private:
     class LogicalChannel;
     struct MultiplexedMessage;
-    
+
     void SendLoop();
     void ReceiveLoop();
-    
+
     std::shared_ptr<Channel> physical_channel_;
     size_t max_logical_channels_;
-    
+
     // Logical channels
-    std::unordered_map<uint8_t, std::shared_ptr<LogicalChannel>> logical_channels_;
+    std::unordered_map<uint8_t, std::shared_ptr<LogicalChannel>>
+        logical_channels_;
     std::mutex channels_mutex_;
-    
+
     // Send queue
     std::queue<MultiplexedMessage> send_queue_;
     std::mutex send_mutex_;
     std::condition_variable send_cv_;
-    
+
     // Threads
     std::thread send_thread_;
     std::thread receive_thread_;
     std::atomic<bool> running_{false};
-    
+
     // Statistics
     mutable Stats stats_;
     mutable std::mutex stats_mutex_;
@@ -88,7 +89,7 @@ private:
 
 /**
  * @brief Demultiplexer for receiving multiplexed channels
- * 
+ *
  * Companion class to ChannelMultiplexer for the receiving side.
  */
 class ChannelDemultiplexer {
@@ -105,7 +106,8 @@ public:
      * @param channel_id Logical channel ID
      * @param handler Function to handle received messages
      */
-    using MessageHandler = std::function<void(const void* data, size_t size, uint32_t type)>;
+    using MessageHandler =
+        std::function<void(const void *data, size_t size, uint32_t type)>;
     void RegisterHandler(uint8_t channel_id, MessageHandler handler);
 
     /**
@@ -127,12 +129,13 @@ public:
 
 private:
     class LogicalReceiveChannel;
-    
+
     void ReceiveLoop();
-    
+
     std::shared_ptr<Channel> physical_channel_;
     std::unordered_map<uint8_t, MessageHandler> handlers_;
-    std::unordered_map<uint8_t, std::shared_ptr<LogicalReceiveChannel>> logical_channels_;
+    std::unordered_map<uint8_t, std::shared_ptr<LogicalReceiveChannel>>
+        logical_channels_;
     std::mutex mutex_;
     std::thread receive_thread_;
     std::atomic<bool> running_{false};
@@ -140,7 +143,7 @@ private:
 
 /**
  * @brief Channel pool for efficient channel management
- * 
+ *
  * Manages a pool of channels with automatic multiplexing when needed.
  */
 class ChannelPool {
@@ -148,12 +151,13 @@ public:
     struct Config {
         size_t initial_channels = 4;
         size_t max_channels = 16;
-        size_t multiplex_threshold = 8;  // Start multiplexing after this many channels
+        size_t multiplex_threshold =
+            8; // Start multiplexing after this many channels
         size_t channel_buffer_size = 16 * 1024 * 1024;
         std::string channel_uri_prefix = "memory://pool_";
     };
 
-    explicit ChannelPool(const Config& config = {});
+    explicit ChannelPool(const Config &config = {});
     ~ChannelPool();
 
     /**
@@ -193,17 +197,12 @@ private:
 
 /**
  * @brief Priority-based multiplexer
- * 
+ *
  * Multiplexes channels with priority-based scheduling.
  */
 class PriorityMultiplexer {
 public:
-    enum class Priority {
-        Low = 0,
-        Normal = 1,
-        High = 2,
-        Critical = 3
-    };
+    enum class Priority { Low = 0, Normal = 1, High = 2, Critical = 3 };
 
     PriorityMultiplexer(std::shared_ptr<Channel> physical_channel);
     ~PriorityMultiplexer();
@@ -215,9 +214,9 @@ public:
      * @param bandwidth_weight Relative bandwidth allocation (1-100)
      * @return Logical channel
      */
-    std::shared_ptr<Channel> CreatePriorityChannel(uint8_t channel_id,
-                                                   Priority priority,
-                                                   uint8_t bandwidth_weight = 10);
+    std::shared_ptr<Channel>
+    CreatePriorityChannel(uint8_t channel_id, Priority priority,
+                          uint8_t bandwidth_weight = 10);
 
     void Start();
     void Stop();
@@ -229,24 +228,26 @@ private:
         std::chrono::steady_clock::time_point timestamp;
         std::vector<uint8_t> data;
         uint32_t type;
-        
-        bool operator<(const PriorityQueueEntry& other) const {
+
+        bool operator<(const PriorityQueueEntry &other) const {
             if (priority != other.priority) {
-                return static_cast<int>(priority) < static_cast<int>(other.priority);
+                return static_cast<int>(priority) <
+                       static_cast<int>(other.priority);
             }
-            return timestamp > other.timestamp;  // Earlier timestamp = higher priority
+            return timestamp >
+                   other.timestamp; // Earlier timestamp = higher priority
         }
     };
 
     void SchedulerLoop();
-    
+
     std::shared_ptr<Channel> physical_channel_;
     std::priority_queue<PriorityQueueEntry> send_queue_;
     std::mutex queue_mutex_;
     std::condition_variable queue_cv_;
     std::thread scheduler_thread_;
     std::atomic<bool> running_{false};
-    
+
     // Bandwidth management
     std::unordered_map<uint8_t, uint8_t> bandwidth_weights_;
     std::unordered_map<uint8_t, uint64_t> bytes_sent_;
@@ -254,7 +255,7 @@ private:
 
 /**
  * @brief Virtual channel that spans multiple physical channels
- * 
+ *
  * Provides a single logical channel interface that transparently
  * uses multiple underlying channels for increased bandwidth.
  */
@@ -266,12 +267,12 @@ public:
      * @param mode Load balancing mode
      */
     enum class BondingMode {
-        RoundRobin,      // Distribute messages round-robin
-        LeastLoaded,     // Send to least loaded channel
-        Broadcast,       // Send to all channels (for redundancy)
-        Striped          // Stripe large messages across channels
+        RoundRobin,  // Distribute messages round-robin
+        LeastLoaded, // Send to least loaded channel
+        Broadcast,   // Send to all channels (for redundancy)
+        Striped      // Stripe large messages across channels
     };
-    
+
     BondedChannel(std::vector<std::shared_ptr<Channel>> channels,
                   BondingMode mode = BondingMode::RoundRobin);
     ~BondedChannel();
@@ -283,14 +284,15 @@ public:
      * @param type Message type
      * @return true if sent successfully
      */
-    bool Send(const void* data, size_t size, uint32_t type);
+    bool Send(const void *data, size_t size, uint32_t type);
 
     /**
      * @brief Receive from any bonded channel
      * @param timeout_ms Timeout in milliseconds
      * @return Received message or nullptr
      */
-    std::unique_ptr<std::vector<uint8_t>> Receive(uint32_t& type, int timeout_ms = 0);
+    std::unique_ptr<std::vector<uint8_t>> Receive(uint32_t &type,
+                                                  int timeout_ms = 0);
 
     /**
      * @brief Get aggregate statistics
@@ -308,7 +310,7 @@ private:
     std::vector<std::shared_ptr<Channel>> channels_;
     BondingMode mode_;
     std::atomic<size_t> next_channel_{0};
-    
+
     // Statistics
     mutable BondStats stats_;
     mutable std::mutex stats_mutex_;

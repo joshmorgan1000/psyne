@@ -1,12 +1,12 @@
 #pragma once
 
-#include <psyne/psyne.hpp>
 #include <chrono>
-#include <vector>
-#include <string>
-#include <memory>
-#include <map>
 #include <functional>
+#include <map>
+#include <memory>
+#include <psyne/psyne.hpp>
+#include <string>
+#include <vector>
 
 namespace psyne {
 namespace debug {
@@ -16,11 +16,11 @@ namespace debug {
  * @brief Health status of a channel
  */
 enum class ChannelHealth {
-    Healthy,        ///< Channel operating normally
-    Warning,        ///< Minor issues detected
-    Critical,       ///< Serious problems detected
-    Disconnected,   ///< Channel not connected/available
-    Unknown         ///< Cannot determine status
+    Healthy,      ///< Channel operating normally
+    Warning,      ///< Minor issues detected
+    Critical,     ///< Serious problems detected
+    Disconnected, ///< Channel not connected/available
+    Unknown       ///< Cannot determine status
 };
 
 /**
@@ -28,13 +28,13 @@ enum class ChannelHealth {
  * @brief Information about ring buffer usage
  */
 struct BufferUsage {
-    size_t total_size = 0;           ///< Total buffer size in bytes
-    size_t used_bytes = 0;           ///< Currently used bytes
-    size_t available_bytes = 0;      ///< Available space in bytes
-    size_t read_position = 0;        ///< Current read position
-    size_t write_position = 0;       ///< Current write position
+    size_t total_size = 0;            ///< Total buffer size in bytes
+    size_t used_bytes = 0;            ///< Currently used bytes
+    size_t available_bytes = 0;       ///< Available space in bytes
+    size_t read_position = 0;         ///< Current read position
+    size_t write_position = 0;        ///< Current write position
     double utilization_percent = 0.0; ///< Usage as percentage (0-100)
-    
+
     // Visual representation
     std::string visual_bar() const;
 };
@@ -82,13 +82,17 @@ struct ChannelDiagnostics {
     std::vector<std::string> warnings;
     std::vector<std::string> errors;
     std::chrono::steady_clock::time_point last_activity;
-    
+
     // Performance history
     std::vector<PerformanceSnapshot> performance_history;
-    
+
     // Health checks
-    bool has_warnings() const { return !warnings.empty(); }
-    bool has_errors() const { return !errors.empty(); }
+    bool has_warnings() const {
+        return !warnings.empty();
+    }
+    bool has_errors() const {
+        return !errors.empty();
+    }
     std::string summary() const;
 };
 
@@ -101,32 +105,33 @@ public:
     /**
      * @brief Inspect a channel and return diagnostic information
      */
-    static ChannelDiagnostics inspect(const Channel& channel);
-    
+    static ChannelDiagnostics inspect(const Channel &channel);
+
     /**
      * @brief Get detailed buffer usage information
      */
-    static BufferUsage get_buffer_usage(const Channel& channel);
-    
+    static BufferUsage get_buffer_usage(const Channel &channel);
+
     /**
      * @brief Analyze channel health and detect issues
      */
-    static ChannelHealth analyze_health(const Channel& channel);
-    
+    static ChannelHealth analyze_health(const Channel &channel);
+
     /**
      * @brief Get human-readable status report
      */
-    static std::string get_status_report(const Channel& channel);
-    
+    static std::string get_status_report(const Channel &channel);
+
     /**
      * @brief Create visual representation of buffer state
      */
-    static std::string visualize_buffer(const Channel& channel, size_t width = 50);
-    
+    static std::string visualize_buffer(const Channel &channel,
+                                        size_t width = 50);
+
     /**
      * @brief Run comprehensive health check
      */
-    static std::vector<std::string> health_check(const Channel& channel);
+    static std::vector<std::string> health_check(const Channel &channel);
 };
 
 /**
@@ -135,40 +140,44 @@ public:
  */
 class PerformanceProfiler {
 public:
-    explicit PerformanceProfiler(const Channel& channel);
-    
+    explicit PerformanceProfiler(const Channel &channel);
+
     /**
      * @brief Start profiling
      */
     void start();
-    
+
     /**
      * @brief Stop profiling
      */
     void stop();
-    
+
     /**
      * @brief Take a performance snapshot
      */
     PerformanceSnapshot snapshot();
-    
+
     /**
      * @brief Get performance history
      */
-    const std::vector<PerformanceSnapshot>& history() const { return history_; }
-    
+    const std::vector<PerformanceSnapshot> &history() const {
+        return history_;
+    }
+
     /**
      * @brief Generate performance report
      */
     std::string generate_report() const;
-    
+
     /**
      * @brief Clear history
      */
-    void clear_history() { history_.clear(); }
+    void clear_history() {
+        history_.clear();
+    }
 
 private:
-    const Channel* channel_;
+    const Channel *channel_;
     std::vector<PerformanceSnapshot> history_;
     std::chrono::steady_clock::time_point start_time_;
     bool profiling_ = false;
@@ -189,40 +198,40 @@ public:
         uint32_t message_type;
         std::string details;
     };
-    
+
     /**
      * @brief Enable tracing for a channel
      */
-    static void enable_tracing(const std::string& channel_uri);
-    
+    static void enable_tracing(const std::string &channel_uri);
+
     /**
      * @brief Disable tracing for a channel
      */
-    static void disable_tracing(const std::string& channel_uri);
-    
+    static void disable_tracing(const std::string &channel_uri);
+
     /**
      * @brief Log a trace event
      */
-    static void trace_event(const std::string& channel_uri, 
-                           const std::string& event_type,
-                           size_t message_size,
-                           uint32_t message_type = 0,
-                           const std::string& details = "");
-    
+    static void trace_event(const std::string &channel_uri,
+                            const std::string &event_type, size_t message_size,
+                            uint32_t message_type = 0,
+                            const std::string &details = "");
+
     /**
      * @brief Get trace history for a channel
      */
-    static std::vector<TraceEvent> get_trace_history(const std::string& channel_uri);
-    
+    static std::vector<TraceEvent>
+    get_trace_history(const std::string &channel_uri);
+
     /**
      * @brief Clear trace history
      */
-    static void clear_traces(const std::string& channel_uri = "");
-    
+    static void clear_traces(const std::string &channel_uri = "");
+
     /**
      * @brief Generate trace report
      */
-    static std::string generate_trace_report(const std::string& channel_uri);
+    static std::string generate_trace_report(const std::string &channel_uri);
 
 private:
     static std::map<std::string, std::vector<TraceEvent>> traces_;
@@ -239,17 +248,18 @@ public:
      * @brief Start interactive debug session
      */
     static void start_session();
-    
+
     /**
      * @brief Register a channel for debugging
      */
-    static void register_channel(const std::string& name, std::shared_ptr<Channel> channel);
-    
+    static void register_channel(const std::string &name,
+                                 std::shared_ptr<Channel> channel);
+
     /**
      * @brief Execute debug command
      */
-    static std::string execute_command(const std::string& command);
-    
+    static std::string execute_command(const std::string &command);
+
     /**
      * @brief Show help for available commands
      */
@@ -257,15 +267,17 @@ public:
 
 private:
     static std::map<std::string, std::shared_ptr<Channel>> registered_channels_;
-    static std::map<std::string, std::function<std::string(const std::vector<std::string>&)>> commands_;
-    
+    static std::map<std::string, std::function<std::string(
+                                     const std::vector<std::string> &)>>
+        commands_;
+
     static void initialize_commands();
 };
 
 /**
  * @brief Print formatted diagnostic information
  */
-void print_diagnostics(const ChannelDiagnostics& diag, bool verbose = false);
+void print_diagnostics(const ChannelDiagnostics &diag, bool verbose = false);
 
 /**
  * @brief Create a visual dashboard showing all registered channels
@@ -280,23 +292,27 @@ public:
     /**
      * @brief Add channel to monitor
      */
-    void add_channel(const std::string& name, std::shared_ptr<Channel> channel);
-    
+    void add_channel(const std::string &name, std::shared_ptr<Channel> channel);
+
     /**
      * @brief Start monitoring (runs in background thread)
      */
-    void start_monitoring(std::chrono::milliseconds interval = std::chrono::milliseconds(1000));
-    
+    void start_monitoring(
+        std::chrono::milliseconds interval = std::chrono::milliseconds(1000));
+
     /**
      * @brief Stop monitoring
      */
     void stop_monitoring();
-    
+
     /**
      * @brief Set alert callback for health issues
      */
-    void set_alert_callback(std::function<void(const std::string&, ChannelHealth, const std::string&)> callback);
-    
+    void
+    set_alert_callback(std::function<void(const std::string &, ChannelHealth,
+                                          const std::string &)>
+                           callback);
+
     /**
      * @brief Get current status of all monitored channels
      */
@@ -304,10 +320,11 @@ public:
 
 private:
     std::map<std::string, std::shared_ptr<Channel>> channels_;
-    std::function<void(const std::string&, ChannelHealth, const std::string&)> alert_callback_;
+    std::function<void(const std::string &, ChannelHealth, const std::string &)>
+        alert_callback_;
     bool monitoring_ = false;
     std::thread monitor_thread_;
-    
+
     void monitor_loop(std::chrono::milliseconds interval);
 };
 

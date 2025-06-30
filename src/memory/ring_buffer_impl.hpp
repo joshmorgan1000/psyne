@@ -32,9 +32,9 @@ public:
         SlabHeader *header;
         void *data;
         size_t size;
-        RingBufferBase* ring_buffer; // Back-reference for MPMC commit tracking
+        RingBufferBase *ring_buffer; // Back-reference for MPMC commit tracking
 
-        WriteHandle(SlabHeader *h, size_t s, RingBufferBase* rb = nullptr)
+        WriteHandle(SlabHeader *h, size_t s, RingBufferBase *rb = nullptr)
             : header(h), data(h->data()), size(s), ring_buffer(rb) {}
         void commit() {
             header->len = static_cast<uint32_t>(size);
@@ -57,7 +57,7 @@ public:
     virtual std::optional<ReadHandle> read() = 0;
     virtual bool empty() const = 0;
     virtual size_t capacity() const = 0;
-    virtual void on_commit(WriteHandle* handle) {} // Override in MPMC
+    virtual void on_commit(WriteHandle *handle) {} // Override in MPMC
 };
 
 // SPSC implementation
@@ -155,7 +155,7 @@ public:
     size_t capacity() const override {
         return buffer_size_;
     }
-    void on_commit(WriteHandle* handle) override;
+    void on_commit(WriteHandle *handle) override;
 
 private:
     static size_t next_power_of_2(size_t n);

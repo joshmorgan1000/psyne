@@ -6,7 +6,7 @@
  * allowing Python applications to use Psyne's high-performance messaging.
  * 
  * @author Psyne Contributors
- * @date 2024
+ * @date 2025
  */
 
 #include <pybind11/pybind11.h>

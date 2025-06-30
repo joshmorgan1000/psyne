@@ -208,8 +208,8 @@ namespace Psyne.Examples
                 sb.AppendLine("      \"active\": true,");
                 sb.AppendLine("      \"roles\": [\"user\", \"viewer\"],");
                 sb.AppendLine("      \"metadata\": {");
-                sb.AppendLine("        \"created\": \"2024-01-01T00:00:00Z\",");
-                sb.AppendLine("        \"last_login\": \"2024-06-28T12:00:00Z\"");
+                sb.AppendLine("        \"created\": \"2025-01-01T00:00:00Z\",");
+                sb.AppendLine("        \"last_login\": \"2025-06-28T12:00:00Z\"");
                 sb.AppendLine("      }");
                 sb.Append("    }");
                 if (i < 99) sb.AppendLine(",");

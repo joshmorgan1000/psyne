@@ -9,81 +9,68 @@ namespace psyne {
 // Message base class implementation
 template <typename Derived>
 Message<Derived>::Message(Channel &channel)
-    : data_(nullptr), size_(0), channel_(&channel), handle_(nullptr) {
-    // Calculate size needed
-    size_t required_size = Derived::calculate_size();
-
-    // Reserve space in channel
-    auto *impl = channel.impl();
-    handle_ = impl->reserve_space(required_size);
-
-    if (handle_) {
-        // Get the data pointer from handle
-        // The handle is actually a SlabHeader pointer
-        auto *header = static_cast<detail::SlabHeader *>(handle_);
-        data_ = static_cast<uint8_t *>(header->data());
-        size_ = required_size;
-
-        // Let derived class initialize their data
-        static_cast<Derived *>(this)->initialize();
+    : slab_(&channel.get_ring_buffer()), offset_(0), channel_(&channel) {
+    // Reserve space in ring buffer and get offset - no allocation!
+    offset_ = channel.reserve_write_slot(Derived::calculate_size());
+    
+    if (offset_ == BUFFER_FULL) {
+        throw std::runtime_error("Ring buffer full - cannot reserve space");
     }
+    
+    // Message is now a typed view over ring buffer at offset
+    // User writes directly to slab memory via data() method
+    
+    // Let derived class initialize their data structure in ring buffer
+    static_cast<Derived *>(this)->initialize();
 }
 
 template <typename Derived>
-Message<Derived>::Message(const void *data, size_t size)
-    : data_(const_cast<uint8_t *>(static_cast<const uint8_t *>(data))),
-      size_(size), channel_(nullptr), handle_(nullptr) {
-    // For incoming messages, data points directly to the message payload
-    // (after any headers)
+Message<Derived>::Message(RingBuffer* slab, uint32_t offset)
+    : slab_(slab), offset_(offset), channel_(nullptr) {
+    // For incoming messages, create view into ring buffer at offset
+    // Message is just a typed view over existing ring buffer data
 }
 
 template <typename Derived>
 Message<Derived>::Message(Message &&other) noexcept
-    : data_(other.data_), size_(other.size_), channel_(other.channel_),
-      handle_(other.handle_) {
-    other.data_ = nullptr;
-    other.size_ = 0;
+    : slab_(other.slab_), offset_(other.offset_), channel_(other.channel_) {
+    other.slab_ = nullptr;
+    other.offset_ = BUFFER_FULL;
     other.channel_ = nullptr;
-    other.handle_ = nullptr;
 }
 
 template <typename Derived>
 Message<Derived> &Message<Derived>::operator=(Message &&other) noexcept {
     if (this != &other) {
-        data_ = other.data_;
-        size_ = other.size_;
+        slab_ = other.slab_;
+        offset_ = other.offset_;
         channel_ = other.channel_;
-        handle_ = other.handle_;
 
-        other.data_ = nullptr;
-        other.size_ = 0;
+        other.slab_ = nullptr;
+        other.offset_ = BUFFER_FULL;
         other.channel_ = nullptr;
-        other.handle_ = nullptr;
     }
     return *this;
 }
 
 template <typename Derived>
 Message<Derived>::~Message() {
-    // If we have a handle and haven't sent, we need to release it
-    // This is simplified - real implementation would handle this properly
+    // Message destructor - no cleanup needed since we don't own data
+    // Data lives in ring buffer, message is just a view
 }
 
 template <typename Derived>
 void Message<Derived>::send() {
-    if (!channel_ || !handle_) {
-        throw std::runtime_error("Cannot send message without channel");
+    if (!channel_ || offset_ == BUFFER_FULL) {
+        throw std::runtime_error("Cannot send invalid message");
     }
 
-    before_send();
-
-    auto *impl = channel_->impl();
-    impl->commit_message(handle_);
-
-    // Clear our state after sending
-    data_ = nullptr;
-    size_ = 0;
-    handle_ = nullptr;
+    // Data is already written by user directly to ring buffer
+    // Just notify receiver that there's a message ready at this offset
+    channel_->notify_message_ready(offset_, Derived::calculate_size());
+    
+    // Message object can be destroyed - data lives in ring buffer
+    // No pointer nulling needed - message is just a view
 }
 
 // FloatVector implementation
@@ -153,7 +140,11 @@ void FloatVector::resize(size_t new_size) {
 
 FloatVector &FloatVector::operator=(std::initializer_list<float> values) {
     resize(values.size());
-    std::copy(values.begin(), values.end(), begin());
+    // Zero-copy optimization: manual copy from initializer list
+    size_t i = 0;
+    for (float value : values) {
+        begin()[i++] = value;
+    }
     return *this;
 }
 
@@ -207,42 +198,42 @@ const double &DoubleMatrix::at(size_t row, size_t col) const {
 }
 
 // ByteVector implementation
-uint8_t& ByteVector::operator[](size_t index) {
+uint8_t &ByteVector::operator[](size_t index) {
     if (index >= size()) {
         throw std::out_of_range("ByteVector index out of range");
     }
     return data()[index];
 }
 
-const uint8_t& ByteVector::operator[](size_t index) const {
+const uint8_t &ByteVector::operator[](size_t index) const {
     if (index >= size()) {
         throw std::out_of_range("ByteVector index out of range");
     }
     return data()[index];
 }
 
-uint8_t* ByteVector::begin() {
+uint8_t *ByteVector::begin() {
     return data();
 }
 
-uint8_t* ByteVector::end() {
+uint8_t *ByteVector::end() {
     return data() + size();
 }
 
-const uint8_t* ByteVector::begin() const {
+const uint8_t *ByteVector::begin() const {
     return data();
 }
 
-const uint8_t* ByteVector::end() const {
+const uint8_t *ByteVector::end() const {
     return data() + size();
 }
 
-uint8_t* ByteVector::data() {
+uint8_t *ByteVector::data() {
     // Return pointer after size header
     return Message<ByteVector>::data() + sizeof(size_t);
 }
 
-const uint8_t* ByteVector::data() const {
+const uint8_t *ByteVector::data() const {
     // Return pointer after size header
     return Message<ByteVector>::data() + sizeof(size_t);
 }
@@ -250,7 +241,8 @@ const uint8_t* ByteVector::data() const {
 size_t ByteVector::size() const {
     if (!Message<ByteVector>::data())
         return 0;
-    size_t stored_size = *reinterpret_cast<const size_t*>(Message<ByteVector>::data());
+    size_t stored_size =
+        *reinterpret_cast<const size_t *>(Message<ByteVector>::data());
     // Sanity check - if size is unreasonably large, it's probably uninitialized
     if (stored_size > capacity()) {
         return 0; // Return 0 for invalid size
@@ -267,17 +259,18 @@ size_t ByteVector::capacity() const {
 
 void ByteVector::resize(size_t new_size) {
     if (new_size > capacity()) {
-        throw std::runtime_error("Cannot resize ByteVector beyond allocated capacity");
+        throw std::runtime_error(
+            "Cannot resize ByteVector beyond allocated capacity");
     }
     if (Message<ByteVector>::data()) {
-        *reinterpret_cast<size_t*>(Message<ByteVector>::data()) = new_size;
+        *reinterpret_cast<size_t *>(Message<ByteVector>::data()) = new_size;
     }
 }
 
 void ByteVector::initialize() {
     // Initialize size to 0
     if (Message<ByteVector>::data()) {
-        *reinterpret_cast<size_t*>(Message<ByteVector>::data()) = 0;
+        *reinterpret_cast<size_t *>(Message<ByteVector>::data()) = 0;
     }
 }
 

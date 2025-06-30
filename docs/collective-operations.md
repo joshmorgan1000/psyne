@@ -288,4 +288,3 @@ try {
 - **Compression**: Gradient compression for bandwidth reduction
 - **Fault tolerance**: Automatic recovery from node failures
 - **Dynamic groups**: Add/remove processes during execution
-- **Hardware offload**: RDMA collective offload engines

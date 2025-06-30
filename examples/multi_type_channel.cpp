@@ -24,75 +24,56 @@ public:
     void set_command(Command cmd, float param = 0.0f) {
         if (!is_valid())
             return;
-        cmd_ = cmd;
-        parameter_ = param;
+        // Write directly to buffer
+        auto* header = reinterpret_cast<Header*>(data());
+        header->cmd = cmd;
+        header->parameter = param;
     }
 
     Command command() const {
-        return cmd_;
+        if (!is_valid())
+            return Start;
+        auto* header = reinterpret_cast<const Header*>(data());
+        return header->cmd;
     }
+    
     float parameter() const {
-        return parameter_;
+        if (!is_valid())
+            return 0.0f;
+        auto* header = reinterpret_cast<const Header*>(data());
+        return header->parameter;
     }
 
     static constexpr size_t calculate_size() {
-        return sizeof(Command) + sizeof(float) + 16; // Some padding
+        return sizeof(Header);
     }
 
 private:
-    friend class Message<ControlMessage>;
-
-    void initialize_storage(void *ptr) {
-        cmd_ = Start;
-        parameter_ = 0.0f;
-    }
-
-    void initialize_view(void *ptr) {
-        // In a real implementation, we'd deserialize from ptr
-        // For this example, we'll use member variables
-    }
-
-    Command cmd_ = Start;
-    float parameter_ = 0.0f;
+    struct Header {
+        Command cmd;
+        float parameter;
+        uint8_t padding[8]; // Align to 16 bytes
+    };
 };
 
 // Simulate a system that processes different message types
 class DataProcessor {
 public:
-    DataProcessor(MPMCChannel &channel)
+    DataProcessor(Channel* channel)
         : channel_(channel), running_(false), sample_rate_(100.0f) {}
 
     void start() {
         running_ = true;
-
-        // Start the event listener with handlers for each message type
-        listener_ = channel_.listen(
-            {// Handle sensor data
-             Channel<MPMCRingBuffer>::make_handler<FloatVector>(
-                 [this](FloatVector &&data) {
-                     handle_sensor_data(std::move(data));
-                 }),
-
-             // Handle matrix operations
-             Channel<MPMCRingBuffer>::make_handler<DoubleMatrix>(
-                 [this](DoubleMatrix &&matrix) {
-                     handle_matrix(std::move(matrix));
-                 }),
-
-             // Handle control messages
-             Channel<MPMCRingBuffer>::make_handler<ControlMessage>(
-                 [this](ControlMessage &&msg) {
-                     handle_control(std::move(msg));
-                 })});
-
+        processor_thread_ = std::thread([this]() {
+            process_messages();
+        });
         std::cout << "[Processor] Started listening for messages\n";
     }
 
     void stop() {
         running_ = false;
-        channel_.stop();
-        if (listener_) {
-            listener_->join();
+        if (processor_thread_.joinable()) {
+            processor_thread_.join();
         }
         std::cout << "[Processor] Stopped\n";
     }
@@ -167,8 +148,46 @@ private:
         }
     }
 
-    MPMCChannel &channel_;
-    std::unique_ptr<std::thread> listener_;
+    void process_messages() {
+        while (running_) {
+            // Try to receive any message
+            size_t msg_size;
+            uint32_t msg_type;
+            void* msg_data = channel_->receive_message(msg_size, msg_type);
+            
+            if (!msg_data) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+            
+            // Process based on type
+            switch (msg_type) {
+            case FloatVector::message_type: {
+                FloatVector vec(msg_data, msg_size);
+                handle_sensor_data(std::move(vec));
+                break;
+            }
+            case DoubleMatrix::message_type: {
+                DoubleMatrix mat(msg_data, msg_size);
+                handle_matrix(std::move(mat));
+                break;
+            }
+            case ControlMessage::message_type: {
+                ControlMessage ctrl(msg_data, msg_size);
+                handle_control(std::move(ctrl));
+                break;
+            }
+            default:
+                std::cout << "[Processor] Unknown message type: " << msg_type << "\n";
+            }
+            
+            // Release message back to channel
+            channel_->release_message(msg_data);
+        }
+    }
+
+    Channel* channel_;
+    std::thread processor_thread_;
     std::atomic<bool> running_;
     bool processing_enabled_ = false;
     float sample_rate_;
@@ -177,7 +196,7 @@ private:
 };
 
 // Generate different types of messages
-void message_generator(MPMCChannel &channel, std::atomic<bool> &running) {
+void message_generator(Channel* channel, std::atomic<bool> &running) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
@@ -185,9 +204,9 @@ void message_generator(MPMCChannel &channel, std::atomic<bool> &running) {
     std::cout << "[Generator] Starting message generation\n";
 
     // Send initial control message to start processing
-    ControlMessage start_msg(channel);
+    ControlMessage start_msg(*channel);
     start_msg.set_command(ControlMessage::Start);
-    channel.send(start_msg);
+    start_msg.send();
 
     size_t iteration = 0;
 
@@ -196,41 +215,47 @@ void message_generator(MPMCChannel &channel, std::atomic<bool> &running) {
 
         // Send sensor data frequently
         if (iteration % 10 == 0) {
-            FloatVector sensor_data(channel);
-            if (sensor_data.is_valid()) {
+            try {
+                FloatVector sensor_data(*channel);
                 sensor_data.resize(16);
                 for (size_t i = 0; i < 16; ++i) {
                     sensor_data[i] = dist(gen);
                 }
-                channel.send(sensor_data);
+                sensor_data.send();
+            } catch (const std::runtime_error& e) {
+                // Buffer full, skip this message
             }
         }
 
         // Send matrix data occasionally
         if (iteration % 50 == 0) {
-            DoubleMatrix matrix(channel);
-            if (matrix.is_valid()) {
+            try {
+                DoubleMatrix matrix(*channel);
                 matrix.set_dimensions(4, 4);
                 for (size_t i = 0; i < 4; ++i) {
                     for (size_t j = 0; j < 4; ++j) {
                         matrix.at(i, j) = dist(gen);
                     }
                 }
-                channel.send(matrix);
+                matrix.send();
+            } catch (const std::runtime_error& e) {
+                // Buffer full, skip this message
             }
         }
 
         // Send control messages rarely
         if (iteration % 200 == 0) {
-            ControlMessage ctrl(channel);
-            if (ctrl.is_valid()) {
+            try {
+                ControlMessage ctrl(*channel);
                 if (iteration % 400 == 0) {
                     ctrl.set_command(ControlMessage::Reset);
                 } else {
                     ctrl.set_command(ControlMessage::SetParameter,
                                      50.0f + iteration);
                 }
-                channel.send(ctrl);
+                ctrl.send();
+            } catch (const std::runtime_error& e) {
+                // Buffer full, skip this message
             }
         }
 
@@ -238,9 +263,13 @@ void message_generator(MPMCChannel &channel, std::atomic<bool> &running) {
     }
 
     // Send stop message
-    ControlMessage stop_msg(channel);
-    stop_msg.set_command(ControlMessage::Stop);
-    channel.send(stop_msg);
+    try {
+        ControlMessage stop_msg(*channel);
+        stop_msg.set_command(ControlMessage::Stop);
+        stop_msg.send();
+    } catch (const std::runtime_error& e) {
+        // Ignore if buffer is full at shutdown
+    }
 
     std::cout << "[Generator] Stopped\n";
 }
@@ -250,20 +279,20 @@ int main() {
     std::cout << "================================\n\n";
 
     // Create a multi-type channel with MPMC support
-    MPMCChannel channel("local://control", 50 * 1024 * 1024,
-                        ChannelType::MultiType);
+    auto channel = create_channel("memory://control", 50 * 1024 * 1024,
+                                  ChannelMode::MPMC, ChannelType::MultiType);
 
     std::cout << "Created multi-type channel with 50MB buffer\n";
     std::cout << "Channel supports multiple message types with 8-byte overhead "
                  "per message\n\n";
 
     // Create the data processor
-    DataProcessor processor(channel);
+    DataProcessor processor(channel.get());
     processor.start();
 
     // Start message generation
     std::atomic<bool> running{true};
-    std::thread generator(message_generator, std::ref(channel),
+    std::thread generator(message_generator, channel.get(),
                           std::ref(running));
 
     // Run for 5 seconds

@@ -1,0 +1,386 @@
+#pragma once
+
+#include "random_utils.hpp"
+#include "time_utils.hpp"
+#include "types.hpp"
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <sstream>
+#include <sys/ioctl.h>
+#include <thread>
+#include <unistd.h>
+#include <unordered_map>
+
+namespace psyne {
+
+using namespace psyne::types;
+
+// Don't use 'using' to avoid conflicts - use InternalInternalLogLevel directly
+
+// Progress bar structure - exactly as you designed it
+struct ProgressBar {
+    std::string id;
+    std::string thread_name;
+    std::string header;
+    std::string start_time_str;
+    float progress;
+    int width;
+    unsigned long start_line;
+    uint64_t start_time;
+};
+
+// GlobalContext - your complete design for multi-threaded progress bars and
+// logging
+struct GlobalContext {
+    std::atomic<uint64_t> stdout_current_line{0};
+    std::unique_lock<std::mutex> stdout_thread_lock;
+    static thread_local std::string thread_context;
+    std::mutex stdout_mutex;
+    std::condition_variable stdout_cv;
+    std::atomic<uint64_t> next_ticket{0};
+    std::atomic<uint64_t> currently_serving{0};
+    std::atomic<uint64_t> threadCounter{0};
+    std::atomic<bool> stopFlag{false};
+    std::atomic<bool> standalone{true};
+    std::shared_mutex progress_mutex;
+    std::atomic<bool> banner_animation_done{true};
+    std::shared_ptr<std::thread> crypto_hash_init_ptr;
+    size_t num_cpu_cores = std::thread::hardware_concurrency();
+    static constexpr uint8_t initialObfuscation[4] = {0x13, 0x6E, 0x68, 0x70};
+    InternalLogLevel global_log_level = InternalLogLevel::DEBUG;
+    std::unordered_map<std::string, ProgressBar> progress_bars;
+};
+
+inline GlobalContext &getGlobalContext() {
+    static GlobalContext instance;
+    return instance;
+}
+
+inline thread_local std::string GlobalContext::thread_context{};
+inline thread_local std::string &thread_context =
+    getGlobalContext().thread_context;
+
+// Your ticket-based stdout locking system - preserved exactly
+static inline void stdout_lock() {
+    unsigned long ticket = getGlobalContext().next_ticket.fetch_add(1);
+    getGlobalContext().stdout_thread_lock =
+        std::unique_lock<std::mutex>(getGlobalContext().stdout_mutex);
+    getGlobalContext().stdout_cv.wait(
+        getGlobalContext().stdout_thread_lock, [&]() {
+            return ticket == getGlobalContext().currently_serving.load();
+        });
+}
+
+static inline void stdout_unlock() {
+    getGlobalContext().currently_serving.fetch_add(1);
+    getGlobalContext().stdout_cv.notify_all();
+    getGlobalContext().stdout_thread_lock.unlock();
+}
+
+// Progress bar update logic - your exact implementation
+static inline void UpdateProgressBar(const ProgressBar &bar) {
+    float progress = bar.progress;
+    int filled_width = static_cast<int>(bar.width * progress);
+    stdout_lock();
+    int lines_down =
+        getGlobalContext().stdout_current_line.load() - bar.start_line;
+    std::ostringstream oss;
+    for (int i = 0; i < lines_down; i++) {
+        oss << "\033[1A";
+    }
+    oss << "\033[2K" << "\r";
+    if (progress >= 1.0f) {
+        uint64_t duration = getCurrentTimestamp() - bar.start_time;
+        oss << bar.start_time_str << " [INFO ] [" << bar.thread_name << "] "
+            << bar.header << " Completed in " << FormatDuration(duration);
+        getGlobalContext().progress_bars.erase(bar.id);
+    } else {
+        uint64_t elapsed_time = getCurrentTimestamp() - bar.start_time;
+        uint64_t estimated_time_remaining =
+            (elapsed_time / progress) - elapsed_time;
+        std::string time_remaining = FormatDuration(estimated_time_remaining);
+        oss << bar.start_time_str << " [INFO ] [" << bar.thread_name << "] "
+            << bar.header << " [" << std::string(filled_width, '=')
+            << std::string(bar.width - filled_width, ' ') << "] " << std::fixed
+            << std::setprecision(1) << (progress * 100)
+            << "% est:" << time_remaining;
+    }
+    oss << "\r";
+    for (int i = 0; i < lines_down; i++) {
+        oss << "\033[1B";
+    }
+    std::cout << oss.str() << "\r";
+    std::cout.flush();
+    stdout_unlock();
+}
+
+static inline void RedrawAllProgressBars() {
+    std::unique_lock lock(getGlobalContext().progress_mutex);
+    for (const auto &[id, bar] : getGlobalContext().progress_bars) {
+        UpdateProgressBar(bar);
+    }
+}
+
+// Your progress bar creation logic - preserved exactly with thread-safe random
+// ID
+static inline std::function<void(float)>
+log_progress(const std::string &header,
+             const std::string &thread_name = thread_context) {
+    // Use thread-safe random ID generation
+    std::string random_id = generate_random_id(32);
+    std::thread log_progress_bar_thread([header, random_id, thread_name]() {
+        thread_context = thread_name;
+        struct winsize w;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+        int term_width = w.ws_col > 0 ? w.ws_col : 80;
+        int bar_width = term_width - 50 - header.length() - 38;
+        std::string timestamp = GetTimestamp();
+        std::ostringstream oss;
+        oss << timestamp << " [INFO ] [" << thread_context << "] " << header
+            << " [" << std::string(bar_width, ' ') << "] 0%\n";
+        stdout_lock();
+        std::cout << oss.str() << "\r";
+        std::cout.flush();
+        {
+            std::unique_lock lock(getGlobalContext().progress_mutex);
+            ProgressBar progress_bar_instance = {
+                random_id,
+                thread_context,
+                header,
+                timestamp,
+                0.0f,
+                bar_width,
+                getGlobalContext().stdout_current_line.load(),
+                getCurrentTimestamp()};
+            getGlobalContext().progress_bars[random_id] = progress_bar_instance;
+        }
+        getGlobalContext().stdout_current_line += 1;
+        stdout_unlock();
+    });
+    log_progress_bar_thread.detach();
+    return [random_id](float progress) mutable {
+        std::unique_lock lock(getGlobalContext().progress_mutex);
+        if (getGlobalContext().progress_bars.find(random_id) ==
+            getGlobalContext().progress_bars.end()) {
+            return;
+        }
+        getGlobalContext().progress_bars[random_id].progress = progress;
+        UpdateProgressBar(getGlobalContext().progress_bars[random_id]);
+    };
+}
+
+// Your concept definitions for logging - preserved exactly
+template <typename T>
+concept Streamable = requires(std::ostream &os, T const &t) {
+    { os << t } -> std::convertible_to<std::ostream &>;
+};
+
+template <typename T>
+concept HasToJson = requires(T t) {
+    { t.toJson() } -> std::convertible_to<std::string>;
+};
+
+template <typename T>
+concept HasToString = requires(T t) {
+    { t.toString() } -> std::convertible_to<std::string>;
+};
+
+template <typename T>
+concept EssentiallyStreamable = Streamable<T> || HasToJson<T> || HasToString<T>;
+
+// Your parameter concatenation logic - preserved exactly
+template <typename T>
+    requires Streamable<T>
+inline static void
+concat_multi_parameter_inputs(std::stringstream &currentstream, T first) {
+    if constexpr (Streamable<T>)
+        currentstream << first;
+    else if constexpr (HasToJson<T>)
+        currentstream << first.toJson().dump();
+    else if constexpr (HasToString<T>)
+        currentstream << first.toString();
+}
+
+template <typename T, typename... Args>
+    requires Streamable<T>
+static void concat_multi_parameter_inputs(std::stringstream &currentstream,
+                                          T first, Args... args) {
+    if constexpr (Streamable<T>)
+        currentstream << first;
+    else if constexpr (HasToJson<T>)
+        currentstream << first.toJson().dump();
+    else if constexpr (HasToString<T>)
+        currentstream << first.toString();
+    if constexpr (sizeof...(args) > 0) {
+        concat_multi_parameter_inputs(currentstream, args...);
+    }
+}
+
+// Log level setter/getter - internal implementation
+inline static void set_internal_log_level(InternalLogLevel level) {
+    getGlobalContext().global_log_level = level;
+}
+
+// Your logging functions - preserved EXACTLY with stringstream->cout->mutex
+// design
+template <typename T, typename... Args>
+    requires EssentiallyStreamable<T>
+static void log_info(T first, Args... args) {
+    std::stringstream oss;
+    oss << GetTimestamp() << " [INFO ] [" << thread_context << "] ";
+    concat_multi_parameter_inputs(oss, first, args...);
+    oss << "\n";
+    int lines = 0;
+    int char_count = 0;
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int term_width = w.ws_col > 0 ? w.ws_col : 80;
+    for (char c : oss.str()) {
+        char_count++;
+        if (char_count % term_width == 0)
+            lines++;
+        if (c == '\n') {
+            lines++;
+            char_count = 0;
+        }
+    }
+    std::cout << oss.str();
+    std::cout.flush();
+    getGlobalContext().stdout_current_line += lines;
+    RedrawAllProgressBars();
+}
+
+template <typename T, typename... Args>
+    requires EssentiallyStreamable<T>
+static void log_error(T first, Args... args) {
+    std::stringstream oss;
+    oss << "\033[1;31m";
+    oss << GetTimestamp() << " [ERROR] [" << thread_context << "] ";
+    concat_multi_parameter_inputs(oss, first, args...);
+    oss << "\n";
+    int lines = 0;
+    int char_count = 0;
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int term_width = w.ws_col > 0 ? w.ws_col : 80;
+    for (char c : oss.str()) {
+        char_count++;
+        if (char_count % term_width == 0)
+            lines++;
+        if (c == '\n') {
+            lines++;
+            char_count = 0;
+        }
+    }
+    oss << "\033[0m";
+    stdout_lock();
+    std::cout << oss.str();
+    std::cout.flush();
+    getGlobalContext().stdout_current_line += lines;
+    stdout_unlock();
+    RedrawAllProgressBars();
+}
+
+template <typename T, typename... Args>
+    requires EssentiallyStreamable<T>
+static void log_warn(T first, Args... args) {
+    std::stringstream oss;
+    oss << "\033[1;33m";
+    oss << GetTimestamp() << " [WARN ] [" << thread_context << "] ";
+    concat_multi_parameter_inputs(oss, first, args...);
+    oss << "\n";
+    int lines = 0;
+    int char_count = 0;
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int term_width = w.ws_col > 0 ? w.ws_col : 80;
+    for (char c : oss.str()) {
+        char_count++;
+        if (char_count % term_width == 0)
+            lines++;
+        if (c == '\n') {
+            lines++;
+            char_count = 0;
+        }
+    }
+    oss << "\033[0m";
+    // stdout_lock();
+    std::cout << oss.str();
+    std::cout.flush();
+    getGlobalContext().stdout_current_line += lines;
+    // stdout_unlock();
+    RedrawAllProgressBars();
+}
+
+template <typename T, typename... Args>
+    requires EssentiallyStreamable<T>
+static void log_debug(T first, Args... args) {
+    if (getGlobalContext().global_log_level > InternalLogLevel::DEBUG) {
+        return;
+    }
+    std::stringstream oss;
+    oss << "\033[1;34m";
+    oss << GetTimestamp() << " [DEBUG] [" << thread_context << "] ";
+    concat_multi_parameter_inputs(oss, first, args...);
+    oss << "\n";
+    int lines = 0;
+    int char_count = 0;
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int term_width = w.ws_col > 0 ? w.ws_col : 80;
+    for (char c : oss.str()) {
+        char_count++;
+        if (char_count % term_width == 0)
+            lines++;
+        if (c == '\n') {
+            lines++;
+            char_count = 0;
+        }
+    }
+    oss << "\033[0m";
+    stdout_lock();
+    std::cout << oss.str();
+    std::cout.flush();
+    getGlobalContext().stdout_current_line += lines;
+    stdout_unlock();
+    RedrawAllProgressBars();
+}
+
+template <typename T, typename... Args>
+    requires EssentiallyStreamable<T>
+static void log_trace(T first, Args... args) {
+    std::stringstream oss;
+    oss << "\033[1;34m";
+    oss << GetTimestamp() << " [TRACE] [" << thread_context << "] ";
+    concat_multi_parameter_inputs(oss, first, args...);
+    oss << "\n";
+    int lines = 0;
+    int char_count = 0;
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int term_width = w.ws_col > 0 ? w.ws_col : 80;
+    for (char c : oss.str()) {
+        char_count++;
+        if (char_count % term_width == 0)
+            lines++;
+        if (c == '\n') {
+            lines++;
+            char_count = 0;
+        }
+    }
+    oss << "\033[0m";
+    stdout_lock();
+    std::cout << oss.str();
+    std::cout.flush();
+    getGlobalContext().stdout_current_line += lines;
+    stdout_unlock();
+    RedrawAllProgressBars();
+}
+
+} // namespace psyne

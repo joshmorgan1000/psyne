@@ -1,9 +1,9 @@
 #pragma once
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
 
 namespace psyne {
 
@@ -17,7 +17,7 @@ inline void psyne_banner() {
 }
 
 // Version information function
-inline const char* get_version() {
+inline const char *get_version() {
     return psyne::version();
 }
 

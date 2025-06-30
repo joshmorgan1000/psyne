@@ -2,7 +2,7 @@
  * @file compute_kernels.metal
  * @brief Metal compute shaders for GPU operations
  * 
- * @copyright Copyright (c) 2024 Psyne Project
+ * @copyright Copyright (c) 2025 Psyne Project
  * @license MIT License
  */
 

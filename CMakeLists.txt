@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(psyne VERSION 1.2.1 LANGUAGES C CXX)
+project(psyne VERSION 1.3.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
@@ -22,6 +22,24 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--strip-all")
     endif()
     add_compile_definitions(NDEBUG ABSL_ASSERT_LEVEL=1)
+    
+    # Enable SIMD optimizations
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+        if(NOT MSVC)
+            add_compile_options("-march=native" "-mavx2" "-mfma")
+            # Enable AVX-512 if available
+            include(CheckCXXCompilerFlag)
+            CHECK_CXX_COMPILER_FLAG("-mavx512f" COMPILER_SUPPORTS_AVX512)
+            if(COMPILER_SUPPORTS_AVX512)
+                add_compile_options("-mavx512f" "-mavx512dq" "-mavx512bw" "-mavx512vl")
+            endif()
+        else()
+            add_compile_options("/arch:AVX2")
+        endif()
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+        # ARM NEON is enabled by default on AArch64
+        add_compile_options("-march=native")
+    endif()
 else()
     # Enable AddressSanitizer only for debug builds on non-Windows platforms
     if(NOT WIN32)
@@ -51,12 +69,12 @@ endif()
 
 
 # ----------------------------------------------------------------------------------------
-# Boost - Removed to minimize dependencies as per project requirements
+# Boost - Required for networking (Boost.Asio)
 # ----------------------------------------------------------------------------------------
-# find_package(Boost REQUIRED COMPONENTS system thread)
-# if(NOT Boost_FOUND)
-#     message(FATAL_ERROR "Boost not found. Please install Boost development libraries.")
-# endif()
+find_package(Boost REQUIRED COMPONENTS system thread)
+if(NOT Boost_FOUND)
+    message(FATAL_ERROR "Boost not found. Please install Boost development libraries.")
+endif()
 
 # ----------------------------------------------------------------------------------------
 # Threads
@@ -87,49 +105,27 @@ if(PSYNE_ENABLE_GPU)
     
     # Check for Metal (macOS only)
     if(APPLE)
-        set(PSYNE_METAL_ENABLED ON)
-        message(STATUS "Metal support enabled (macOS)")
+        # Temporarily disable Metal until metal-cpp headers are added
+        set(PSYNE_METAL_ENABLED OFF)
+        message(STATUS "Metal support temporarily disabled (needs metal-cpp headers)")
     else()
         set(PSYNE_METAL_ENABLED OFF)
     endif()
     
-    # Check for RDMA (InfiniBand verbs) - Unix only
-    if(NOT WIN32)
-        find_path(RDMA_INCLUDE_DIR infiniband/verbs.h)
-        find_library(RDMA_LIBRARY ibverbs)
-        if(RDMA_INCLUDE_DIR AND RDMA_LIBRARY)
-            set(PSYNE_RDMA_ENABLED ON)
-            message(STATUS "RDMA support enabled")
-            message(STATUS "RDMA include dir: ${RDMA_INCLUDE_DIR}")
-            message(STATUS "RDMA library: ${RDMA_LIBRARY}")
-        else()
-            set(PSYNE_RDMA_ENABLED OFF)
-            message(STATUS "RDMA support disabled (libibverbs not found)")
-        endif()
+    # Check for Vulkan
+    find_package(Vulkan)
+    if(Vulkan_FOUND)
+        set(PSYNE_VULKAN_ENABLED ON)
+        message(STATUS "Vulkan support enabled")
+        message(STATUS "Vulkan include dir: ${Vulkan_INCLUDE_DIRS}")
+        message(STATUS "Vulkan library: ${Vulkan_LIBRARIES}")
     else()
-        set(PSYNE_RDMA_ENABLED OFF)
-        message(STATUS "RDMA support disabled (not available on Windows)")
+        set(PSYNE_VULKAN_ENABLED OFF)
+        message(STATUS "Vulkan support disabled (Vulkan SDK not found)")
     endif()
     
-    # Check for UCX (Unified Communication X) - Unix only
-    if(NOT WIN32)
-        find_path(UCX_INCLUDE_DIR ucp/api/ucp.h)
-        find_library(UCX_UCP_LIBRARY ucp)
-        find_library(UCX_UCS_LIBRARY ucs)
-        if(UCX_INCLUDE_DIR AND UCX_UCP_LIBRARY AND UCX_UCS_LIBRARY)
-            set(PSYNE_UCX_ENABLED ON)
-            message(STATUS "UCX support enabled")
-            message(STATUS "UCX include dir: ${UCX_INCLUDE_DIR}")
-            message(STATUS "UCX UCP library: ${UCX_UCP_LIBRARY}")
-            message(STATUS "UCX UCS library: ${UCX_UCS_LIBRARY}")
-        else()
-            set(PSYNE_UCX_ENABLED OFF)
-            message(STATUS "UCX support disabled (UCX libraries not found)")
-        endif()
-    else()
-        set(PSYNE_UCX_ENABLED OFF)
-        message(STATUS "UCX support disabled (not available on Windows)")
-    endif()
+    # RDMA/UCX/Fabric support removed - no hardware available for testing
+    
 else()
     set(PSYNE_CUDA_ENABLED OFF)
     set(PSYNE_METAL_ENABLED OFF)
@@ -141,14 +137,16 @@ set(PSYNE_SOURCES
     # Public header
     "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
     
-    # Core implementation - minimal set for WebRTC demo
+    # Core implementation - minimal set
     "${CMAKE_SOURCE_DIR}/src/psyne_minimal.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/webrtc_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/webrtc/ice_agent.cpp"
+    # "${CMAKE_SOURCE_DIR}/src/channel/lockfree_ipc_channel.cpp" # TODO: Fix for new API
     "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
     
     # Memory management
     "${CMAKE_SOURCE_DIR}/src/memory/dynamic_slab_allocator.cpp"
+    "${CMAKE_SOURCE_DIR}/src/memory/custom_allocator.cpp"
     
     # Header-only files
     "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"
@@ -159,9 +157,11 @@ set(PSYNE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/types/advanced_types.hpp"
     "${CMAKE_SOURCE_DIR}/src/psyne_impl.hpp"
     
-    # Messaging patterns
-    "${CMAKE_SOURCE_DIR}/src/patterns/zmq_patterns.cpp"
-    "${CMAKE_SOURCE_DIR}/src/patterns/nng_patterns.cpp"
+    # SIMD optimizations
+    "${CMAKE_SOURCE_DIR}/src/simd/simd_ops.cpp"
+    
+    # Tensor transport optimizations - temporarily disabled due to constructor issues
+    # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"
 )
 
 # Add GPU sources if enabled
@@ -171,20 +171,8 @@ if(PSYNE_ENABLE_GPU)
         "${CMAKE_SOURCE_DIR}/src/gpu/gpu_message.cpp"
     )
     
-    # Add RDMA sources if available
-    if(PSYNE_RDMA_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/rdma/rdma_verbs.cpp"
-        )
-    endif()
+    # RDMA sources removed - no hardware for testing
     
-    # Add UCX sources if available
-    if(PSYNE_UCX_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/ucx/ucx_channel.cpp"
-            "${CMAKE_SOURCE_DIR}/src/ucx/ucx_message.cpp"
-        )
-    endif()
     
     # Add Metal sources for macOS
     if(PSYNE_METAL_ENABLED)
@@ -200,12 +188,13 @@ if(PSYNE_ENABLE_GPU)
             "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_context.cpp"
         )
         
-        # Add GPUDirect RDMA sources if both CUDA and RDMA are available
-        if(PSYNE_RDMA_ENABLED)
-            list(APPEND PSYNE_SOURCES
-                "${CMAKE_SOURCE_DIR}/src/gpu/gpudirect_message.cpp"
-            )
-        endif()
+    endif()
+    
+    # Add Vulkan sources if available
+    if(PSYNE_VULKAN_ENABLED)
+        list(APPEND PSYNE_SOURCES
+            "${CMAKE_SOURCE_DIR}/src/gpu/vulkan/vulkan_buffer.cpp"
+        )
     endif()
 endif()
 
@@ -215,8 +204,8 @@ set(PSYNE_LIBRARIES
     OpenSSL::SSL
     OpenSSL::Crypto
     Threads::Threads
-    # Boost::system  # Removed to minimize dependencies
-    # Boost::thread  # Removed to minimize dependencies
+    Boost::system
+    Boost::thread
 )
 
 # Add GPU libraries if enabled
@@ -239,16 +228,12 @@ if(PSYNE_ENABLE_GPU)
         )
     endif()
     
-    if(PSYNE_RDMA_ENABLED)
-        list(APPEND PSYNE_LIBRARIES
-            ${RDMA_LIBRARY}
-        )
-    endif()
+    # RDMA libraries removed - no hardware for testing
     
-    if(PSYNE_UCX_ENABLED)
+    
+    if(PSYNE_VULKAN_ENABLED)
         list(APPEND PSYNE_LIBRARIES
-            ${UCX_UCP_LIBRARY}
-            ${UCX_UCS_LIBRARY}
+            ${Vulkan_LIBRARIES}
         )
     endif()
 endif()
@@ -264,18 +249,20 @@ set(PSYNE_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/include/psyne
     ${CMAKE_SOURCE_DIR}/src/utils
     ${EIGEN3_INCLUDE_DIR}
-    # ${Boost_INCLUDE_DIRS}  # Removed to minimize dependencies
+    ${Boost_INCLUDE_DIRS}
 )
 
 # Add GPU include directories if enabled
-if(PSYNE_ENABLE_GPU AND PSYNE_CUDA_ENABLED)
-    list(APPEND PSYNE_INCLUDE_DIRS ${CUDAToolkit_INCLUDE_DIRS})
+if(PSYNE_ENABLE_GPU)
+    if(PSYNE_CUDA_ENABLED)
+        list(APPEND PSYNE_INCLUDE_DIRS ${CUDAToolkit_INCLUDE_DIRS})
+    endif()
+    
+    if(PSYNE_VULKAN_ENABLED)
+        list(APPEND PSYNE_INCLUDE_DIRS ${Vulkan_INCLUDE_DIRS})
+    endif()
 endif()
 
-# Add UCX include directories if enabled
-if(PSYNE_ENABLE_GPU AND PSYNE_UCX_ENABLED)
-    list(APPEND PSYNE_INCLUDE_DIRS ${UCX_INCLUDE_DIR})
-endif()
 
 target_include_directories(psyne PRIVATE ${PSYNE_INCLUDE_DIRS})
 
@@ -291,14 +278,12 @@ if(PSYNE_ENABLE_GPU)
         target_compile_definitions(psyne PRIVATE PSYNE_CUDA_ENABLED)
     endif()
     
-    if(PSYNE_RDMA_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_RDMA_SUPPORT)
-        target_include_directories(psyne PRIVATE ${RDMA_INCLUDE_DIR})
-    endif()
+    # RDMA compile definitions removed - no hardware for testing
     
-    if(PSYNE_UCX_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_UCX_SUPPORT)
-        target_include_directories(psyne PRIVATE ${UCX_INCLUDE_DIR})
+    
+    if(PSYNE_VULKAN_ENABLED)
+        target_compile_definitions(psyne PRIVATE PSYNE_VULKAN_ENABLED)
+        target_include_directories(psyne PRIVATE ${Vulkan_INCLUDE_DIRS})
     endif()
 endif()
 
@@ -372,14 +357,7 @@ message(STATUS "  GPU Support:       ${PSYNE_ENABLE_GPU}")
 if(PSYNE_ENABLE_GPU)
     message(STATUS "    CUDA:            ${PSYNE_CUDA_ENABLED}")
     message(STATUS "    Metal:           ${PSYNE_METAL_ENABLED}")
-    message(STATUS "    RDMA:            ${PSYNE_RDMA_ENABLED}")
-    message(STATUS "    UCX:             ${PSYNE_UCX_ENABLED}")
-    if(PSYNE_CUDA_ENABLED AND PSYNE_RDMA_ENABLED)
-        message(STATUS "    GPUDirect RDMA:  ON")
-    endif()
-    if(PSYNE_UCX_ENABLED)
-        message(STATUS "    UCX Transports:  AUTO")
-    endif()
+    # RDMA/UCX/GPUDirect support removed - no hardware for testing
 endif()
 message(STATUS "")
 message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=ON to build examples")
