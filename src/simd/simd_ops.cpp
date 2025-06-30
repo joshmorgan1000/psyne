@@ -241,6 +241,11 @@ size_t SIMDCompression::compress_rle(const uint8_t *src, size_t src_size,
     return (src_pos == src_size) ? dst_pos : 0;
 }
 
+#ifdef __x86_64__
+  #ifdef __GNUC__
+    __attribute__((target("avx2,fma,avx512f")))
+  #endif
+#endif
 void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
     if (count == 0)
         return;
@@ -286,6 +291,11 @@ void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
 #endif
 }
 
+#ifdef __x86_64__
+  #ifdef __GNUC__
+    __attribute__((target("avx2,fma,avx512f")))
+  #endif
+#endif
 void SIMDCompression::quantize_int8(const float *src, int8_t *dst, size_t count,
                                     float scale) {
 #ifdef __x86_64__
@@ -352,6 +362,11 @@ void SIMDCompression::quantize_int8(const float *src, int8_t *dst, size_t count,
 }
 
 // Checksum implementations
+#ifdef __x86_64__
+  #ifdef __GNUC__
+    __attribute__((target("crc32")))
+  #endif
+#endif
 uint32_t SIMDChecksum::crc32(const uint8_t *data, size_t size) {
     uint32_t crc = 0xFFFFFFFF;
 

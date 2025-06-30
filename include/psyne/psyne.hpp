@@ -410,8 +410,9 @@ public:
 
     // Calculate required size (must be provided by derived classes)
     static size_t calculate_size() {
-        // Default size for dynamic messages - will be resized as needed
-        return 1024;
+        // Large buffer for 16M+ floats (64MB)
+        // 16,777,216 floats * 4 bytes + 8 bytes header = 67,108,872 bytes
+        return 64 * 1024 * 1024; // 64MB buffer for massive GPU workloads
     }
 
     // Array access
@@ -2378,3 +2379,9 @@ void deallocate_tensor(void* ptr);
 
 // Include SIMD operations implementation
 #include "../../src/simd/simd_ops.hpp"
+
+// Include GPU support if enabled
+#if defined(PSYNE_GPU_SUPPORT) || defined(PSYNE_CUDA_SUPPORT) || defined(PSYNE_METAL_SUPPORT) || defined(PSYNE_VULKAN_SUPPORT)
+#include "gpu/gpu_buffer.hpp"
+#include "gpu/gpu_message.hpp"
+#endif

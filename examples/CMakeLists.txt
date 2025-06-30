@@ -128,11 +128,24 @@ endif()
 # GPU examples (optional)
 if(PSYNE_ENABLE_GPU)
     add_psyne_example(gpu_vector_demo)
+    target_compile_definitions(gpu_vector_demo PRIVATE PSYNE_GPU_SUPPORT)
     
     # CUDA-specific examples
     if(PSYNE_CUDA_ENABLED)
         add_psyne_example(cuda_vector_demo)
         add_psyne_example(test_cuda)
+        
+        # Add CUDA definitions
+        target_compile_definitions(cuda_vector_demo PRIVATE PSYNE_GPU_SUPPORT PSYNE_CUDA_SUPPORT PSYNE_CUDA_ENABLED)
+        target_compile_definitions(test_cuda PRIVATE PSYNE_GPU_SUPPORT PSYNE_CUDA_SUPPORT PSYNE_CUDA_ENABLED)
+        
+        # Add CUDA include directories
+        target_include_directories(cuda_vector_demo PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+        target_include_directories(test_cuda PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+        
+        # Link CUDA libraries
+        target_link_libraries(cuda_vector_demo CUDA::cudart CUDA::cuda_driver)
+        target_link_libraries(test_cuda CUDA::cudart CUDA::cuda_driver)
     endif()
     
     # Metal-specific examples (macOS)
