@@ -309,9 +309,9 @@ if(PSYNE_BUILD_EXAMPLES)
 endif()
 
 # ------------------------------------------------------------------------------
-# CUDA Test (optional)
+# CUDA Test (optional) - only if examples are not built
 # ------------------------------------------------------------------------------
-if(PSYNE_CUDA_ENABLED)
+if(PSYNE_CUDA_ENABLED AND NOT PSYNE_BUILD_EXAMPLES)
     add_executable(test_cuda examples/test_cuda.cpp)
     target_link_libraries(test_cuda PRIVATE psyne)
     target_include_directories(test_cuda PRIVATE ${CMAKE_SOURCE_DIR}/include)

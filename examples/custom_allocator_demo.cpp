@@ -3,7 +3,7 @@
  * @brief Demonstrates custom memory allocator with huge page support
  */
 
-#include "../src/memory/custom_allocator.hpp"
+// Custom allocator functionality should be available through psyne.hpp
 #include <chrono>
 #include <iostream>
 #include <psyne/psyne.hpp>

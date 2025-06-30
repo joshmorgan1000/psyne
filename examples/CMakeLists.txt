@@ -70,8 +70,7 @@ add_psyne_example(webrtc_p2p_demo)
 
 # Transport protocols
 add_psyne_example(quic_demo)
-# TODO: rudp_demo has include path issues - needs fixing by Linux
-# add_psyne_example(rudp_demo)
+add_psyne_example(rudp_demo)
 
 # Messaging patterns
 add_psyne_example(publish_subscribe_demo)
@@ -80,16 +79,14 @@ add_psyne_example(publish_subscribe_demo)
 add_psyne_example(routing_demo_final)
 
 # Advanced features
-# TODO: async_messaging_demo has dependency issues - needs fixing by Linux
-# add_psyne_example(async_messaging_demo)
+add_psyne_example(async_messaging_demo)
 add_psyne_example(coroutine_example)
 # TODO: modern_cpp20_demo has API compatibility issues - needs fixing by macOS
 # add_psyne_example(modern_cpp20_demo)
 
 # Type system examples
 add_psyne_example(enhanced_types_demo)
-# TODO: message_types_demo has API compatibility issues - needs fixing by Linux
-# add_psyne_example(message_types_demo)
+add_psyne_example(message_types_demo)
 add_psyne_example(simple_enhanced_types_test)
 add_psyne_example(test_bytevector)
 # TODO: test_floatvector has API compatibility issues - needs fixing by macOS
@@ -100,8 +97,7 @@ add_psyne_example(performance_demo)
 add_psyne_example(high_performance_messaging)
 add_psyne_example(metrics_demo)
 add_psyne_example(simd_demo)
-# TODO: custom_allocator_demo has API compatibility issues - needs fixing by Linux
-# add_psyne_example(custom_allocator_demo)
+add_psyne_example(custom_allocator_demo)
 # TODO: tensor_optimization_demo has API compatibility issues - needs fixing by macOS
 # add_psyne_example(tensor_optimization_demo)
 
@@ -111,8 +107,7 @@ add_psyne_example(debug_demo)
 add_psyne_example(debug_multicast)
 
 # Collective operations
-# TODO: collective_demo has API compatibility issues - needs fixing by Linux
-# add_psyne_example(collective_demo)
+add_psyne_example(collective_demo)
 add_psyne_example(collective_simple_test)
 
 # Platform-specific

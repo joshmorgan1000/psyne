@@ -17,7 +17,7 @@
 #include <iomanip>
 #include <iostream>
 #include <psyne/psyne.hpp>
-#include "../src/transport/rudp.hpp"
+// RUDP functionality should be available through psyne.hpp
 #include <random>
 #include <thread>
 #include <vector>

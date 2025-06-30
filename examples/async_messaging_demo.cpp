@@ -15,8 +15,7 @@
 
 // Enable async support
 #define PSYNE_ASYNC_SUPPORT
-#include "../src/async/async_channel.hpp"
-#include "../src/utils/pthread.hpp"
+// Async functionality should be available through psyne.hpp
 
 using namespace psyne;
 using namespace psyne::async;

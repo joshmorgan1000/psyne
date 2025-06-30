@@ -2058,6 +2058,322 @@ class TensorOps;
 class LayoutTransform;
 
 } // namespace simd
+
+// ============================================================================
+// Transport Support (RUDP)
+// ============================================================================
+
+namespace transport {
+
+/**
+ * @brief RUDP packet types
+ */
+enum class RUDPPacketType : uint8_t {
+    DATA = 0,      ///< Data packet
+    ACK = 1,       ///< Acknowledgment packet
+    NACK = 2,      ///< Negative acknowledgment
+    SYN = 3,       ///< Synchronization (connection establishment)
+    FIN = 4,       ///< Finish (connection termination)
+    HEARTBEAT = 5, ///< Keep-alive heartbeat
+    RESET = 6      ///< Reset connection
+};
+
+/**
+ * @brief RUDP connection statistics
+ */
+struct RUDPStats {
+    uint64_t packets_sent = 0;
+    uint64_t packets_received = 0;
+    uint64_t bytes_sent = 0;
+    uint64_t bytes_received = 0;
+    uint64_t packets_retransmitted = 0;
+    uint64_t packets_out_of_order = 0;
+    uint64_t packets_duplicate = 0;
+    uint64_t acks_sent = 0;
+    uint64_t acks_received = 0;
+    double rtt_ms = 0.0;
+    double rtt_variance_ms = 0.0;
+    uint32_t cwnd = 1;         ///< Congestion window
+    uint32_t ssthresh = 65535; ///< Slow start threshold
+};
+
+/**
+ * @brief RUDP configuration
+ */
+struct RUDPConfig {
+    uint32_t max_window_size = 8192;        ///< Maximum receive window
+    uint32_t initial_timeout_ms = 1000;     ///< Initial retransmission timeout
+    uint32_t max_retransmits = 5;           ///< Maximum retransmission attempts
+    uint32_t heartbeat_interval_ms = 5000;  ///< Heartbeat interval
+    uint32_t connection_timeout_ms = 30000; ///< Connection timeout
+    bool enable_fast_retransmit = true;     ///< Enable fast retransmit on 3 duplicate ACKs
+    bool enable_selective_ack = true;       ///< Enable selective acknowledgments
+    bool enable_nagle = false;              ///< Enable Nagle's algorithm
+};
+
+/**
+ * @brief Connection state for RUDP
+ */
+enum class RUDPConnectionState {
+    CLOSED,
+    LISTEN,
+    SYN_SENT,
+    SYN_RECEIVED,
+    ESTABLISHED,
+    FIN_WAIT,
+    CLOSE_WAIT,
+    CLOSING,
+    TIME_WAIT
+};
+
+// Forward declarations for RUDP classes
+class RUDPChannel;
+class RUDPServer;
+
+/**
+ * @brief Create RUDP client channel
+ */
+std::unique_ptr<RUDPChannel>
+create_rudp_client(const std::string &remote_address, uint16_t remote_port,
+                   const RUDPConfig &config = {});
+
+/**
+ * @brief Create RUDP server
+ */
+std::unique_ptr<RUDPServer> create_rudp_server(uint16_t port,
+                                               const RUDPConfig &config = {});
+
+} // namespace transport
+
+// ============================================================================
+// Async Support
+// ============================================================================
+
+#ifdef PSYNE_ASYNC_SUPPORT
+namespace async {
+
+// Forward declarations for async classes
+template <typename ChannelType>
+class AsyncChannel;
+
+/**
+ * @brief Thread pool for async handlers
+ */
+class PsynePool {
+public:
+    PsynePool(int min_threads, int max_threads);
+    ~PsynePool();
+    
+    // Add methods as needed
+    void submit_task(std::function<void()> task);
+    void shutdown();
+    
+private:
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+/**
+ * @brief Configuration for async message handlers
+ */
+struct AsyncHandlerConfig {
+    int max_concurrent_handlers = 4;
+    bool use_thread_pool = true;
+    PsynePool* thread_pool = nullptr;
+};
+
+} // namespace async
+#endif // PSYNE_ASYNC_SUPPORT
+
+// ============================================================================
+// Collective Operations
+// ============================================================================
+
+namespace collective {
+
+/**
+ * @brief Reduce operations for collective communication
+ */
+enum class ReduceOp {
+    Sum,
+    Min,
+    Max,
+    Avg
+};
+
+// Forward declarations
+class CollectiveGroup;
+
+template <typename T>
+class Broadcast;
+
+template <typename T>
+class AllReduce;
+
+template <typename T>
+class Scatter;
+
+template <typename T>
+class Gather;
+
+template <typename T>
+class AllGather;
+
+/**
+ * @brief Create a collective communication group
+ */
+std::shared_ptr<CollectiveGroup> 
+create_collective_group(int rank, const std::vector<std::string>& peer_uris, 
+                       const std::string& topology = "ring");
+
+} // namespace collective
+
+// ============================================================================
+// Memory Management
+// ============================================================================
+
+namespace memory {
+
+/**
+ * @brief Allocation flags for custom allocator
+ */
+enum class AllocFlags : uint32_t {
+    None = 0,
+    Zeroed = 1 << 0,       ///< Zero-initialize memory
+    HugePage = 1 << 1,     ///< Use huge pages if available
+    Aligned64 = 1 << 2,    ///< Align to 64-byte boundary
+    Aligned128 = 1 << 3,   ///< Align to 128-byte boundary
+    Aligned256 = 1 << 4,   ///< Align to 256-byte boundary
+    NUMA = 1 << 5          ///< NUMA-aware allocation
+};
+
+// Allow bitwise operations on flags
+inline AllocFlags operator|(AllocFlags a, AllocFlags b) {
+    return static_cast<AllocFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+/**
+ * @brief Block information for allocated memory
+ */
+struct BlockInfo {
+    size_t size;
+    bool is_huge_page;
+    int numa_node;
+    void* base_address;
+};
+
+/**
+ * @brief Allocation statistics
+ */
+struct AllocatorStats {
+    uint64_t total_allocated = 0;
+    uint64_t total_freed = 0;
+    uint64_t current_usage = 0;
+    uint64_t peak_usage = 0;
+    uint64_t allocation_count = 0;
+    uint64_t free_count = 0;
+    uint64_t huge_page_count = 0;
+};
+
+/**
+ * @brief Custom memory allocator singleton
+ */
+class CustomAllocator {
+public:
+    static CustomAllocator& instance();
+    
+    void* allocate(size_t size, AllocFlags flags = AllocFlags::None);
+    void deallocate(void* ptr);
+    
+    bool huge_pages_available() const;
+    size_t get_huge_page_size() const;
+    int get_numa_nodes() const;
+    
+    AllocatorStats stats() const;
+    std::optional<BlockInfo> get_block_info(void* ptr) const;
+    
+private:
+    CustomAllocator() = default;
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+/**
+ * @brief STL-compatible allocator using CustomAllocator
+ */
+template <typename T>
+class StlCustomAllocator {
+public:
+    using value_type = T;
+    using pointer = T*;
+    using const_pointer = const T*;
+    using reference = T&;
+    using const_reference = const T&;
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
+
+    template <typename U>
+    struct rebind {
+        using other = StlCustomAllocator<U>;
+    };
+
+    StlCustomAllocator() = default;
+    template <typename U>
+    StlCustomAllocator(const StlCustomAllocator<U>&) {}
+
+    pointer allocate(size_type n) {
+        return static_cast<pointer>(
+            CustomAllocator::instance().allocate(n * sizeof(T)));
+    }
+
+    void deallocate(pointer p, size_type) {
+        CustomAllocator::instance().deallocate(p);
+    }
+
+    template <typename U>
+    bool operator==(const StlCustomAllocator<U>&) const { return true; }
+    
+    template <typename U>
+    bool operator!=(const StlCustomAllocator<U>&) const { return false; }
+};
+
+/**
+ * @brief RAII wrapper for custom allocated memory
+ */
+class UniqueAlloc {
+public:
+    UniqueAlloc(size_t size, AllocFlags flags = AllocFlags::None);
+    ~UniqueAlloc();
+    
+    // Move-only semantics
+    UniqueAlloc(UniqueAlloc&& other) noexcept;
+    UniqueAlloc& operator=(UniqueAlloc&& other) noexcept;
+    UniqueAlloc(const UniqueAlloc&) = delete;
+    UniqueAlloc& operator=(const UniqueAlloc&) = delete;
+    
+    void* get() const { return ptr_; }
+    size_t size() const { return size_; }
+    bool is_valid() const { return ptr_ != nullptr; }
+    
+    void reset();
+    
+private:
+    void* ptr_ = nullptr;
+    size_t size_ = 0;
+};
+
+/**
+ * @brief Allocate memory optimized for tensor operations
+ */
+void* allocate_tensor(size_t size);
+
+/**
+ * @brief Deallocate tensor memory
+ */
+void deallocate_tensor(void* ptr);
+
+} // namespace memory
+
 } // namespace psyne
 
 // Include SIMD operations implementation
