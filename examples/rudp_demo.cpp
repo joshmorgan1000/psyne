@@ -17,7 +17,7 @@
 #include <iomanip>
 #include <iostream>
 #include <psyne/psyne.hpp>
-#include <psyne/transport/rudp.hpp>
+#include "../src/transport/rudp.hpp"
 #include <random>
 #include <thread>
 #include <vector>

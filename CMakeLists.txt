@@ -28,7 +28,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
         if(NOT MSVC)
             add_compile_options("-march=native" "-mavx2" "-mfma")
             # Check if CPU actually supports AVX-512 at runtime (mainly Intel)
-            # AMD Ryzen doesn't support AVX-512, so skip for AMD
+            # AMD Ryzen doesn't support AVX-512, but it does support AVX2... TODO: fix this. We can't just assume AVX-512 is available on all x86_64 intel CPUs.
             execute_process(COMMAND cat /proc/cpuinfo 
                           COMMAND grep -i "vendor_id.*intel"
                           RESULT_VARIABLE IS_INTEL_CPU 
@@ -134,8 +134,6 @@ if(PSYNE_ENABLE_GPU)
         message(STATUS "Vulkan support disabled (Vulkan SDK not found)")
     endif()
     
-    # RDMA/UCX/Fabric support removed - no hardware available for testing
-    
 else()
     set(PSYNE_CUDA_ENABLED OFF)
     set(PSYNE_METAL_ENABLED OFF)
@@ -179,7 +177,7 @@ set(PSYNE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.cpp"
     
     # Tensor transport optimizations - temporarily disabled due to constructor issues
-    # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"
+    # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"  TODO: Fix constructor issues
 )
 
 # Add GPU sources if enabled
@@ -188,9 +186,6 @@ if(PSYNE_ENABLE_GPU)
         "${CMAKE_SOURCE_DIR}/src/gpu/gpu_context.cpp"
         "${CMAKE_SOURCE_DIR}/src/gpu/gpu_message.cpp"
     )
-    
-    # RDMA sources removed - no hardware for testing
-    
     
     # Add Metal sources for macOS
     if(PSYNE_METAL_ENABLED)
@@ -247,9 +242,6 @@ if(PSYNE_ENABLE_GPU)
         )
     endif()
     
-    # RDMA libraries removed - no hardware for testing
-    
-    
     if(PSYNE_VULKAN_ENABLED)
         list(APPEND PSYNE_LIBRARIES
             ${Vulkan_LIBRARIES}
@@ -301,9 +293,6 @@ if(PSYNE_ENABLE_GPU)
     if(PSYNE_CUDA_ENABLED)
         target_compile_definitions(psyne PRIVATE PSYNE_CUDA_ENABLED)
     endif()
-    
-    # RDMA compile definitions removed - no hardware for testing
-    
     
     if(PSYNE_VULKAN_ENABLED)
         target_compile_definitions(psyne PRIVATE PSYNE_VULKAN_ENABLED)
@@ -381,7 +370,7 @@ message(STATUS "  GPU Support:       ${PSYNE_ENABLE_GPU}")
 if(PSYNE_ENABLE_GPU)
     message(STATUS "    CUDA:            ${PSYNE_CUDA_ENABLED}")
     message(STATUS "    Metal:           ${PSYNE_METAL_ENABLED}")
-    # RDMA/UCX/GPUDirect support removed - no hardware for testing
+    message(STATUS "    Vulkan:          ${PSYNE_VULKAN_ENABLED}")
 endif()
 message(STATUS "")
 message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=ON to build examples")
