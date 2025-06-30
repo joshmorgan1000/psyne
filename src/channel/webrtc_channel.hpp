@@ -264,6 +264,7 @@ public:
     void notify_message_ready(uint32_t offset, size_t size) override;
     RingBuffer& get_ring_buffer() override;
     void advance_read_pointer(size_t size) override;
+    std::span<uint8_t> get_write_span(size_t size) noexcept;
 
     // WebRTC-specific methods
     void set_peer_id(const std::string &peer_id) {
@@ -330,6 +331,7 @@ private:
     // For zero-copy API adaptation
     std::unordered_map<uint32_t, std::unique_ptr<uint8_t[]>> pending_writes_;
     std::atomic<uint32_t> next_write_id_{1};
+    uint32_t current_write_id_{0};
 
     // Private methods
     void initialize_peer_connection();

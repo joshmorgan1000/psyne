@@ -416,10 +416,6 @@ public:
     static void transpose_layout(const float *src, float *dst, size_t n, size_t m);
 };
 
-/**
- * @brief SIMD-accelerated memory operations
- */
-void simd_memcpy(void *dst, const void *src, size_t size);
 
 
 /**

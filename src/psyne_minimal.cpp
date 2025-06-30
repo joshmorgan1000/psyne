@@ -272,6 +272,27 @@ public:
             current_read_handle_ = std::nullopt;
         }
     }
+    
+    std::span<uint8_t> get_write_span(size_t size) noexcept override {
+        if (!ring_buffer_) {
+            return std::span<uint8_t>{};
+        }
+        
+        // Reserve space for message type (4 bytes) + data
+        size_t total_size = sizeof(uint32_t) + size;
+        auto write_handle = ring_buffer_->reserve(total_size);
+        
+        if (!write_handle) {
+            return std::span<uint8_t>{};
+        }
+        
+        // Store write handle for later use
+        current_write_handle_ = std::move(*write_handle);
+        
+        // Return span pointing to the data portion (after the 4-byte type header)
+        uint8_t *buffer = static_cast<uint8_t *>(current_write_handle_->data);
+        return std::span<uint8_t>(buffer + sizeof(uint32_t), size);
+    }
 
 private:
     std::string shm_name_;
@@ -510,6 +531,11 @@ Channel::create(const std::string &uri, size_t buffer_size, ChannelMode mode,
                 impl_->advance_read_pointer(size);
             }
             
+            std::span<uint8_t> get_write_span(size_t size) noexcept override {
+                // Delegate to the underlying implementation
+                return impl_->get_write_span(size);
+            }
+            
         private:
             std::unique_ptr<detail::WebRTCChannel> impl_;
         };
@@ -553,6 +579,11 @@ Channel::create(const std::string &uri, size_t buffer_size, ChannelMode mode,
             }
             void advance_read_pointer(size_t size) noexcept override {
                 impl_->advance_read_pointer(size);
+            }
+            
+            std::span<uint8_t> get_write_span(size_t size) noexcept override {
+                // Delegate to the underlying implementation  
+                return impl_->get_write_span(size);
             }
             
         private:
