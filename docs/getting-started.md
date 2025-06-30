@@ -4,14 +4,53 @@ This guide will walk you through the basic concepts and usage patterns of Psyne.
 
 ## Installation
 
+### Prerequisites
+
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo apt-get install build-essential cmake libnuma-dev libssl-dev
+
+# For GPU support (optional)
+sudo apt-get install nvidia-cuda-toolkit vulkan-tools libvulkan-dev
+
+# For examples and tests
+sudo apt-get install clang-14  # For CUDA host compiler
+```
+
+**macOS:**
+```bash
+# Install Xcode command line tools
+xcode-select --install
+
+# Install dependencies via Homebrew
+brew install cmake openssl
+```
+
+### Build Instructions
+
 ```bash
 # Clone the repository
 git clone https://github.com/joshmorgan1000/psyne.git
 cd psyne
 
+# Build Boost (required)
+# Note: Download Boost 1.89+ and build it first
+# See: https://www.boost.org/doc/libs/1_89_0/more/getting_started/
+
 # Build with CMake
 mkdir build && cd build
-cmake ..
+
+# Basic build
+cmake -DBOOST_ROOT=/path/to/boost ..
+make
+
+# Build with examples and tests
+cmake -DPSYNE_BUILD_EXAMPLES=ON -DPSYNE_BUILD_TESTS=ON -DBOOST_ROOT=/path/to/boost ..
+make
+
+# Linux with GPU support
+cmake -DPSYNE_BUILD_EXAMPLES=ON -DPSYNE_ENABLE_GPU=ON -DCMAKE_CUDA_HOST_COMPILER=clang-14 -DBOOST_ROOT=/path/to/boost ..
 make
 ```
 
@@ -39,15 +78,16 @@ using namespace psyne;
 
 int main() {
     // Create a single-type channel for float vectors
-    SPSCChannel channel("ipc://hello", 1024 * 1024, ChannelType::SingleType);
+    auto channel = create_channel("memory://hello", 1024 * 1024, 
+                                  ChannelMode::SPSC, ChannelType::SingleType);
     
-    // Producer: Create and send a message
-    FloatVector message(channel);
+    // Producer: Create and send a message directly in buffer (zero-copy)
+    FloatVector message(*channel);
     message = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-    channel.send(message);
+    message.send();
     
-    // Consumer: Receive the message
-    auto received = channel.receive_single<FloatVector>();
+    // Consumer: Receive the message (zero-copy view)
+    auto received = channel->receive<FloatVector>();
     if (received) {
         std::cout << "Received " << received->size() << " floats: ";
         for (float val : *received) {

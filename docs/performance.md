@@ -14,19 +14,19 @@ Psyne is designed from the ground up as a zero-copy messaging system. This means
 
 **DO:**
 ```cpp
-// Create message directly in channel
-FloatVector msg(channel);
+// Create message directly in channel (zero-copy)
+FloatVector msg(*channel);
 msg.resize(100);
 // Fill data directly...
-msg.send();
+msg.send(); // Send the message (zero-copy notification)
 ```
 
 **DON'T:**
 ```cpp
 // Avoid creating messages outside channels
-FloatVector msg;
+std::vector<float> data(100);
 // ... fill data ...
-channel.send_copy(msg); // DEPRECATED - violates zero-copy
+// channel.send_copy(data); // DEPRECATED - violates zero-copy
 ```
 
 ### 2. Ring Buffer Selection
@@ -48,7 +48,7 @@ Choose the right producer-consumer pattern for your use case:
 **DO:**
 ```cpp
 // Process multiple messages in one go
-while (auto msg = channel.receive_single<MyMessage>()) {
+while (auto msg = channel->receive<MyMessage>()) {
     process(*msg);
 }
 ```
@@ -56,7 +56,7 @@ while (auto msg = channel.receive_single<MyMessage>()) {
 **DON'T:**
 ```cpp
 // Avoid processing one message at a time with delays
-if (auto msg = channel.receive_single<MyMessage>()) {
+if (auto msg = channel->receive<MyMessage>()) {
     process(*msg);
     sleep(1); // Bad - increases latency
 }
