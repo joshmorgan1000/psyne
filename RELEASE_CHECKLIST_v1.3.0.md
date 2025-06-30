@@ -48,7 +48,8 @@ Last updated: 2025-01-30
 - [x] Find empty methods and stub function or classes - implement them if they are features, or remove them if they are not going to be implemented (e.g. HPC, H100 type features that we can't test)
 
 ## Testing Required
-- [x] Run all examples to ensure they compile and work (34/56 compile successfully, others disabled due to Message constructor API changes)
+- [ ] Run all examples to ensure they compile and work. Do not delete any of them. If they do not work, fix them.
+- [ ] Run all unit tests to ensure they pass. Do not delete any of them. If they do not pass, fix them.
 - [x] Memory leak testing (completed - see MEMORY_LEAK_REPORT.md for detailed analysis)
 - [x] Make sure minimum size for all Channel buffers is 64MB. Keep in mind that is the *minimum* size, larger structs/objects should be much larger.
 - [ ] Cross-platform testing (Linux, macOS)
