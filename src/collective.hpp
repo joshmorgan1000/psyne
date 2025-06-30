@@ -22,7 +22,7 @@
 #include <future>
 #include <memory>
 #include <numeric>
-#include <psyne/channel.hpp>
+#include <psyne/psyne.hpp>
 #include <span>
 #include <vector>
 

@@ -189,6 +189,9 @@ set(PSYNE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/channel/multicast_factory.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.cpp"
     
+    # C API
+    "${CMAKE_SOURCE_DIR}/src/c_api/psyne_c_api.cpp"
+    
     # Tensor transport optimizations - temporarily disabled due to constructor issues
     # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"  TODO: Fix constructor issues
 )

@@ -78,6 +78,9 @@ class SensorReading : public Message<SensorReading> {
 public:
     static constexpr uint32_t message_type = 400;
     
+    // Constructor that takes a channel
+    explicit SensorReading(Channel& channel) : Message<SensorReading>(channel) {}
+    
     struct Data {
         float temperature;
         float humidity;
@@ -242,7 +245,7 @@ void test_double_matrix() {
 void test_sensor_reading() {
     std::cout << "=== SensorReading Tests ===\n";
 
-    auto channel = Channel::create("memory://sensor_test", 1024 * 1024);
+    auto channel = create_channel("memory://sensor_test", 128 * 1024 * 1024, ChannelMode::SPSC, ChannelType::MultiType);
 
     SensorReading msg(*channel);
     msg.set_reading(25.5f, 65.0f, 1013.25f, 42, "Room101");

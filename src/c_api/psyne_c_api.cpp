@@ -26,7 +26,7 @@ struct psyne_message {
     bool is_send; // true for send, false for receive
 
     // For send messages
-    std::unique_ptr<Message<ByteVector>> send_msg;
+    std::unique_ptr<ByteVector> send_msg;
 };
 
 // Global state

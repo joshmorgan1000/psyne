@@ -9,10 +9,10 @@ int main() {
     std::cout << "==============================\n\n";
 
     // Create a single-type channel optimized for FloatVector
-    auto channel = create_channel("memory://simple", 1024 * 1024,
+    auto channel = create_channel("memory://simple", 128 * 1024 * 1024,
                                   ChannelMode::SPSC, ChannelType::SingleType);
 
-    std::cout << "Channel created with 1MB buffer\n";
+    std::cout << "Channel created with 128MB buffer\n";
 
     // Demonstrate zero-copy write
     std::cout

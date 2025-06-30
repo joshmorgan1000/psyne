@@ -31,6 +31,9 @@ class CoordinationMessage : public Message<CoordinationMessage> {
 public:
     static constexpr uint32_t message_type = 500;
     
+    // Constructor that takes a channel
+    explicit CoordinationMessage(Channel& channel) : Message<CoordinationMessage>(channel) {}
+    
     struct Data {
         uint32_t operation_id;
         uint32_t sender_rank;
@@ -62,7 +65,7 @@ class SimulatedCollectiveGroup {
 private:
     uint32_t rank_;
     uint32_t world_size_;
-    std::vector<std::shared_ptr<Channel<CoordinationMessage>>> channels_;
+    std::vector<std::unique_ptr<Channel>> channels_;
     
 public:
     SimulatedCollectiveGroup(uint32_t rank, uint32_t world_size) 
@@ -72,8 +75,8 @@ public:
         for (uint32_t r = 0; r < world_size_; ++r) {
             if (r != rank_) {
                 std::string channel_name = "memory://collective_" + std::to_string(rank_) + "_to_" + std::to_string(r);
-                auto channel = Channel::get_or_create<CoordinationMessage>(channel_name);
-                channels_.push_back(channel);
+                auto channel = create_channel(channel_name, 1024 * 1024, ChannelMode::SPSC, ChannelType::SingleType);
+                channels_.push_back(std::move(channel));
             } else {
                 channels_.push_back(nullptr); // Self channel
             }
@@ -91,7 +94,7 @@ public:
         for (uint32_t r = 0; r < world_size_; ++r) {
             if (r != rank_ && channels_[r]) {
                 try {
-                    CoordinationMessage msg(*channels_[r]);
+                    CoordinationMessage msg(*channels_[r].get());
                     msg.set_data(999, rank_, 0, nullptr, 0); // Barrier operation ID
                     msg.send();
                 } catch (...) {
@@ -107,10 +110,10 @@ public:
                 if (r != rank_ && channels_[r]) {
                     size_t size;
                     uint32_t type;
-                    void* data = channels_[r]->receive_message(size, type);
+                    void* data = channels_[r]->receive_raw_message(size, type);
                     if (data) {
                         received++;
-                        channels_[r]->release_message(data);
+                        channels_[r]->release_raw_message(data);
                     }
                 }
             }
@@ -127,7 +130,7 @@ public:
         }
         
         try {
-            CoordinationMessage msg(*channels_[target_rank]);
+            CoordinationMessage msg(*channels_[target_rank].get());
             msg.set_data(op_id, rank_, seq, data, size);
             msg.send();
         } catch (...) {
@@ -143,19 +146,19 @@ public:
         
         size_t msg_size;
         uint32_t type;
-        void* msg_data = channels_[source_rank]->receive_message(msg_size, type);
+        void* msg_data = channels_[source_rank]->receive_raw_message(msg_size, type);
         if (msg_data) {
-            CoordinationMessage temp_msg(*channels_[source_rank]);
+            CoordinationMessage temp_msg(*channels_[source_rank].get());
             std::memcpy(temp_msg.Message::data(), msg_data, msg_size);
             
             if (temp_msg.data().operation_id == expected_op_id) {
                 size_t copy_size = std::min(max_size, static_cast<size_t>(temp_msg.data().data_size));
                 std::memcpy(data, temp_msg.data().payload, copy_size);
-                channels_[source_rank]->release_message(msg_data);
+                channels_[source_rank]->release_raw_message(msg_data);
                 return true;
             }
             
-            channels_[source_rank]->release_message(msg_data);
+            channels_[source_rank]->release_raw_message(msg_data);
         }
         return false;
     }

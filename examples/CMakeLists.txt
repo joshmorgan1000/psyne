@@ -18,6 +18,9 @@ include_directories(
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+# Find Arrow (required for arrow_demo)
+find_package(Arrow REQUIRED)
+
 # Function to add an example executable
 function(add_psyne_example name)
     add_executable(${name} ${name}.cpp)
@@ -111,7 +114,22 @@ add_psyne_example(collective_simple_test)
 add_psyne_example(windows_test)
 
 # Integration examples
-add_psyne_example(arrow_demo)
+# Arrow example
+add_executable(arrow_demo arrow_demo.cpp)
+target_link_libraries(arrow_demo 
+    psyne
+    Threads::Threads
+    Eigen3::Eigen
+    Arrow::arrow_shared
+)
+target_compile_features(arrow_demo PRIVATE cxx_std_20)
+target_include_directories(arrow_demo PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Add compiler warnings
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(arrow_demo PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 add_psyne_example(grpc_demo)
 
 # C API example (requires special handling for .c file)

@@ -1,6 +1,4 @@
 #include <iostream>
-#include <psyne/gpu/gpu_buffer.hpp>
-#include <psyne/gpu/gpu_message.hpp>
 #include <psyne/psyne.hpp>
 #include <Eigen/Core>
 

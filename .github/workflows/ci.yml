@@ -1,6 +1,5 @@
 name: Build and Test
 
-# Only run on pushes to main and pull requests to reduce noise
 on:
   push:
     branches: [ main ]
@@ -15,26 +14,35 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        compiler: [gcc-11, clang-14]
+        include:
+          - compiler: gcc-11
+            cxx: g++-11
+          - compiler: clang-14
+            cxx: clang++-14
         build_type: [Release]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            cmake \
-            libeigen3-dev \
-            libssl-dev \
-            pkg-config
+          sudo apt-get install -y build-essential cmake libeigen3-dev libssl-dev pkg-config
+
+      - name: Install Apache Arrow C++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates lsb-release wget
+          wget https://packages.apache.org/artifactory/arrow/$(lsb_release -sc)/apache-arrow-apt-source-latest-$(lsb_release -sc).deb
+          sudo apt install -y ./apache-arrow-apt-source-latest-$(lsb_release -sc).deb
+          sudo apt-get update
+          sudo apt-get install -y libarrow-dev libarrow-dataset-dev libparquet-dev
 
       - name: Configure CMake
+        env:
+          CC: ${{ matrix.compiler }}
+          CXX: ${{ matrix.cxx }}
         run: |
-          mkdir -p build
-          cd build
+          mkdir -p build && cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DPSYNE_BUILD_TESTS=ON
@@ -50,23 +58,18 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           brew update
-          brew install \
-            cmake \
-            eigen \
-            openssl \
-            pkg-config
+          brew install cmake eigen openssl pkg-config apache-arrow
 
       - name: Configure CMake
         run: |
-          mkdir -p build
-          cd build
+          mkdir -p build && cd build
           cmake .. \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix apache-arrow)" \
             -DCMAKE_BUILD_TYPE=Release \
             -DPSYNE_BUILD_TESTS=ON
 
@@ -82,29 +85,35 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        build_type: [Release, Debug]
-        arch: [x64]
+        include:
+          - build_type: Release
+            arch: x64
+          - build_type: Debug
+            arch: x64
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
 
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
+      - name: Bootstrap vcpkg
+        uses: lukka/get-vcpkg@v15
+        id: vcpkg
 
-      - name: Install vcpkg dependencies
+      - name: Install dependencies via vcpkg
         run: |
-          vcpkg install eigen3:x64-windows
-          vcpkg install openssl:x64-windows
-          vcpkg integrate install
+          "${{ steps.vcpkg.outputs.vcpkg-root }}\vcpkg.exe" install \
+            eigen3:x64-windows \
+            openssl:x64-windows \
+            arrow:x64-windows \
+            parquet:x64-windows
+          "${{ steps.vcpkg.outputs.vcpkg-root }}\vcpkg.exe" integrate install
 
       - name: Configure CMake
         run: |
-          mkdir build
-          cd build
+          mkdir build && cd build
           cmake .. `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
             -DPSYNE_BUILD_TESTS=ON `
-            -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-root }}\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
             -A ${{ matrix.arch }}
 
@@ -114,24 +123,28 @@ jobs:
       - name: Run Tests
         run: |
           cd build
-          ctest --output-on-failure -C ${{ matrix.build_type }}
+          ctest -C ${{ matrix.build_type }} --output-on-failure
 
   validate-examples:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            cmake \
-            libeigen3-dev \
-            libssl-dev
+          sudo apt-get install -y build-essential cmake libeigen3-dev libssl-dev
 
-      - name: Build with Examples
+      - name: Install Apache Arrow C++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates lsb-release wget
+          wget https://packages.apache.org/artifactory/arrow/$(lsb_release -sc)/apache-arrow-apt-source-latest-$(lsb_release -sc).deb
+          sudo apt install -y ./apache-arrow-apt-source-latest-$(lsb_release -sc).deb
+          sudo apt-get update
+          sudo apt-get install -y libarrow-dev libarrow-dataset-dev libparquet-dev
+
+      - name: Build Examples
         run: |
           mkdir -p build && cd build
           cmake .. \
