@@ -75,6 +75,8 @@ add_psyne_example(rudp_demo)
 add_psyne_example(publish_subscribe_demo)
 add_psyne_example(request_reply_demo)
 add_psyne_example(routing_demo_final)
+add_psyne_example(filtered_fanout_demo)
+add_psyne_example(pair_pattern_demo)
 
 # Advanced features
 add_psyne_example(async_messaging_demo)

@@ -40,7 +40,7 @@ endif()
 
 # Add tests
 add_psyne_test(simple_test)
-# add_psyne_test(basic_test) # TODO: Update for v1.3.0 API
+# add_psyne_test(basic_test) # Disabled: Uses deprecated v1.2 API patterns
 add_psyne_test(message_test)
 add_psyne_test(channel_test)
 add_psyne_test(compression_encryption_test)

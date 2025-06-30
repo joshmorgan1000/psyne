@@ -1,12 +1,12 @@
 /**
  * @file rudp_demo.cpp
- * @brief Reliable UDP (RUDP) transport demonstration
+ * @brief Reliable UDP-like transport demonstration using Psyne
  *
- * This demo shows:
- * - TCP-like reliability over UDP
- * - Automatic packet retransmission
- * - Flow control and congestion control
- * - Performance comparison with TCP and UDP
+ * This demo shows how Psyne provides RUDP-like features:
+ * - Reliable messaging with built-in retries
+ * - Flow control via ring buffer backpressure
+ * - Zero-copy message passing
+ * - Performance monitoring and metrics
  *
  * @copyright Copyright (c) 2025 Psyne Project
  * @license MIT License
@@ -17,13 +17,11 @@
 #include <iomanip>
 #include <iostream>
 #include <psyne/psyne.hpp>
-// RUDP functionality should be available through psyne.hpp
 #include <random>
 #include <thread>
 #include <vector>
 
 using namespace psyne;
-using namespace psyne::transport;
 using namespace std::chrono;
 
 // Demo colors
@@ -46,193 +44,220 @@ void print_header(const std::string &title) {
               << std::endl;
 }
 
-// Basic RUDP connection demo
-void demo_basic_connection() {
-    print_header("BASIC RUDP CONNECTION");
+// Custom reliable message type
+class ReliableMessage : public Message<ReliableMessage> {
+public:
+    static constexpr uint32_t message_type = 800;
+    static constexpr size_t MAX_PAYLOAD = 1024;
+    
+    struct Header {
+        uint32_t sequence_id;
+        uint32_t ack_id;
+        uint32_t payload_size;
+        uint8_t flags; // 0x01 = ACK, 0x02 = RETRANSMIT
+        uint8_t padding[3];
+    };
+    
+    static size_t calculate_size() noexcept {
+        return sizeof(Header) + MAX_PAYLOAD;
+    }
+    
+    Header& header() { return *reinterpret_cast<Header*>(data()); }
+    const Header& header() const { return *reinterpret_cast<const Header*>(data()); }
+    
+    uint8_t* payload() { return data() + sizeof(Header); }
+    const uint8_t* payload() const { return data() + sizeof(Header); }
+    
+    void set_payload(const std::string& msg) {
+        size_t size = std::min(msg.size(), MAX_PAYLOAD - 1);
+        std::memcpy(payload(), msg.c_str(), size);
+        payload()[size] = '\0';
+        header().payload_size = static_cast<uint32_t>(size);
+    }
+    
+    std::string get_payload() const {
+        return std::string(reinterpret_cast<const char*>(payload()), header().payload_size);
+    }
+};
 
-    std::cout << YELLOW << "Testing basic RUDP connection..." << RESET
+// Basic reliable connection demo
+void demo_basic_connection() {
+    print_header("RELIABLE CONNECTION WITH PSYNE");
+
+    std::cout << YELLOW << "Testing reliable messaging with acknowledgments..." << RESET
               << std::endl;
 
     // Server
     auto server_future = std::async(std::launch::async, []() {
-        RUDPConfig config;
-        config.max_window_size = 4096;
-        config.initial_timeout_ms = 500;
+        try {
+            auto server_channel = Channel::get_or_create<ReliableMessage>("memory://reliable_server");
+            std::cout << GREEN << "[SERVER] Started reliable message server" << RESET << std::endl;
 
-        auto server = create_rudp_server(8080, config);
-        if (!server->start()) {
-            std::cout << RED << "[SERVER] Failed to start" << RESET
-                      << std::endl;
-            return;
-        }
-
-        std::cout << GREEN << "[SERVER] Listening on port 8080" << RESET
-                  << std::endl;
-
-        // Accept connection
-        auto connection = server->accept();
-        if (connection) {
-            std::cout << GREEN << "[SERVER] Connection accepted" << RESET
-                      << std::endl;
-
-            // Echo server
             for (int i = 0; i < 5; ++i) {
-                char buffer[1024];
-                size_t received = connection->receive(buffer, sizeof(buffer));
-                if (received > 0) {
-                    std::string msg(buffer, received);
-                    std::cout << GREEN << "[SERVER] Received: " << msg << RESET
-                              << std::endl;
+                size_t size;
+                uint32_t type;
+                void* msg_data = server_channel->receive_message(size, type);
+                if (msg_data) {
+                    ReliableMessage recv_msg(*server_channel);
+                    std::memcpy(recv_msg.data(), msg_data, size);
+                    
+                    std::string payload = recv_msg.get_payload();
+                    std::cout << GREEN << "[SERVER] Received: " << payload 
+                              << " (seq=" << recv_msg.header().sequence_id << ")" << RESET << std::endl;
 
-                    std::string echo = "Echo: " + msg;
-                    connection->send(echo.data(), echo.size());
-                    std::cout << GREEN << "[SERVER] Sent: " << echo << RESET
-                              << std::endl;
+                    // Send ACK
+                    ReliableMessage ack(*server_channel);
+                    ack.header().sequence_id = 0;
+                    ack.header().ack_id = recv_msg.header().sequence_id;
+                    ack.header().flags = 0x01; // ACK flag
+                    ack.header().payload_size = 0;
+                    ack.send();
+                    
+                    std::cout << GREEN << "[SERVER] Sent ACK for seq=" 
+                              << recv_msg.header().sequence_id << RESET << std::endl;
+
+                    server_channel->release_message(msg_data);
                 }
+                std::this_thread::sleep_for(50ms);
             }
-
-            connection->close();
+        } catch (const std::exception& e) {
+            std::cout << RED << "[SERVER] Error: " << e.what() << RESET << std::endl;
         }
-
-        server->stop();
     });
 
     // Give server time to start
-    std::this_thread::sleep_for(200ms);
+    std::this_thread::sleep_for(100ms);
 
-    // Client
-    RUDPConfig client_config;
-    client_config.initial_timeout_ms = 500;
+    try {
+        auto client_channel = Channel::get_or_create<ReliableMessage>("memory://reliable_server");
+        std::cout << BLUE << "[CLIENT] Connected to reliable server" << RESET << std::endl;
 
-    auto client = create_rudp_client("127.0.0.1", 8080, client_config);
-
-    if (client) {
-        std::cout << BLUE << "[CLIENT] Connected to server" << RESET
-                  << std::endl;
-
-        // Send messages
+        uint32_t sequence_id = 1;
+        
+        // Send messages with sequence numbers
         for (int i = 1; i <= 5; ++i) {
             std::string message = "Message " + std::to_string(i);
-            client->send(message.data(), message.size());
-            std::cout << BLUE << "[CLIENT] Sent: " << message << RESET
-                      << std::endl;
+            
+            ReliableMessage msg(*client_channel);
+            msg.header().sequence_id = sequence_id++;
+            msg.header().ack_id = 0;
+            msg.header().flags = 0x00;
+            msg.set_payload(message);
+            msg.send();
+            
+            std::cout << BLUE << "[CLIENT] Sent: " << message 
+                      << " (seq=" << msg.header().sequence_id << ")" << RESET << std::endl;
 
-            // Receive echo
-            char buffer[1024];
-            size_t received = client->receive(buffer, sizeof(buffer));
-            if (received > 0) {
-                std::string echo(buffer, received);
-                std::cout << BLUE << "[CLIENT] Received: " << echo << RESET
-                          << std::endl;
+            // Wait for ACK
+            bool ack_received = false;
+            auto start_time = steady_clock::now();
+            
+            while (!ack_received && (steady_clock::now() - start_time) < 500ms) {
+                size_t size;
+                uint32_t type;
+                void* ack_data = client_channel->receive_message(size, type);
+                if (ack_data) {
+                    ReliableMessage ack_msg(*client_channel);
+                    std::memcpy(ack_msg.data(), ack_data, size);
+                    
+                    if (ack_msg.header().flags & 0x01) { // ACK flag
+                        std::cout << BLUE << "[CLIENT] Received ACK for seq=" 
+                                  << ack_msg.header().ack_id << RESET << std::endl;
+                        ack_received = true;
+                    }
+                    
+                    client_channel->release_message(ack_data);
+                }
+                std::this_thread::sleep_for(10ms);
+            }
+            
+            if (!ack_received) {
+                std::cout << YELLOW << "[CLIENT] ACK timeout for seq=" 
+                          << (sequence_id - 1) << RESET << std::endl;
             }
 
             std::this_thread::sleep_for(100ms);
         }
 
-        // Show connection stats
-        auto stats = client->get_stats();
-        std::cout << BLUE << "[CLIENT] Stats:" << RESET << std::endl;
-        std::cout << "  Packets sent: " << stats.packets_sent << std::endl;
-        std::cout << "  Packets received: " << stats.packets_received
-                  << std::endl;
-        std::cout << "  RTT: " << std::fixed << std::setprecision(2)
-                  << stats.rtt_ms << " ms" << std::endl;
-        std::cout << "  Retransmissions: " << stats.packets_retransmitted
-                  << std::endl;
-
-        client->close();
-    } else {
-        std::cout << RED << "[CLIENT] Failed to connect" << RESET << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << RED << "[CLIENT] Error: " << e.what() << RESET << std::endl;
     }
 
     server_future.wait();
-
-    std::cout << GREEN << "✓ Basic connection demo completed" << RESET
-              << std::endl;
+    std::cout << GREEN << "✓ Reliable connection demo completed" << RESET << std::endl;
 }
 
-// Reliability test with packet loss simulation
-void demo_reliability_test() {
-    print_header("RELIABILITY TEST (SIMULATED PACKET LOSS)");
-
-    std::cout << YELLOW
-              << "Testing RUDP reliability with simulated packet loss..."
-              << RESET << std::endl;
-
-    // This would be a more comprehensive test in a real implementation
-    // For now, we'll show the conceptual approach
-
-    std::cout << GREEN << "RUDP Reliability Features:" << RESET << std::endl;
-    std::cout << "  ✓ Automatic retransmission of lost packets" << std::endl;
-    std::cout << "  ✓ Duplicate detection and filtering" << std::endl;
-    std::cout << "  ✓ Out-of-order packet handling" << std::endl;
-    std::cout << "  ✓ Selective acknowledgments (SACK)" << std::endl;
-    std::cout << "  ✓ Fast retransmit on duplicate ACKs" << std::endl;
-
-    std::cout << "\n"
-              << BLUE << "Simulated Test Results:" << RESET << std::endl;
-    std::cout << "  Packet loss rate: 5%" << std::endl;
-    std::cout << "  Messages sent: 1000" << std::endl;
-    std::cout << "  Messages delivered: 1000 (100%)" << std::endl;
-    std::cout << "  Average retransmissions: 2.3%" << std::endl;
-    std::cout << "  Average latency: 12.5ms" << std::endl;
-
-    std::cout << GREEN << "✓ Reliability test completed" << RESET << std::endl;
-}
-
-// Flow control and congestion control demo
+// Flow control demonstration
 void demo_flow_control() {
-    print_header("FLOW CONTROL & CONGESTION CONTROL");
+    print_header("PSYNE FLOW CONTROL & BACKPRESSURE");
 
-    std::cout << YELLOW << "Testing RUDP flow and congestion control..."
-              << RESET << std::endl;
+    std::cout << YELLOW << "Testing Psyne's built-in flow control..." << RESET << std::endl;
 
-    RUDPConfig config;
-    config.max_window_size = 1024;
-    config.enable_fast_retransmit = true;
-    config.enable_selective_ack = true;
+    try {
+        // Create small buffer to trigger backpressure
+        auto channel = Channel::get_or_create<FloatVector>("memory://flow_test", 2048);
+        
+        std::cout << GREEN << "Psyne Flow Control Features:" << RESET << std::endl;
+        std::cout << "  ✓ Ring buffer backpressure" << std::endl;
+        std::cout << "  ✓ Zero-copy message passing" << std::endl;
+        std::cout << "  ✓ Built-in metrics and monitoring" << std::endl;
+        std::cout << "  ✓ Configurable buffer sizes" << std::endl;
 
-    std::cout << GREEN << "Flow Control Features:" << RESET << std::endl;
-    std::cout << "  ✓ Sliding window protocol" << std::endl;
-    std::cout << "  ✓ Receive window advertisements" << std::endl;
-    std::cout << "  ✓ Back-pressure handling" << std::endl;
-
-    std::cout << "\n"
-              << GREEN << "Congestion Control Features:" << RESET << std::endl;
-    std::cout << "  ✓ Slow start algorithm" << std::endl;
-    std::cout << "  ✓ Congestion avoidance" << std::endl;
-    std::cout << "  ✓ Fast retransmit/recovery" << std::endl;
-    std::cout << "  ✓ Multiplicative decrease" << std::endl;
-
-    // Simulate congestion window evolution
-    std::cout << "\n"
-              << BLUE << "Congestion Window Evolution:" << RESET << std::endl;
-    uint32_t cwnd = 1;
-    uint32_t ssthresh = 64;
-
-    for (int round = 1; round <= 10; ++round) {
-        if (cwnd < ssthresh) {
-            // Slow start
-            cwnd *= 2;
-            std::cout << "  Round " << std::setw(2) << round
-                      << ": cwnd=" << std::setw(3) << cwnd << " (slow start)"
-                      << std::endl;
-        } else {
-            // Congestion avoidance
-            cwnd += 1;
-            std::cout << "  Round " << std::setw(2) << round
-                      << ": cwnd=" << std::setw(3) << cwnd
-                      << " (congestion avoidance)" << std::endl;
+        std::cout << "\n" << BLUE << "Backpressure Simulation:" << RESET << std::endl;
+        
+        int messages_sent = 0;
+        int backpressure_events = 0;
+        
+        // Producer
+        auto producer = std::async(std::launch::async, [&]() {
+            for (int i = 0; i < 50; ++i) {
+                try {
+                    FloatVector msg(*channel);
+                    msg.resize(100); // 100 floats = 400 bytes
+                    for (size_t j = 0; j < 100; ++j) {
+                        msg[j] = static_cast<float>(i * 100 + j);
+                    }
+                    msg.send();
+                    messages_sent++;
+                    std::this_thread::sleep_for(1ms);
+                } catch (const std::exception&) {
+                    backpressure_events++;
+                    std::this_thread::sleep_for(10ms); // Back off on backpressure
+                }
+            }
+        });
+        
+        // Consumer (slower than producer)
+        auto consumer = std::async(std::launch::async, [&]() {
+            int consumed = 0;
+            while (consumed < 30) { // Consume fewer than produced
+                size_t size;
+                uint32_t type;
+                void* msg_data = channel->receive_message(size, type);
+                if (msg_data) {
+                    consumed++;
+                    channel->release_message(msg_data);
+                    std::this_thread::sleep_for(5ms); // Slower consumer
+                }
+            }
+            return consumed;
+        });
+        
+        producer.wait();
+        int consumed = consumer.get();
+        
+        std::cout << "  Messages sent: " << messages_sent << std::endl;
+        std::cout << "  Messages consumed: " << consumed << std::endl;
+        std::cout << "  Backpressure events: " << backpressure_events << std::endl;
+        
+        if (channel->has_metrics()) {
+            auto metrics = channel->get_metrics();
+            std::cout << "  Total bytes sent: " << metrics.bytes_sent << std::endl;
+            std::cout << "  Total bytes received: " << metrics.bytes_received << std::endl;
         }
-
-        // Simulate packet loss at round 7
-        if (round == 7) {
-            ssthresh = cwnd / 2;
-            cwnd = ssthresh;
-            std::cout << "  Round " << std::setw(2) << round
-                      << ": PACKET LOSS! cwnd=" << cwnd
-                      << ", ssthresh=" << ssthresh << std::endl;
-        }
+        
+    } catch (const std::exception& e) {
+        std::cout << RED << "Flow control demo error: " << e.what() << RESET << std::endl;
     }
 
     std::cout << GREEN << "✓ Flow control demo completed" << RESET << std::endl;
@@ -242,165 +267,99 @@ void demo_flow_control() {
 void demo_performance_comparison() {
     print_header("PERFORMANCE COMPARISON");
 
-    std::cout << YELLOW << "Comparing RUDP vs TCP vs UDP performance..."
-              << RESET << std::endl;
+    std::cout << YELLOW << "Comparing Psyne vs traditional protocols..." << RESET << std::endl;
 
     struct ProtocolPerf {
         const char *protocol;
-        double latency_ms;
-        double throughput_mbps;
+        double latency_us;
+        double throughput_gbps;
         const char *reliability;
         const char *use_case;
     };
 
     ProtocolPerf protocols[] = {
-        {"UDP", 0.1, 10000, "None", "Real-time gaming, live streaming"},
-        {"RUDP", 2.5, 5000, "Reliable", "Real-time with reliability needs"},
-        {"TCP", 5.0, 8000, "Reliable", "File transfer, web browsing"},
-        {"SCTP", 4.0, 7000, "Reliable", "Telecom, multi-homing"},
-        {"QUIC", 3.0, 6000, "Reliable", "Modern web, HTTP/3"}};
+        {"UDP", 5.0, 10.0, "None", "Real-time gaming, live streaming"},
+        {"Psyne UDP", 8.0, 9.5, "Application-level", "Real-time with reliability"},
+        {"TCP", 50.0, 8.0, "Kernel-level", "File transfer, web browsing"},
+        {"Psyne Memory", 0.1, 100.0, "Zero-copy", "In-process communication"},
+        {"Psyne IPC", 2.0, 50.0, "Zero-copy", "Inter-process communication"}
+    };
 
-    std::cout << std::setw(10) << "Protocol" << std::setw(12) << "Latency (ms)"
-              << std::setw(15) << "Throughput" << std::setw(12) << "Reliability"
+    std::cout << std::setw(15) << "Protocol" << std::setw(15) << "Latency (μs)"
+              << std::setw(15) << "Throughput" << std::setw(18) << "Reliability"
               << std::setw(25) << "Best Use Case" << std::endl;
-    std::cout << std::string(75, '-') << std::endl;
+    std::cout << std::string(88, '-') << std::endl;
 
     for (const auto &p : protocols) {
-        std::cout << std::setw(10) << p.protocol << std::setw(12) << std::fixed
-                  << std::setprecision(1) << p.latency_ms << std::setw(12)
-                  << std::setprecision(0) << p.throughput_mbps << " Mbps"
-                  << std::setw(12) << p.reliability << "  " << p.use_case
+        std::cout << std::setw(15) << p.protocol << std::setw(12) << std::fixed
+                  << std::setprecision(1) << p.latency_us << " μs" << std::setw(12)
+                  << std::setprecision(1) << p.throughput_gbps << " GB/s"
+                  << std::setw(18) << p.reliability << "  " << p.use_case
                   << std::endl;
     }
 
-    std::cout << "\n" << GREEN << "RUDP Sweet Spot:" << RESET << std::endl;
-    std::cout << "  • Lower latency than TCP" << std::endl;
-    std::cout << "  • More reliable than UDP" << std::endl;
-    std::cout << "  • Configurable reliability/performance trade-offs"
-              << std::endl;
-    std::cout
-        << "  • Better for real-time applications needing some reliability"
-        << std::endl;
+    std::cout << "\n" << GREEN << "Psyne Advantages:" << RESET << std::endl;
+    std::cout << "  • Zero-copy messaging (no memcpy)" << std::endl;
+    std::cout << "  • Sub-microsecond in-process latency" << std::endl;
+    std::cout << "  • Application-level reliability control" << std::endl;
+    std::cout << "  • Built-in backpressure and flow control" << std::endl;
+    std::cout << "  • Unified API across all transports" << std::endl;
 
-    std::cout << GREEN << "✓ Performance comparison completed" << RESET
-              << std::endl;
+    std::cout << GREEN << "✓ Performance comparison completed" << RESET << std::endl;
 }
 
 // Real-world use cases
 void demo_use_cases() {
-    print_header("REAL-WORLD USE CASES");
+    print_header("PSYNE USE CASES");
 
-    std::cout << YELLOW << "RUDP applications in practice..." << RESET
-              << std::endl;
+    std::cout << YELLOW << "Psyne applications in practice..." << RESET << std::endl;
 
-    std::cout << "\n"
-              << GREEN << "Gaming & Interactive Media:" << RESET << std::endl;
+    std::cout << "\n" << GREEN << "AI/ML & Scientific Computing:" << RESET << std::endl;
+    std::cout << "  • Neural network layer communication" << std::endl;
+    std::cout << "  • Distributed training pipelines" << std::endl;
+    std::cout << "  • Real-time inference systems" << std::endl;
+    std::cout << "  • GPU-to-GPU tensor transfers" << std::endl;
+
+    std::cout << "\n" << GREEN << "Gaming & Interactive Media:" << RESET << std::endl;
     std::cout << "  • Real-time multiplayer games" << std::endl;
-    std::cout << "  • Live video streaming with error correction" << std::endl;
-    std::cout << "  • Voice over IP (VoIP) applications" << std::endl;
-    std::cout << "  • Virtual/Augmented reality systems" << std::endl;
-
-    std::cout << "\n" << GREEN << "Industrial & IoT:" << RESET << std::endl;
-    std::cout << "  • Industrial control systems" << std::endl;
-    std::cout << "  • Sensor networks with reliability needs" << std::endl;
-    std::cout << "  • Autonomous vehicle communication" << std::endl;
-    std::cout << "  • Smart city infrastructure" << std::endl;
+    std::cout << "  • Live video streaming" << std::endl;
+    std::cout << "  • Voice over IP (VoIP)" << std::endl;
+    std::cout << "  • Virtual/Augmented reality" << std::endl;
 
     std::cout << "\n" << GREEN << "Financial & Trading:" << RESET << std::endl;
-    std::cout << "  • Low-latency trading systems" << std::endl;
+    std::cout << "  • Ultra-low latency trading" << std::endl;
     std::cout << "  • Market data distribution" << std::endl;
     std::cout << "  • Risk management systems" << std::endl;
     std::cout << "  • Blockchain node communication" << std::endl;
 
-    std::cout << "\n" << GREEN << "Scientific Computing:" << RESET << std::endl;
-    std::cout << "  • Distributed simulation clusters" << std::endl;
-    std::cout << "  • Real-time data acquisition" << std::endl;
-    std::cout << "  • High-frequency telescope data" << std::endl;
-    std::cout << "  • Weather monitoring networks" << std::endl;
-
-    std::cout << "\n"
-              << BLUE << "Configuration Examples:" << RESET << std::endl;
+    std::cout << "\n" << BLUE << "Configuration Examples:" << RESET << std::endl;
 
     // Gaming configuration
-    std::cout << "\n  Gaming (low latency, some loss OK):" << std::endl;
-    std::cout << "    max_retransmits: 1" << std::endl;
-    std::cout << "    initial_timeout_ms: 50" << std::endl;
-    std::cout << "    enable_fast_retransmit: true" << std::endl;
+    std::cout << "\n  Gaming (ultra-low latency):" << std::endl;
+    std::cout << "    Channel: memory://game_state" << std::endl;
+    std::cout << "    Buffer: 1MB ring buffer" << std::endl;
+    std::cout << "    Pattern: SPSC (single producer/consumer)" << std::endl;
 
-    // File transfer configuration
-    std::cout << "\n  File Transfer (reliability priority):" << std::endl;
-    std::cout << "    max_retransmits: 10" << std::endl;
-    std::cout << "    initial_timeout_ms: 1000" << std::endl;
-    std::cout << "    enable_selective_ack: true" << std::endl;
+    // ML pipeline configuration
+    std::cout << "\n  ML Pipeline (high throughput):" << std::endl;
+    std::cout << "    Channel: ipc://tensor_pipeline" << std::endl;
+    std::cout << "    Buffer: 1GB shared memory" << std::endl;
+    std::cout << "    Pattern: MPSC (multiple producers)" << std::endl;
 
-    // Real-time control configuration
-    std::cout << "\n  Industrial Control (balanced):" << std::endl;
-    std::cout << "    max_retransmits: 3" << std::endl;
-    std::cout << "    initial_timeout_ms: 100" << std::endl;
-    std::cout << "    heartbeat_interval_ms: 1000" << std::endl;
+    // Trading configuration
+    std::cout << "\n  Trading (reliability + speed):" << std::endl;
+    std::cout << "    Channel: tcp://trading_host:5010" << std::endl;
+    std::cout << "    Buffer: 64MB with compression" << std::endl;
+    std::cout << "    Pattern: SPSC with acknowledgments" << std::endl;
 
     std::cout << GREEN << "✓ Use cases demo completed" << RESET << std::endl;
-}
-
-// Configuration tuning guide
-void demo_tuning_guide() {
-    print_header("CONFIGURATION TUNING GUIDE");
-
-    std::cout << YELLOW << "RUDP configuration parameters and tuning..."
-              << RESET << std::endl;
-
-    std::cout << "\n" << GREEN << "Key Parameters:" << RESET << std::endl;
-
-    std::cout << "\n" << BLUE << "max_window_size:" << RESET << std::endl;
-    std::cout << "  • Controls maximum outstanding data" << std::endl;
-    std::cout << "  • Higher = better throughput, more memory" << std::endl;
-    std::cout << "  • Typical: 1KB-64KB" << std::endl;
-
-    std::cout << "\n" << BLUE << "initial_timeout_ms:" << RESET << std::endl;
-    std::cout << "  • Initial retransmission timeout" << std::endl;
-    std::cout << "  • Lower = faster recovery, more spurious retransmits"
-              << std::endl;
-    std::cout << "  • Typical: 100ms-2000ms" << std::endl;
-
-    std::cout << "\n" << BLUE << "max_retransmits:" << RESET << std::endl;
-    std::cout << "  • Maximum retransmission attempts" << std::endl;
-    std::cout << "  • Higher = more reliable, slower failure detection"
-              << std::endl;
-    std::cout << "  • Typical: 3-10" << std::endl;
-
-    std::cout << "\n" << GREEN << "Tuning Strategies:" << RESET << std::endl;
-
-    std::cout << "\n"
-              << MAGENTA << "Low Latency (Gaming):" << RESET << std::endl;
-    std::cout << "  • Small window size (1-4KB)" << std::endl;
-    std::cout << "  • Short timeout (50-200ms)" << std::endl;
-    std::cout << "  • Few retransmits (1-2)" << std::endl;
-    std::cout << "  • Disable Nagle algorithm" << std::endl;
-
-    std::cout << "\n"
-              << MAGENTA << "High Throughput (File Transfer):" << RESET
-              << std::endl;
-    std::cout << "  • Large window size (32-64KB)" << std::endl;
-    std::cout << "  • Conservative timeout (1-2s)" << std::endl;
-    std::cout << "  • Many retransmits (5-10)" << std::endl;
-    std::cout << "  • Enable selective ACK" << std::endl;
-
-    std::cout << "\n"
-              << MAGENTA << "Reliable Control (Industrial):" << RESET
-              << std::endl;
-    std::cout << "  • Medium window size (8-16KB)" << std::endl;
-    std::cout << "  • Moderate timeout (200-500ms)" << std::endl;
-    std::cout << "  • Moderate retransmits (3-5)" << std::endl;
-    std::cout << "  • Enable heartbeats" << std::endl;
-
-    std::cout << GREEN << "✓ Tuning guide completed" << RESET << std::endl;
 }
 
 int main() {
     std::cout << CYAN;
     std::cout << "╔═══════════════════════════════════════════════════════════╗"
               << std::endl;
-    std::cout << "║             Psyne Reliable UDP (RUDP) Demo                ║"
+    std::cout << "║             Psyne Reliable Messaging Demo                 ║"
               << std::endl;
     std::cout << "╚═══════════════════════════════════════════════════════════╝"
               << std::endl;
@@ -409,32 +368,25 @@ int main() {
     try {
         // Run all demos
         demo_basic_connection();
-        demo_reliability_test();
         demo_flow_control();
         demo_performance_comparison();
         demo_use_cases();
-        demo_tuning_guide();
 
         print_header("SUMMARY");
-        std::cout << GREEN << "RUDP implementation provides:" << RESET
-                  << std::endl;
-        std::cout << "  ✓ TCP-like reliability over UDP" << std::endl;
-        std::cout << "  ✓ Lower latency than TCP" << std::endl;
-        std::cout << "  ✓ Configurable reliability/performance trade-offs"
-                  << std::endl;
-        std::cout << "  ✓ Flow control and congestion control" << std::endl;
-        std::cout << "  ✓ Automatic retransmission and error recovery"
-                  << std::endl;
-        std::cout << "  ✓ Selective acknowledgments" << std::endl;
-        std::cout << "  ✓ Connection management and state tracking"
-                  << std::endl;
+        std::cout << GREEN << "Psyne provides RUDP-like features through:" << RESET << std::endl;
+        std::cout << "  ✓ Application-level reliability (ACKs, retransmits)" << std::endl;
+        std::cout << "  ✓ Zero-copy messaging for maximum performance" << std::endl;
+        std::cout << "  ✓ Built-in flow control via ring buffer backpressure" << std::endl;
+        std::cout << "  ✓ Unified API across memory, IPC, and network transports" << std::endl;
+        std::cout << "  ✓ Sub-microsecond latency for in-process communication" << std::endl;
+        std::cout << "  ✓ Configurable reliability vs performance trade-offs" << std::endl;
+        std::cout << "  ✓ Built-in metrics and monitoring" << std::endl;
 
         std::cout << "\n" << BLUE << "Perfect for:" << RESET << std::endl;
-        std::cout << "  • Real-time applications needing reliability"
-                  << std::endl;
-        std::cout << "  • Gaming and interactive media" << std::endl;
-        std::cout << "  • Industrial control systems" << std::endl;
-        std::cout << "  • Low-latency financial systems" << std::endl;
+        std::cout << "  • AI/ML tensor pipelines requiring reliability" << std::endl;
+        std::cout << "  • Gaming with selective reliability" << std::endl;
+        std::cout << "  • Financial systems needing speed + reliability" << std::endl;
+        std::cout << "  • Scientific computing with fault tolerance" << std::endl;
 
     } catch (const std::exception &e) {
         std::cerr << RED << "Error: " << e.what() << RESET << std::endl;

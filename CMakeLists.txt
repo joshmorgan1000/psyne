@@ -27,21 +27,34 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
         if(NOT MSVC)
             add_compile_options("-march=native" "-mavx2" "-mfma")
-            # Check if CPU actually supports AVX-512 at runtime (mainly Intel)
-            # AMD Ryzen doesn't support AVX-512, but it does support AVX2... TODO: fix this. We can't just assume AVX-512 is available on all x86_64 intel CPUs.
-            execute_process(COMMAND cat /proc/cpuinfo 
-                          COMMAND grep -i "vendor_id.*intel"
-                          RESULT_VARIABLE IS_INTEL_CPU 
-                          OUTPUT_QUIET ERROR_QUIET)
-            if(IS_INTEL_CPU EQUAL 0)
-                include(CheckCXXCompilerFlag)
-                CHECK_CXX_COMPILER_FLAG("-mavx512f" COMPILER_SUPPORTS_AVX512)
-                if(COMPILER_SUPPORTS_AVX512)
+            # Check if CPU actually supports AVX-512 at build time
+            # Only enable AVX-512 if both compiler and CPU support it
+            include(CheckCXXCompilerFlag)
+            CHECK_CXX_COMPILER_FLAG("-mavx512f" COMPILER_SUPPORTS_AVX512)
+            
+            if(COMPILER_SUPPORTS_AVX512)
+                # Check CPU features at build time (Linux/macOS)
+                if(EXISTS "/proc/cpuinfo")
+                    execute_process(COMMAND grep -q "avx512f" /proc/cpuinfo
+                                  RESULT_VARIABLE CPU_HAS_AVX512
+                                  OUTPUT_QUIET ERROR_QUIET)
+                elseif(APPLE)
+                    execute_process(COMMAND sysctl -n machdep.cpu.features
+                                  COMMAND grep -q "AVX512F"
+                                  RESULT_VARIABLE CPU_HAS_AVX512
+                                  OUTPUT_QUIET ERROR_QUIET)
+                else()
+                    set(CPU_HAS_AVX512 1) # Unknown platform, skip AVX-512
+                endif()
+                
+                if(CPU_HAS_AVX512 EQUAL 0)
                     add_compile_options("-mavx512f" "-mavx512dq" "-mavx512bw" "-mavx512vl")
-                    message(STATUS "AVX-512 enabled for Intel CPU")
+                    message(STATUS "AVX-512 enabled (compiler and CPU support detected)")
+                else()
+                    message(STATUS "AVX-512 disabled (CPU does not support it)")
                 endif()
             else()
-                message(STATUS "AVX-512 disabled for non-Intel CPU")
+                message(STATUS "AVX-512 disabled (compiler does not support it)")
             endif()
         else()
             add_compile_options("/arch:AVX2")

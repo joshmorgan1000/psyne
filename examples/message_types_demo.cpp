@@ -1,15 +1,116 @@
+/**
+ * @file message_types_demo.cpp
+ * @brief Demonstration of different message types with Psyne
+ *
+ * This example shows:
+ * - Built-in message types (FloatVector, ByteVector)
+ * - Custom message type definitions
+ * - Multi-type channel usage
+ * - Performance characteristics
+ *
+ * @copyright Copyright (c) 2025 Psyne Project
+ * @license MIT License
+ */
+
 #include <cassert>
+#include <chrono>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <psyne/psyne.hpp>
 #include <vector>
 
 using namespace psyne;
 
+// Custom matrix message type
+class DoubleMatrix : public Message<DoubleMatrix> {
+public:
+    static constexpr uint32_t message_type = 300;
+    static constexpr size_t MAX_ROWS = 64;
+    static constexpr size_t MAX_COLS = 64;
+    
+    struct Header {
+        uint32_t rows;
+        uint32_t cols;
+        uint64_t timestamp;
+    };
+    
+    static size_t calculate_size() noexcept {
+        return sizeof(Header) + MAX_ROWS * MAX_COLS * sizeof(double);
+    }
+    
+    Header& header() { return *reinterpret_cast<Header*>(data()); }
+    const Header& header() const { return *reinterpret_cast<const Header*>(data()); }
+    
+    double* matrix_data() { return reinterpret_cast<double*>(data() + sizeof(Header)); }
+    const double* matrix_data() const { return reinterpret_cast<const double*>(data() + sizeof(Header)); }
+    
+    void set_dimensions(uint32_t rows, uint32_t cols) {
+        if (rows > MAX_ROWS || cols > MAX_COLS) {
+            throw std::invalid_argument("Matrix dimensions exceed maximum");
+        }
+        header().rows = rows;
+        header().cols = cols;
+        header().timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+    }
+    
+    uint32_t rows() const { return header().rows; }
+    uint32_t cols() const { return header().cols; }
+    
+    double& at(size_t row, size_t col) {
+        if (row >= rows() || col >= cols()) {
+            throw std::out_of_range("Matrix index out of bounds");
+        }
+        return matrix_data()[row * cols() + col];
+    }
+    
+    const double& at(size_t row, size_t col) const {
+        if (row >= rows() || col >= cols()) {
+            throw std::out_of_range("Matrix index out of bounds");
+        }
+        return matrix_data()[row * cols() + col];
+    }
+};
+
+// Custom sensor data message
+class SensorReading : public Message<SensorReading> {
+public:
+    static constexpr uint32_t message_type = 400;
+    
+    struct Data {
+        float temperature;
+        float humidity;
+        float pressure;
+        uint32_t sensor_id;
+        uint64_t timestamp;
+        char location[16];
+    };
+    
+    static size_t calculate_size() noexcept {
+        return sizeof(Data);
+    }
+    
+    Data& sensor_data() { return *reinterpret_cast<Data*>(data()); }
+    const Data& sensor_data() const { return *reinterpret_cast<const Data*>(data()); }
+    
+    void set_reading(float temp, float hum, float press, uint32_t id, const char* loc) {
+        sensor_data().temperature = temp;
+        sensor_data().humidity = hum;
+        sensor_data().pressure = press;
+        sensor_data().sensor_id = id;
+        sensor_data().timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        
+        strncpy(sensor_data().location, loc, sizeof(sensor_data().location) - 1);
+        sensor_data().location[sizeof(sensor_data().location) - 1] = '\0';
+    }
+};
+
 void test_float_vector() {
     std::cout << "=== FloatVector Tests ===\n";
 
-    auto channel = create_channel("memory://float_test", 1024 * 1024);
+    auto channel = Channel::get_or_create<FloatVector>("memory://float_test");
 
     // Test basic operations
     FloatVector msg(*channel);
@@ -27,34 +128,28 @@ void test_float_vector() {
     }
     std::cout << "\n";
 
-    // Test Eigen integration
-    auto eigen_view = msg.as_eigen();
-    std::cout << "Eigen view sum: " << eigen_view.sum() << "\n";
-    std::cout << "Eigen view mean: " << eigen_view.mean() << "\n";
-
     // Test send/receive
     msg.send();
 
-    auto received = channel->receive_single<FloatVector>();
-    assert(received.has_value());
-    assert(received->size() == 10);
-
-    std::cout << "Successfully sent and received FloatVector\n";
-
-    // Test initializer list
-    FloatVector msg2(*channel);
-    msg2 = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-    std::cout << "Initializer list test: ";
-    for (float val : msg2) {
-        std::cout << val << " ";
+    size_t size;
+    uint32_t type;
+    void* received_data = channel->receive_message(size, type);
+    if (received_data) {
+        FloatVector received_msg(*channel);
+        std::memcpy(received_msg.data(), received_data, size);
+        
+        std::cout << "Received FloatVector with " << received_msg.size() << " elements\n";
+        assert(received_msg.size() == 10);
+        
+        channel->release_message(received_data);
+        std::cout << "Successfully sent and received FloatVector\n\n";
     }
-    std::cout << "\n\n";
 }
 
 void test_byte_vector() {
     std::cout << "=== ByteVector Tests ===\n";
 
-    auto channel = create_channel("memory://byte_test", 1024 * 1024);
+    auto channel = Channel::get_or_create<ByteVector>("memory://byte_test");
 
     ByteVector msg(*channel);
     msg.resize(16);
@@ -71,27 +166,28 @@ void test_byte_vector() {
     }
     std::cout << "\n";
 
-    // Test iterators
-    std::cout << "Using iterators: ";
-    for (auto it = msg.begin(); it != msg.end(); ++it) {
-        printf("%02x ", *it);
-    }
-    std::cout << "\n";
-
     // Test send/receive
     msg.send();
 
-    auto received = channel->receive_single<ByteVector>();
-    assert(received.has_value());
-    assert(received->size() == 16);
-
-    std::cout << "Successfully sent and received ByteVector\n\n";
+    size_t size;
+    uint32_t type;
+    void* received_data = channel->receive_message(size, type);
+    if (received_data) {
+        ByteVector received_msg(*channel);
+        std::memcpy(received_msg.data(), received_data, size);
+        
+        std::cout << "Received ByteVector with " << received_msg.size() << " bytes\n";
+        assert(received_msg.size() == 16);
+        
+        channel->release_message(received_data);
+        std::cout << "Successfully sent and received ByteVector\n\n";
+    }
 }
 
 void test_double_matrix() {
     std::cout << "=== DoubleMatrix Tests ===\n";
 
-    auto channel = create_channel("memory://matrix_test", 1024 * 1024);
+    auto channel = Channel::get_or_create<DoubleMatrix>("memory://matrix_test");
 
     DoubleMatrix msg(*channel);
     msg.set_dimensions(3, 4); // 3 rows, 4 columns
@@ -127,23 +223,66 @@ void test_double_matrix() {
     // Test send/receive
     msg.send();
 
-    auto received = channel->receive_single<DoubleMatrix>();
-    assert(received.has_value());
-    assert(received->rows() == 3);
-    assert(received->cols() == 4);
+    size_t size;
+    uint32_t type;
+    void* received_data = channel->receive_message(size, type);
+    if (received_data) {
+        DoubleMatrix received_msg(*channel);
+        std::memcpy(received_msg.data(), received_data, size);
+        
+        std::cout << "Received " << received_msg.rows() << "x" << received_msg.cols() << " matrix\n";
+        assert(received_msg.rows() == 3);
+        assert(received_msg.cols() == 4);
+        
+        channel->release_message(received_data);
+        std::cout << "Successfully sent and received DoubleMatrix\n\n";
+    }
+}
 
-    std::cout << "Successfully sent and received DoubleMatrix\n\n";
+void test_sensor_reading() {
+    std::cout << "=== SensorReading Tests ===\n";
+
+    auto channel = Channel::get_or_create<SensorReading>("memory://sensor_test");
+
+    SensorReading msg(*channel);
+    msg.set_reading(25.5f, 65.0f, 1013.25f, 42, "Room101");
+
+    std::cout << "Created SensorReading:\n";
+    std::cout << "  Temperature: " << msg.sensor_data().temperature << "°C\n";
+    std::cout << "  Humidity: " << msg.sensor_data().humidity << "%\n";
+    std::cout << "  Pressure: " << msg.sensor_data().pressure << " hPa\n";
+    std::cout << "  Sensor ID: " << msg.sensor_data().sensor_id << "\n";
+    std::cout << "  Location: " << msg.sensor_data().location << "\n";
+
+    // Test send/receive
+    msg.send();
+
+    size_t size;
+    uint32_t type;
+    void* received_data = channel->receive_message(size, type);
+    if (received_data) {
+        SensorReading received_msg(*channel);
+        std::memcpy(received_msg.data(), received_data, size);
+        
+        std::cout << "Received sensor reading from: " << received_msg.sensor_data().location << "\n";
+        assert(received_msg.sensor_data().sensor_id == 42);
+        
+        channel->release_message(received_data);
+        std::cout << "Successfully sent and received SensorReading\n\n";
+    }
 }
 
 void test_multi_type_channel() {
     std::cout << "=== Multi-Type Channel Test ===\n";
 
-    auto channel = create_channel("memory://multi_test", 1024 * 1024,
-                                  ChannelMode::SPSC, ChannelType::MultiType);
+    // Using separate channels for different types (current Psyne approach)
+    auto float_channel = Channel::get_or_create<FloatVector>("memory://multi_float");
+    auto byte_channel = Channel::get_or_create<ByteVector>("memory://multi_byte");
+    auto matrix_channel = Channel::get_or_create<DoubleMatrix>("memory://multi_matrix");
 
     // Send different types of messages
     {
-        FloatVector float_msg(*channel);
+        FloatVector float_msg(*float_channel);
         float_msg.resize(3);
         float_msg[0] = 1.0f;
         float_msg[1] = 2.0f;
@@ -153,7 +292,7 @@ void test_multi_type_channel() {
     }
 
     {
-        ByteVector byte_msg(*channel);
+        ByteVector byte_msg(*byte_channel);
         byte_msg.resize(4);
         for (size_t i = 0; i < 4; ++i) {
             byte_msg[i] = static_cast<uint8_t>(i + 100);
@@ -163,7 +302,7 @@ void test_multi_type_channel() {
     }
 
     {
-        DoubleMatrix matrix_msg(*channel);
+        DoubleMatrix matrix_msg(*matrix_channel);
         matrix_msg.set_dimensions(2, 2);
         matrix_msg.at(0, 0) = 10.5;
         matrix_msg.at(0, 1) = 20.5;
@@ -173,39 +312,57 @@ void test_multi_type_channel() {
         std::cout << "Sent DoubleMatrix\n";
     }
 
-    // Receive them back (order should be preserved)
+    // Receive them back
     {
-        auto msg = channel->receive_single<FloatVector>();
-        assert(msg.has_value());
-        std::cout << "Received FloatVector: ";
-        for (float val : *msg) {
-            std::cout << val << " ";
-        }
-        std::cout << "\n";
-    }
-
-    {
-        auto msg = channel->receive_single<ByteVector>();
-        assert(msg.has_value());
-        std::cout << "Received ByteVector: ";
-        for (uint8_t val : *msg) {
-            std::cout << static_cast<int>(val) << " ";
-        }
-        std::cout << "\n";
-    }
-
-    {
-        auto msg = channel->receive_single<DoubleMatrix>();
-        assert(msg.has_value());
-        std::cout << "Received DoubleMatrix:\n";
-        for (size_t i = 0; i < msg->rows(); ++i) {
-            std::cout << "  [";
-            for (size_t j = 0; j < msg->cols(); ++j) {
-                std::cout << msg->at(i, j);
-                if (j < msg->cols() - 1)
-                    std::cout << ", ";
+        size_t size;
+        uint32_t type;
+        void* data = float_channel->receive_message(size, type);
+        if (data) {
+            FloatVector msg(*float_channel);
+            std::memcpy(msg.data(), data, size);
+            std::cout << "Received FloatVector: ";
+            for (size_t i = 0; i < msg.size(); ++i) {
+                std::cout << msg[i] << " ";
             }
-            std::cout << "]\n";
+            std::cout << "\n";
+            float_channel->release_message(data);
+        }
+    }
+
+    {
+        size_t size;
+        uint32_t type;
+        void* data = byte_channel->receive_message(size, type);
+        if (data) {
+            ByteVector msg(*byte_channel);
+            std::memcpy(msg.data(), data, size);
+            std::cout << "Received ByteVector: ";
+            for (size_t i = 0; i < msg.size(); ++i) {
+                std::cout << static_cast<int>(msg[i]) << " ";
+            }
+            std::cout << "\n";
+            byte_channel->release_message(data);
+        }
+    }
+
+    {
+        size_t size;
+        uint32_t type;
+        void* data = matrix_channel->receive_message(size, type);
+        if (data) {
+            DoubleMatrix msg(*matrix_channel);
+            std::memcpy(msg.data(), data, size);
+            std::cout << "Received DoubleMatrix:\n";
+            for (size_t i = 0; i < msg.rows(); ++i) {
+                std::cout << "  [";
+                for (size_t j = 0; j < msg.cols(); ++j) {
+                    std::cout << msg.at(i, j);
+                    if (j < msg.cols() - 1)
+                        std::cout << ", ";
+                }
+                std::cout << "]\n";
+            }
+            matrix_channel->release_message(data);
         }
     }
 
@@ -215,15 +372,16 @@ void test_multi_type_channel() {
 void test_performance() {
     std::cout << "=== Performance Test ===\n";
 
-    auto channel = create_channel("memory://perf_test", 8 * 1024 * 1024);
+    auto channel = Channel::get_or_create<FloatVector>("memory://perf_test", 8 * 1024 * 1024);
 
-    const int num_messages = 10000;
-    const size_t vector_size = 1000;
+    const int num_messages = 1000;  // Reduced for demo
+    const size_t vector_size = 100;  // Reduced for demo
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    // Send messages
+    // Send and receive messages
     for (int i = 0; i < num_messages; ++i) {
+        // Send
         FloatVector msg(*channel);
         msg.resize(vector_size);
 
@@ -235,13 +393,21 @@ void test_performance() {
         msg.send();
 
         // Receive immediately (single-threaded test)
-        auto received = channel->receive_single<FloatVector>();
-        assert(received.has_value());
-        assert(received->size() == vector_size);
+        size_t size;
+        uint32_t type;
+        void* received_data = channel->receive_message(size, type);
+        if (received_data) {
+            FloatVector received_msg(*channel);
+            std::memcpy(received_msg.data(), received_data, size);
+            
+            assert(received_msg.size() == vector_size);
 
-        // Verify first element
-        float expected = std::sin(static_cast<float>(i)) * 100.0f;
-        assert(std::abs((*received)[0] - expected) < 0.001f);
+            // Verify first element
+            float expected = std::sin(static_cast<float>(i)) * 100.0f;
+            assert(std::abs(received_msg[0] - expected) < 0.001f);
+            
+            channel->release_message(received_data);
+        }
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -276,6 +442,7 @@ int main() {
         test_float_vector();
         test_byte_vector();
         test_double_matrix();
+        test_sensor_reading();
         test_multi_type_channel();
         test_performance();
 

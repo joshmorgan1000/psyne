@@ -1,114 +1,309 @@
 /**
  * @file collective_demo.cpp
- * @brief Demonstration of collective communication operations
+ * @brief Demonstration of collective-like communication patterns using Psyne
  *
- * This example shows how to use psyne's collective operations for
- * distributed computing, including broadcast, all-reduce, scatter/gather.
+ * This example shows how to implement collective communication patterns
+ * (broadcast, all-reduce, scatter/gather) using Psyne's basic messaging:
+ * - Point-to-point messaging with coordination
+ * - Multi-channel patterns for distributed operations
+ * - Synchronization using message passing
+ * - ML-style gradient aggregation simulation
  *
- * To run this demo:
- * 1. Start multiple instances with different ranks
- * 2. Each instance needs the same peer URIs list
+ * Note: This is a simulation of collective operations using Psyne's current API.
+ * True collective operations would require additional coordination infrastructure.
  *
- * Example for 3 processes:
- *   ./collective_demo 0 3 tcp://localhost:5000 tcp://localhost:5001
- * tcp://localhost:5002
- *   ./collective_demo 1 3 tcp://localhost:5000 tcp://localhost:5001
- * tcp://localhost:5002
- *   ./collective_demo 2 3 tcp://localhost:5000 tcp://localhost:5001
- * tcp://localhost:5002
+ * @copyright Copyright (c) 2025 Psyne Project
+ * @license MIT License
  */
 
 #include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
-#include <psyne/collective.hpp>
+#include <psyne/psyne.hpp>
 #include <thread>
 #include <vector>
 
 using namespace psyne;
-using namespace psyne::collective;
+
+// Simple coordination message
+class CoordinationMessage : public Message<CoordinationMessage> {
+public:
+    static constexpr uint32_t message_type = 500;
+    
+    struct Data {
+        uint32_t operation_id;
+        uint32_t sender_rank;
+        uint32_t sequence_number;
+        uint32_t data_size;
+        char payload[1024]; // Variable payload
+    };
+    
+    static size_t calculate_size() noexcept {
+        return sizeof(Data);
+    }
+    
+    Data& data() { return *reinterpret_cast<Data*>(Message::data()); }
+    const Data& data() const { return *reinterpret_cast<const Data*>(Message::data()); }
+    
+    void set_data(uint32_t op_id, uint32_t rank, uint32_t seq, const void* payload_data, size_t payload_size) {
+        data().operation_id = op_id;
+        data().sender_rank = rank;
+        data().sequence_number = seq;
+        data().data_size = static_cast<uint32_t>(std::min(payload_size, sizeof(Data::payload)));
+        if (payload_data && data().data_size > 0) {
+            std::memcpy(data().payload, payload_data, data().data_size);
+        }
+    }
+};
+
+// Simulated collective group
+class SimulatedCollectiveGroup {
+private:
+    uint32_t rank_;
+    uint32_t world_size_;
+    std::vector<std::shared_ptr<Channel<CoordinationMessage>>> channels_;
+    
+public:
+    SimulatedCollectiveGroup(uint32_t rank, uint32_t world_size) 
+        : rank_(rank), world_size_(world_size) {
+        
+        // Create channels for communication with other ranks
+        for (uint32_t r = 0; r < world_size_; ++r) {
+            if (r != rank_) {
+                std::string channel_name = "memory://collective_" + std::to_string(rank_) + "_to_" + std::to_string(r);
+                auto channel = Channel::get_or_create<CoordinationMessage>(channel_name);
+                channels_.push_back(channel);
+            } else {
+                channels_.push_back(nullptr); // Self channel
+            }
+        }
+    }
+    
+    uint32_t rank() const { return rank_; }
+    uint32_t size() const { return world_size_; }
+    
+    // Simple barrier simulation
+    void barrier() {
+        if (world_size_ == 1) return;
+        
+        // Send barrier message to all other ranks
+        for (uint32_t r = 0; r < world_size_; ++r) {
+            if (r != rank_ && channels_[r]) {
+                try {
+                    CoordinationMessage msg(*channels_[r]);
+                    msg.set_data(999, rank_, 0, nullptr, 0); // Barrier operation ID
+                    msg.send();
+                } catch (...) {
+                    // Ignore failures for now
+                }
+            }
+        }
+        
+        // Receive barrier messages from all other ranks
+        uint32_t received = 0;
+        while (received < world_size_ - 1) {
+            for (uint32_t r = 0; r < world_size_; ++r) {
+                if (r != rank_ && channels_[r]) {
+                    size_t size;
+                    uint32_t type;
+                    void* data = channels_[r]->receive_message(size, type);
+                    if (data) {
+                        received++;
+                        channels_[r]->release_message(data);
+                    }
+                }
+            }
+            if (received < world_size_ - 1) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+    }
+    
+    // Send data to specific rank
+    void send_to_rank(uint32_t target_rank, const void* data, size_t size, uint32_t op_id, uint32_t seq) {
+        if (target_rank >= world_size_ || target_rank == rank_ || !channels_[target_rank]) {
+            return;
+        }
+        
+        try {
+            CoordinationMessage msg(*channels_[target_rank]);
+            msg.set_data(op_id, rank_, seq, data, size);
+            msg.send();
+        } catch (...) {
+            // Ignore failures
+        }
+    }
+    
+    // Receive data from specific rank
+    bool receive_from_rank(uint32_t source_rank, void* data, size_t max_size, uint32_t expected_op_id) {
+        if (source_rank >= world_size_ || source_rank == rank_ || !channels_[source_rank]) {
+            return false;
+        }
+        
+        size_t msg_size;
+        uint32_t type;
+        void* msg_data = channels_[source_rank]->receive_message(msg_size, type);
+        if (msg_data) {
+            CoordinationMessage temp_msg(*channels_[source_rank]);
+            std::memcpy(temp_msg.Message::data(), msg_data, msg_size);
+            
+            if (temp_msg.data().operation_id == expected_op_id) {
+                size_t copy_size = std::min(max_size, static_cast<size_t>(temp_msg.data().data_size));
+                std::memcpy(data, temp_msg.data().payload, copy_size);
+                channels_[source_rank]->release_message(msg_data);
+                return true;
+            }
+            
+            channels_[source_rank]->release_message(msg_data);
+        }
+        return false;
+    }
+};
 
 // Helper function to print vectors
 template <typename T>
-void print_vector(const std::string &label, const std::vector<T> &vec,
-                  size_t rank) {
+void print_vector(const std::string &label, const std::vector<T> &vec, uint32_t rank) {
     std::cout << "[Rank " << rank << "] " << label << ": ";
-    for (const auto &val : vec) {
-        std::cout << std::setw(6) << val << " ";
+    for (size_t i = 0; i < std::min(vec.size(), size_t(8)); ++i) {
+        std::cout << std::setw(6) << vec[i] << " ";
     }
+    if (vec.size() > 8) std::cout << "...";
     std::cout << std::endl;
 }
 
-// Demonstrate broadcast operation
-void demo_broadcast(std::shared_ptr<CollectiveGroup> group) {
+// Demonstrate simulated broadcast operation
+void demo_broadcast(std::shared_ptr<SimulatedCollectiveGroup> group) {
     const auto rank = group->rank();
     const auto size = group->size();
 
-    std::cout << "\n=== Broadcast Demo ===" << std::endl;
+    std::cout << "\n=== Simulated Broadcast Demo ===" << std::endl;
 
     // Data to broadcast
-    std::vector<float> data(10);
+    std::vector<float> data(8);
 
     if (rank == 0) {
         // Root initializes data
         std::iota(data.begin(), data.end(), 1.0f);
         std::cout << "[Rank 0] Broadcasting data..." << std::endl;
         print_vector("Original", data, rank);
+        
+        // Send to all other ranks
+        for (uint32_t r = 1; r < size; ++r) {
+            group->send_to_rank(r, data.data(), data.size() * sizeof(float), 100, 0);
+        }
     } else {
-        // Non-root has zeros
+        // Non-root receives data
         std::fill(data.begin(), data.end(), 0.0f);
         print_vector("Before broadcast", data, rank);
+        
+        // Attempt to receive from rank 0
+        std::vector<float> temp_data(8);
+        bool received = false;
+        for (int attempt = 0; attempt < 100 && !received; ++attempt) {
+            if (group->receive_from_rank(0, temp_data.data(), temp_data.size() * sizeof(float), 100)) {
+                data = temp_data;
+                received = true;
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        
+        if (received) {
+            print_vector("After broadcast", data, rank);
+        } else {
+            std::cout << "[Rank " << rank << "] Failed to receive broadcast" << std::endl;
+        }
     }
-
-    // Execute broadcast from rank 0
-    Broadcast<float> bcast(group);
-    bcast.execute(std::span<float>(data), 0);
-
-    // All ranks should now have the same data
-    print_vector("After broadcast", data, rank);
 }
 
-// Demonstrate all-reduce operation
-void demo_allreduce(std::shared_ptr<CollectiveGroup> group) {
+// Demonstrate simulated all-reduce operation (sum)
+void demo_allreduce(std::shared_ptr<SimulatedCollectiveGroup> group) {
     const auto rank = group->rank();
     const auto size = group->size();
 
-    std::cout << "\n=== All-Reduce Demo (Sum) ===" << std::endl;
+    std::cout << "\n=== Simulated All-Reduce Demo (Sum) ===" << std::endl;
 
     // Each rank contributes different values
-    std::vector<float> data(8);
+    std::vector<float> data(4);
     for (size_t i = 0; i < data.size(); ++i) {
-        data[i] = rank + 1.0f + i * 0.1f;
+        data[i] = static_cast<float>(rank + 1) + i * 0.1f;
     }
 
     print_vector("Local data", data, rank);
 
-    // Execute all-reduce with sum operation
-    AllReduce<float> allreduce(group);
-    allreduce.execute(std::span<float>(data), ReduceOp::Sum);
-
-    // All ranks should have the sum
-    print_vector("After all-reduce", data, rank);
-
-    // Verify correctness
-    float expected_sum = 0;
-    for (size_t r = 0; r < size; ++r) {
-        expected_sum += (r + 1.0f);
+    if (size == 1) {
+        print_vector("After all-reduce (single rank)", data, rank);
+        return;
     }
-    std::cout << "[Rank " << rank
-              << "] First element should be: " << expected_sum
-              << " (actual: " << data[0] << ")" << std::endl;
+
+    // Simple all-reduce simulation: everyone sends to rank 0, rank 0 sums and broadcasts back
+    if (rank == 0) {
+        // Rank 0 collects from all other ranks
+        std::vector<std::vector<float>> all_data(size);
+        all_data[0] = data; // Own data
+        
+        // Receive from other ranks
+        for (uint32_t r = 1; r < size; ++r) {
+            std::vector<float> temp_data(4);
+            bool received = false;
+            for (int attempt = 0; attempt < 100 && !received; ++attempt) {
+                if (group->receive_from_rank(r, temp_data.data(), temp_data.size() * sizeof(float), 200)) {
+                    all_data[r] = temp_data;
+                    received = true;
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+        }
+        
+        // Sum all data
+        std::vector<float> result(4, 0.0f);
+        for (const auto& rank_data : all_data) {
+            for (size_t i = 0; i < result.size(); ++i) {
+                result[i] += rank_data[i];
+            }
+        }
+        
+        data = result;
+        print_vector("Sum result", data, rank);
+        
+        // Broadcast result back to all ranks
+        for (uint32_t r = 1; r < size; ++r) {
+            group->send_to_rank(r, result.data(), result.size() * sizeof(float), 201, 0);
+        }
+    } else {
+        // Other ranks send their data to rank 0
+        group->send_to_rank(0, data.data(), data.size() * sizeof(float), 200, 0);
+        
+        // Receive result from rank 0
+        std::vector<float> result(4);
+        bool received = false;
+        for (int attempt = 0; attempt < 100 && !received; ++attempt) {
+            if (group->receive_from_rank(0, result.data(), result.size() * sizeof(float), 201)) {
+                data = result;
+                received = true;
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        
+        if (received) {
+            print_vector("After all-reduce", data, rank);
+        } else {
+            std::cout << "[Rank " << rank << "] Failed to receive all-reduce result" << std::endl;
+        }
+    }
 }
 
-// Demonstrate scatter operation
-void demo_scatter(std::shared_ptr<CollectiveGroup> group) {
+// Demonstrate simulated scatter operation
+void demo_scatter(std::shared_ptr<SimulatedCollectiveGroup> group) {
     const auto rank = group->rank();
     const auto size = group->size();
 
-    std::cout << "\n=== Scatter Demo ===" << std::endl;
+    std::cout << "\n=== Simulated Scatter Demo ===" << std::endl;
 
-    const size_t chunk_size = 4;
+    const size_t chunk_size = 3;
     std::vector<int> send_data;
     std::vector<int> recv_data(chunk_size);
 
@@ -117,154 +312,133 @@ void demo_scatter(std::shared_ptr<CollectiveGroup> group) {
         send_data.resize(size * chunk_size);
         std::iota(send_data.begin(), send_data.end(), 1);
         print_vector("Data to scatter", send_data, rank);
+        
+        // Keep own chunk
+        for (size_t i = 0; i < chunk_size; ++i) {
+            recv_data[i] = send_data[i];
+        }
+        
+        // Send chunks to other ranks
+        for (uint32_t r = 1; r < size; ++r) {
+            std::vector<int> chunk(chunk_size);
+            for (size_t i = 0; i < chunk_size; ++i) {
+                chunk[i] = send_data[r * chunk_size + i];
+            }
+            group->send_to_rank(r, chunk.data(), chunk.size() * sizeof(int), 300, 0);
+        }
+    } else {
+        // Other ranks receive their chunk
+        bool received = false;
+        for (int attempt = 0; attempt < 100 && !received; ++attempt) {
+            if (group->receive_from_rank(0, recv_data.data(), recv_data.size() * sizeof(int), 300)) {
+                received = true;
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        
+        if (!received) {
+            std::cout << "[Rank " << rank << "] Failed to receive scatter data" << std::endl;
+        }
     }
 
-    // Execute scatter from rank 0
-    Scatter<int> scatter(group);
-    scatter.execute(std::span<const int>(send_data), std::span<int>(recv_data),
-                    0);
-
-    // Each rank should have its chunk
     print_vector("Received chunk", recv_data, rank);
 }
 
-// Demonstrate gather operation
-void demo_gather(std::shared_ptr<CollectiveGroup> group) {
-    const auto rank = group->rank();
-    const auto size = group->size();
-
-    std::cout << "\n=== Gather Demo ===" << std::endl;
-
-    // Each rank sends its rank ID repeated
-    std::vector<int> send_data(4, rank);
-    std::vector<int> recv_data;
-
-    if (rank == 0) {
-        recv_data.resize(size * send_data.size());
-    }
-
-    print_vector("Sending", send_data, rank);
-
-    // Execute gather to rank 0
-    Gather<int> gather(group);
-    gather.execute(std::span<const int>(send_data), std::span<int>(recv_data),
-                   0);
-
-    if (rank == 0) {
-        print_vector("Gathered data", recv_data, rank);
-    }
-}
-
-// Demonstrate all-gather operation
-void demo_allgather(std::shared_ptr<CollectiveGroup> group) {
-    const auto rank = group->rank();
-    const auto size = group->size();
-
-    std::cout << "\n=== All-Gather Demo ===" << std::endl;
-
-    // Each rank contributes its rank + 10
-    std::vector<double> send_data = {static_cast<double>(rank + 10),
-                                     static_cast<double>(rank + 20)};
-    std::vector<double> recv_data(size * send_data.size());
-
-    print_vector("Local contribution", send_data, rank);
-
-    // Execute all-gather
-    AllGather<double> allgather(group);
-    allgather.execute(std::span<const double>(send_data),
-                      std::span<double>(recv_data));
-
-    print_vector("All-gathered data", recv_data, rank);
-}
-
-// Performance benchmark for all-reduce
-void benchmark_allreduce(std::shared_ptr<CollectiveGroup> group) {
-    const auto rank = group->rank();
-    const auto size = group->size();
-
-    std::cout << "\n=== All-Reduce Performance Benchmark ===" << std::endl;
-
-    // Test different data sizes
-    std::vector<size_t> test_sizes = {1024, 16384, 262144,
-                                      1048576}; // 1KB to 1MB
-
-    for (auto data_size : test_sizes) {
-        std::vector<float> data(data_size / sizeof(float), 1.0f);
-
-        // Warm up
-        AllReduce<float> allreduce(group);
-        allreduce.execute(std::span<float>(data), ReduceOp::Sum);
-
-        // Benchmark
-        const int iterations = 10;
-        auto start = std::chrono::high_resolution_clock::now();
-
-        for (int i = 0; i < iterations; ++i) {
-            allreduce.execute(std::span<float>(data), ReduceOp::Sum);
-        }
-
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration =
-            std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-        if (rank == 0) {
-            double avg_time =
-                duration.count() / static_cast<double>(iterations);
-            double bandwidth =
-                (data_size * size * 2) /
-                avg_time; // MB/s (multiply by 2 for reduce+broadcast)
-
-            std::cout << "Data size: " << std::setw(8) << data_size
-                      << " bytes, "
-                      << "Avg time: " << std::setw(8) << std::fixed
-                      << std::setprecision(2) << avg_time << " µs, "
-                      << "Bandwidth: " << std::setw(8) << bandwidth << " MB/s"
-                      << std::endl;
-        }
-    }
-}
-
 // Demonstrate ML-style gradient aggregation
-void demo_ml_gradient_aggregation(std::shared_ptr<CollectiveGroup> group) {
+void demo_ml_gradient_aggregation(std::shared_ptr<SimulatedCollectiveGroup> group) {
     const auto rank = group->rank();
     const auto size = group->size();
 
     std::cout << "\n=== ML Gradient Aggregation Demo ===" << std::endl;
 
     // Simulate gradient tensors from different workers
-    const size_t model_params = 1000;
+    const size_t model_params = 100; // Reduced for demo
     std::vector<float> gradients(model_params);
 
-    // Each worker computes different gradients (simulate with random values)
-    std::srand(rank + 1);
-    for (auto &g : gradients) {
-        g = (std::rand() / static_cast<float>(RAND_MAX)) * 0.1f - 0.05f;
+    // Each worker computes different gradients (simulate with pattern)
+    for (size_t i = 0; i < gradients.size(); ++i) {
+        gradients[i] = static_cast<float>(rank + 1) * 0.01f + i * 0.001f;
     }
 
     // Calculate local gradient stats
     float local_sum = std::accumulate(gradients.begin(), gradients.end(), 0.0f);
     float local_mean = local_sum / gradients.size();
 
-    std::cout << "[Rank " << rank << "] Local gradient mean: " << local_mean
-              << std::endl;
+    std::cout << "[Rank " << rank << "] Local gradient mean: " << std::fixed 
+              << std::setprecision(4) << local_mean << std::endl;
 
-    // All-reduce to average gradients across all workers
-    AllReduce<float> allreduce(group);
-    allreduce.execute(std::span<float>(gradients), ReduceOp::Sum);
+    if (size == 1) {
+        std::cout << "[Rank " << rank << "] Single worker - no aggregation needed" << std::endl;
+        return;
+    }
 
-    // Divide by number of workers to get average
-    for (auto &g : gradients) {
-        g /= size;
+    // Simulate all-reduce for gradients (same pattern as demo_allreduce but with different data)
+    if (rank == 0) {
+        // Collect gradients from all workers
+        std::vector<std::vector<float>> all_gradients(size);
+        all_gradients[0] = gradients;
+        
+        for (uint32_t r = 1; r < size; ++r) {
+            std::vector<float> worker_gradients(model_params);
+            bool received = false;
+            for (int attempt = 0; attempt < 100 && !received; ++attempt) {
+                if (group->receive_from_rank(r, worker_gradients.data(), 
+                                           worker_gradients.size() * sizeof(float), 400)) {
+                    all_gradients[r] = worker_gradients;
+                    received = true;
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+        }
+        
+        // Average all gradients
+        std::vector<float> averaged_gradients(model_params, 0.0f);
+        for (const auto& worker_grads : all_gradients) {
+            for (size_t i = 0; i < averaged_gradients.size(); ++i) {
+                averaged_gradients[i] += worker_grads[i];
+            }
+        }
+        for (auto& g : averaged_gradients) {
+            g /= size;
+        }
+        
+        gradients = averaged_gradients;
+        
+        // Broadcast averaged gradients back
+        for (uint32_t r = 1; r < size; ++r) {
+            group->send_to_rank(r, averaged_gradients.data(), 
+                              averaged_gradients.size() * sizeof(float), 401, 0);
+        }
+    } else {
+        // Send gradients to parameter server (rank 0)
+        group->send_to_rank(0, gradients.data(), gradients.size() * sizeof(float), 400, 0);
+        
+        // Receive averaged gradients
+        std::vector<float> averaged_gradients(model_params);
+        bool received = false;
+        for (int attempt = 0; attempt < 100 && !received; ++attempt) {
+            if (group->receive_from_rank(0, averaged_gradients.data(), 
+                                       averaged_gradients.size() * sizeof(float), 401)) {
+                gradients = averaged_gradients;
+                received = true;
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+        
+        if (!received) {
+            std::cout << "[Rank " << rank << "] Failed to receive averaged gradients" << std::endl;
+        }
     }
 
     // Calculate global gradient stats
-    float global_sum =
-        std::accumulate(gradients.begin(), gradients.end(), 0.0f);
+    float global_sum = std::accumulate(gradients.begin(), gradients.end(), 0.0f);
     float global_mean = global_sum / gradients.size();
 
-    std::cout << "[Rank " << rank
-              << "] Global gradient mean after aggregation: " << global_mean
-              << std::endl;
+    std::cout << "[Rank " << rank << "] Global gradient mean after aggregation: " 
+              << std::fixed << std::setprecision(4) << global_mean << std::endl;
 
     // Simulate parameter update
     std::vector<float> parameters(model_params, 1.0f);
@@ -274,52 +448,41 @@ void demo_ml_gradient_aggregation(std::shared_ptr<CollectiveGroup> group) {
         parameters[i] -= learning_rate * gradients[i];
     }
 
-    if (rank == 0) {
-        std::cout << "Parameters updated with aggregated gradients!"
-                  << std::endl;
-    }
+    std::cout << "[Rank " << rank << "] Parameters updated with aggregated gradients!" << std::endl;
+}
+
+void print_usage(const char* program_name) {
+    std::cout << "Usage: " << program_name << " <rank> <world_size>" << std::endl;
+    std::cout << "Example: " << program_name << " 0 3" << std::endl;
+    std::cout << "Note: This demo simulates collective operations using in-memory channels." << std::endl;
+    std::cout << "      For true distributed operations, use network channels." << std::endl;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 4) {
-        std::cerr << "Usage: " << argv[0]
-                  << " <rank> <world_size> <uri1> <uri2> ..." << std::endl;
-        std::cerr << "Example: " << argv[0]
-                  << " 0 3 tcp://localhost:5000 tcp://localhost:5001 "
-                     "tcp://localhost:5002"
-                  << std::endl;
+    if (argc != 3) {
+        print_usage(argv[0]);
         return 1;
     }
 
     // Parse command line arguments
-    const CollectiveGroup::RankId rank = std::stoi(argv[1]);
-    const size_t world_size = std::stoi(argv[2]);
+    const uint32_t rank = std::stoi(argv[1]);
+    const uint32_t world_size = std::stoi(argv[2]);
 
-    if (argc - 3 != static_cast<int>(world_size)) {
-        std::cerr << "Number of URIs must match world_size" << std::endl;
+    if (rank >= world_size) {
+        std::cerr << "Rank must be less than world_size" << std::endl;
         return 1;
     }
 
-    std::vector<std::string> peer_uris;
-    for (int i = 3; i < argc; ++i) {
-        peer_uris.push_back(argv[i]);
-    }
-
-    std::cout << "=== Collective Operations Demo ===" << std::endl;
+    std::cout << "=== Collective Operations Simulation ===" << std::endl;
     std::cout << "Rank: " << rank << " / " << world_size << std::endl;
-    std::cout << "URIs: ";
-    for (const auto &uri : peer_uris) {
-        std::cout << uri << " ";
-    }
-    std::cout << std::endl;
+    std::cout << "Note: Using simulated collective operations with memory channels" << std::endl;
 
     try {
-        // Create collective group
-        auto group = create_collective_group(rank, peer_uris, "ring");
+        // Create simulated collective group
+        auto group = std::make_shared<SimulatedCollectiveGroup>(rank, world_size);
 
-        // Wait for all processes to start
-        std::cout << "Waiting for all processes to connect..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        // Wait a bit for initialization
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         // Synchronize all processes
         std::cout << "Synchronizing..." << std::endl;
@@ -335,20 +498,10 @@ int main(int argc, char *argv[]) {
         demo_scatter(group);
         group->barrier();
 
-        demo_gather(group);
-        group->barrier();
-
-        demo_allgather(group);
-        group->barrier();
-
-        benchmark_allreduce(group);
-        group->barrier();
-
         demo_ml_gradient_aggregation(group);
         group->barrier();
 
-        std::cout << "\n[Rank " << rank << "] All demos completed successfully!"
-                  << std::endl;
+        std::cout << "\n[Rank " << rank << "] All demos completed successfully!" << std::endl;
 
     } catch (const std::exception &e) {
         std::cerr << "[Rank " << rank << "] Error: " << e.what() << std::endl;

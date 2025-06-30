@@ -3,6 +3,7 @@
 #include "channel_impl.hpp"
 #include <atomic>
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/websocket.hpp>
 #include <condition_variable>
@@ -17,6 +18,7 @@ namespace detail {
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
 namespace net = boost::asio;
+namespace ssl = net::ssl;
 using tcp = net::ip::tcp;
 
 /**
@@ -107,6 +109,10 @@ private:
     std::atomic<bool> stopped_{false};
     std::atomic<bool> connected_{false};
     bool is_server_;
+    bool use_ssl_{false};
+    
+    // SSL support
+    std::unique_ptr<ssl::context> ssl_context_;
 
     // Metrics
     std::atomic<uint64_t> messages_sent_{0};

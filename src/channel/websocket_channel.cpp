@@ -28,7 +28,13 @@ WebSocketChannel::WebSocketChannel(const std::string &uri, size_t buffer_size,
     uint16_t port = static_cast<uint16_t>(std::stoi(match[3].str()));
 
     if (use_ssl) {
-        throw std::runtime_error("WSS (WebSocket Secure) not yet implemented");
+        // Basic WSS support - create SSL context with default settings
+        ssl_context_ = std::make_unique<ssl::context>(ssl::context::tlsv12_client);
+        ssl_context_->set_default_verify_paths();
+        ssl_context_->set_verify_mode(ssl::verify_none); // Basic implementation - no verification
+        use_ssl_ = true;
+    } else {
+        use_ssl_ = false;
     }
 
     // Start IO thread

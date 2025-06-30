@@ -25,7 +25,7 @@
 ## Implement Messaging Patterns
 - [ ] Request/Reply
 - [ ] Publish/Subscribe
-- [ ] Dealer/Router (May be more efficient if we break the "no memcpy" rule for this pattern)
+- [X] Dealer/Router (We call it a filtered fanout)
 - [ ] Pair
 
 ## Code Cleanup
