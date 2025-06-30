@@ -14,6 +14,7 @@
 
 #ifdef PSYNE_CUDA_ENABLED
 #include "cuda/cuda_buffer.hpp"
+#include "cuda/cuda_kernels.hpp"
 #include <cuda_runtime.h>
 #endif
 
@@ -81,13 +82,8 @@ void GPUVector<float>::gpu_scale(GPUContext &context, float scalar) {
         // Launch CUDA kernel for scaling
         float *device_data = static_cast<float *>(cuda_buffer->device_ptr());
 
-        // Simple CUDA kernel call (would need actual kernel implementation)
-        // For now, we'll use a host-side implementation with CUDA memory
-        float *host_data = static_cast<float *>(cuda_buffer->map());
-        for (size_t i = 0; i < size_; ++i) {
-            host_data[i] *= scalar;
-        }
-        cuda_buffer->unmap();
+        // Use actual CUDA kernel for GPU acceleration
+        cuda::launch_scale_float_kernel(device_data, scalar, size_, cuda_buffer->stream());
         cuda_buffer->synchronize();
 
         // Mark CPU data as dirty
@@ -152,13 +148,8 @@ void GPUVector<double>::gpu_scale(GPUContext &context, double scalar) {
         // Launch CUDA kernel for scaling
         double *device_data = static_cast<double *>(cuda_buffer->device_ptr());
 
-        // Simple CUDA kernel call (would need actual kernel implementation)
-        // For now, we'll use a host-side implementation with CUDA memory
-        double *host_data = static_cast<double *>(cuda_buffer->map());
-        for (size_t i = 0; i < size_; ++i) {
-            host_data[i] *= scalar;
-        }
-        cuda_buffer->unmap();
+        // Use actual CUDA kernel for GPU acceleration
+        cuda::launch_scale_double_kernel(device_data, scalar, size_, cuda_buffer->stream());
         cuda_buffer->synchronize();
 
         // Mark CPU data as dirty
@@ -238,17 +229,12 @@ void GPUVector<float>::gpu_add(GPUContext &context,
         auto cuda_buffer_b =
             static_cast<cuda::CudaBuffer *>(gpu_buffer_b.get());
 
-        // Simple CUDA kernel call (would need actual kernel implementation)
-        // For now, we'll use a host-side implementation with CUDA memory
-        float *host_data_a = static_cast<float *>(cuda_buffer_a->map());
-        float *host_data_b = static_cast<float *>(cuda_buffer_b->map());
+        // Use actual CUDA kernel for GPU acceleration
+        float *device_data_a = static_cast<float *>(cuda_buffer_a->device_ptr());
+        float *device_data_b = static_cast<float *>(cuda_buffer_b->device_ptr());
 
-        for (size_t i = 0; i < size_; ++i) {
-            host_data_a[i] += host_data_b[i];
-        }
-
-        cuda_buffer_a->unmap();
-        cuda_buffer_b->unmap();
+        // Launch kernel for vector addition (result goes into first vector)
+        cuda::launch_add_float_kernel(device_data_a, device_data_a, device_data_b, size_, cuda_buffer_a->stream());
         cuda_buffer_a->synchronize();
 
         // Mark CPU data as dirty

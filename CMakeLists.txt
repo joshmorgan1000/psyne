@@ -204,6 +204,7 @@ if(PSYNE_ENABLE_GPU)
         list(APPEND PSYNE_SOURCES
             "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_buffer.cpp"
             "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_context.cpp"
+            "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_kernels.cu"
         )
         
     endif()
