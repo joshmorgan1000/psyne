@@ -1,0 +1,19 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: Psyne
+Description: Zero-copy RPC library optimized for AI/ML
+Version: @PROJECT_VERSION@
+URL: https://github.com/joshmorgan1000/psyne
+
+Requires: eigen3 openssl
+Libs: -L${libdir} -lpsyne
+Cflags: -I${includedir}
+
+# Features
+gpu_support=@PSYNE_ENABLE_GPU@
+cuda_support=@PSYNE_CUDA_ENABLED@
+metal_support=@PSYNE_METAL_ENABLED@
+vulkan_support=@PSYNE_VULKAN_ENABLED@

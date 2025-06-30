@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <chrono>
 #include <memory>
 #include <psyne/psyne.hpp>

@@ -844,7 +844,7 @@ protected:
  * auto chan1 = psyne::create_channel("memory://buffer1");
  *
  * // Create a TCP server with metrics enabled
- * auto server = psyne::create_channel("tcp://:8080", 1024*1024,
+ * auto server = psyne::create_channel("tcp://:8080", 64*1024*1024,
  *                                     ChannelMode::SPSC,
  *                                     ChannelType::MultiType, true);
  *
@@ -856,7 +856,7 @@ protected:
  * @endcode
  */
 inline std::unique_ptr<Channel>
-create_channel(const std::string &uri, size_t buffer_size = 1024 * 1024,
+create_channel(const std::string &uri, size_t buffer_size = 64 * 1024 * 1024,
                ChannelMode mode = ChannelMode::SPSC,
                ChannelType type = ChannelType::MultiType,
                bool enable_metrics = false,
@@ -1181,7 +1181,7 @@ private:
  */
 inline std::unique_ptr<Channel>
 create_reliable_channel(const std::string &uri,
-                        size_t buffer_size = 1024 * 1024,
+                        size_t buffer_size = 64 * 1024 * 1024,
                         ChannelMode mode = ChannelMode::SPSC,
                         const ReliabilityConfig &config = {}) {
     auto channel = create_channel(uri, buffer_size, mode);
@@ -1451,7 +1451,7 @@ struct WebRTCConfig {
 /**
  * @brief Create a WebRTC channel for peer-to-peer communication
  * @param peer_id Target peer identifier
- * @param buffer_size Buffer size for messages (default: 1MB)
+ * @param buffer_size Buffer size for messages (default: 64MB)
  * @param signaling_server_uri WebSocket signaling server URI
  * @param config WebRTC configuration
  * @return Unique pointer to the channel
@@ -1465,7 +1465,7 @@ struct WebRTCConfig {
  * // Create WebRTC channel to peer "player2"
  * auto channel = psyne::webrtc::create_channel(
  *     "player2",
- *     1024*1024,
+ *     64*1024*1024,
  *     "ws://signaling.example.com:8080"
  * );
  *
@@ -1480,7 +1480,7 @@ struct WebRTCConfig {
  * @endcode
  */
 std::unique_ptr<Channel>
-create_channel(const std::string &peer_id, size_t buffer_size = 1024 * 1024,
+create_channel(const std::string &peer_id, size_t buffer_size = 64 * 1024 * 1024,
                const std::string &signaling_server_uri = "ws://localhost:8080",
                const WebRTCConfig &config = {});
 
@@ -1522,26 +1522,26 @@ enum class Role {
  * @brief Create a UDP multicast publisher
  * @param multicast_address Multicast group address (e.g., "239.255.0.1")
  * @param port Port number
- * @param buffer_size Buffer size for messages (default: 1MB)
+ * @param buffer_size Buffer size for messages (default: 64MB)
  * @param compression_config Optional compression configuration
  * @return Unique pointer to the channel
  */
 std::unique_ptr<Channel>
 create_publisher(const std::string &multicast_address, uint16_t port,
-                 size_t buffer_size = 1024 * 1024,
+                 size_t buffer_size = 64 * 1024 * 1024,
                  const compression::CompressionConfig &compression_config = {});
 
 /**
  * @brief Create a UDP multicast subscriber
  * @param multicast_address Multicast group address (e.g., "239.255.0.1")
  * @param port Port number
- * @param buffer_size Buffer size for messages (default: 1MB)
+ * @param buffer_size Buffer size for messages (default: 64MB)
  * @param interface_address Local interface to bind to (optional)
  * @return Unique pointer to the channel
  */
 std::unique_ptr<Channel>
 create_subscriber(const std::string &multicast_address, uint16_t port,
-                  size_t buffer_size = 1024 * 1024,
+                  size_t buffer_size = 64 * 1024 * 1024,
                   const std::string &interface_address = "");
 
 /**
@@ -1556,7 +1556,7 @@ create_subscriber(const std::string &multicast_address, uint16_t port,
  */
 std::unique_ptr<Channel> create_multicast_channel(
     const std::string &multicast_address, uint16_t port, Role role,
-    size_t buffer_size = 1024 * 1024,
+    size_t buffer_size = 64 * 1024 * 1024,
     const compression::CompressionConfig &compression_config = {},
     const std::string &interface_address = "");
 
@@ -1687,7 +1687,7 @@ public:
     using Message<MLTensorF>::Message;
 
     static size_t calculate_size() {
-        return 1024 * 1024; // 1MB default
+        return 64 * 1024 * 1024; // 64MB default
     }
 
     void initialize() {
@@ -1765,7 +1765,7 @@ public:
     using Message<SparseMatrixF>::Message;
 
     static size_t calculate_size() {
-        return 1024 * 1024; // 1MB default
+        return 64 * 1024 * 1024; // 64MB default
     }
 
     void initialize() {

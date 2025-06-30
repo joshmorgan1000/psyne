@@ -293,7 +293,21 @@ if(PSYNE_ENABLE_GPU)
 endif()
 
 
-target_include_directories(psyne PRIVATE ${PSYNE_INCLUDE_DIRS})
+# Set up public and private include directories
+target_include_directories(psyne 
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/psyne>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/utils>
+        $<INSTALL_INTERFACE:include>
+        $<INSTALL_INTERFACE:include/psyne>
+        $<INSTALL_INTERFACE:include/psyne/utils>
+    PRIVATE
+        ${EIGEN3_INCLUDE_DIR}
+        ${Boost_INCLUDE_DIRS}
+        $<$<BOOL:${PSYNE_CUDA_ENABLED}>:${CUDAToolkit_INCLUDE_DIRS}>
+        $<$<BOOL:${PSYNE_VULKAN_ENABLED}>:${Vulkan_INCLUDE_DIRS}>
+)
 
 # Add compile definitions for GPU support
 if(PSYNE_ENABLE_GPU)
@@ -314,9 +328,81 @@ if(PSYNE_ENABLE_GPU)
 endif()
 
 # ------------------------------------------------------------------------------
-# Examples (optional)
+# Installation targets
 # ------------------------------------------------------------------------------
-option(PSYNE_BUILD_EXAMPLES "Build example programs" OFF)
+include(GNUInstallDirs)
+
+# Install the shared library
+install(TARGETS psyne
+    EXPORT PsyneTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Install the public header
+install(FILES
+    "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne
+)
+
+# Install utility headers that are part of the public API
+install(FILES
+    "${CMAKE_SOURCE_DIR}/src/utils/logger.hpp"
+    "${CMAKE_SOURCE_DIR}/src/utils/time_utils.hpp"
+    "${CMAKE_SOURCE_DIR}/src/utils/random_utils.hpp"
+    "${CMAKE_SOURCE_DIR}/src/utils/pthread.hpp"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne/utils
+)
+
+# Create and install package config files
+include(CMakePackageConfigHelpers)
+
+# Generate PsyneConfig.cmake
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PsyneConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
+)
+
+# Generate PsyneConfigVersion.cmake
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+# Install CMake config files
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
+)
+
+# Install the export set
+install(EXPORT PsyneTargets
+    FILE PsyneTargets.cmake
+    NAMESPACE Psyne::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
+)
+
+# Create a pkg-config file
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/psyne.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/psyne.pc"
+    @ONLY
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/psyne.pc"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+)
+
+# ------------------------------------------------------------------------------
+# Examples (enabled by default)
+# ------------------------------------------------------------------------------
+option(PSYNE_BUILD_EXAMPLES "Build example programs" ON)
 if(PSYNE_BUILD_EXAMPLES)
     add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
 endif()
@@ -332,10 +418,9 @@ if(PSYNE_CUDA_ENABLED AND NOT PSYNE_BUILD_EXAMPLES)
 endif()
 
 # ------------------------------------------------------------------------------
-# Tests (optional)
+# Tests (enabled by default)
 # ------------------------------------------------------------------------------
-option(PSYNE_BUILD_TESTS "Build unit tests" OFF)
-# Tests disabled by default due to implementation issues
+option(PSYNE_BUILD_TESTS "Build unit tests" ON)
 if(PSYNE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
@@ -386,6 +471,7 @@ if(PSYNE_ENABLE_GPU)
     message(STATUS "    Vulkan:          ${PSYNE_VULKAN_ENABLED}")
 endif()
 message(STATUS "")
-message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=ON to build examples")
-message(STATUS "Use -DPSYNE_BUILD_TESTS=ON to build tests")
+message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=OFF to disable examples")
+message(STATUS "Use -DPSYNE_BUILD_TESTS=OFF to disable tests")
+message(STATUS "Use 'make install' to install library and headers")
 message(STATUS "===================================================")
