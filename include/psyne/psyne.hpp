@@ -2382,6 +2382,6 @@ void deallocate_tensor(void* ptr);
 
 // Include GPU support if enabled
 #if defined(PSYNE_GPU_SUPPORT) || defined(PSYNE_CUDA_SUPPORT) || defined(PSYNE_METAL_SUPPORT) || defined(PSYNE_VULKAN_SUPPORT)
-#include "gpu/gpu_buffer.hpp"
-#include "gpu/gpu_message.hpp"
+#include "../../src/gpu/gpu_buffer.hpp"
+#include "../../src/gpu/gpu_message.hpp"
 #endif

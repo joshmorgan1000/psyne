@@ -23,7 +23,11 @@ public:
         impl_->notify_message_ready(offset, size);
     }
 
-    RingBuffer& get_ring_buffer() override {
+    RingBuffer& get_ring_buffer() noexcept override {
+        return impl_->get_ring_buffer();
+    }
+
+    const RingBuffer& get_ring_buffer() const noexcept override {
         return impl_->get_ring_buffer();
     }
 
@@ -31,27 +35,8 @@ public:
         impl_->advance_read_pointer(size);
     }
 
-    // Legacy interface (deprecated)
-    [[deprecated("Use reserve_write_slot() instead")]]
-    void *reserve_space(size_t size) override {
-        return impl_->reserve_space(size);
-    }
-
-    [[deprecated("Data is committed when written")]]
-    void commit_message(void *handle) override {
-        impl_->commit_message(handle);
-    }
-
-    void *receive_message(size_t &size, uint32_t &type) override {
-        return impl_->receive_message(size, type);
-    }
-
-    void release_message(void *handle) override {
-        impl_->release_message(handle);
-    }
-
     // Channel properties
-    std::string uri() const override {
+    const std::string& uri() const override {
         return impl_->uri();
     }
 
@@ -69,19 +54,6 @@ public:
 
     bool is_stopped() const override {
         return impl_->is_stopped();
-    }
-
-    // Channel properties
-    std::string uri() const override {
-        return impl_->uri();
-    }
-
-    ChannelMode mode() const override {
-        return impl_->mode();
-    }
-
-    ChannelType type() const override {
-        return impl_->type();
     }
 
     void *receive_raw_message(size_t &size, uint32_t &type) override {
@@ -118,7 +90,7 @@ create_publisher(const std::string &multicast_address, uint16_t port,
     std::string uri = "udp://" + multicast_address + ":" + std::to_string(port);
     auto impl = std::make_unique<detail::UDPMulticastChannel>(
         uri, buffer_size, ChannelMode::SPMC, ChannelType::MultiType,
-        detail::MulticastRole::Publisher, compression_config);
+        detail::MulticastRole::Publisher, compression_config, "");
     return std::make_unique<detail::MulticastChannelWrapper>(std::move(impl));
 }
 
@@ -126,9 +98,10 @@ std::unique_ptr<Channel>
 create_subscriber(const std::string &multicast_address, uint16_t port,
                   size_t buffer_size, const std::string &interface_address) {
     std::string uri = "udp://" + multicast_address + ":" + std::to_string(port);
+    compression::CompressionConfig empty_config{};
     auto impl = std::make_unique<detail::UDPMulticastChannel>(
         uri, buffer_size, ChannelMode::SPMC, ChannelType::MultiType,
-        detail::MulticastRole::Subscriber, {}, interface_address);
+        detail::MulticastRole::Subscriber, empty_config, interface_address);
     return std::make_unique<detail::MulticastChannelWrapper>(std::move(impl));
 }
 
