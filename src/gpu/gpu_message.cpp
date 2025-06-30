@@ -7,6 +7,7 @@
  */
 
 #include "gpu_message.hpp"
+#include "../utils/logger.hpp"
 
 #if defined(__APPLE__) && defined(PSYNE_METAL_ENABLED)
 #include "metal/metal_buffer.hpp"
@@ -29,6 +30,9 @@ template class GPUVector<int32_t>;
 // GPU scale operation for float
 template <>
 void GPUVector<float>::gpu_scale(GPUContext &context, float scalar) {
+    log_debug("GPU scale operation: float vector size=", size_,
+              ", scalar=", scalar,
+              ", backend=", static_cast<int>(context.backend()));
 #if defined(__APPLE__) && defined(PSYNE_METAL_ENABLED)
     if (context.backend() == GPUBackend::Metal) {
         auto metal_context = static_cast<metal::MetalContext *>(&context);
@@ -81,10 +85,13 @@ void GPUVector<float>::gpu_scale(GPUContext &context, float scalar) {
 
         // Launch CUDA kernel for scaling
         float *device_data = static_cast<float *>(cuda_buffer->device_ptr());
+        log_trace("Launching CUDA scale kernel for ", size_, " elements");
 
         // Use actual CUDA kernel for GPU acceleration
-        cuda::launch_scale_float_kernel(device_data, scalar, size_, cuda_buffer->stream());
+        cuda::launch_scale_float_kernel(device_data, scalar, size_,
+                                        cuda_buffer->stream());
         cuda_buffer->synchronize();
+        log_trace("CUDA scale operation completed successfully");
 
         // Mark CPU data as dirty
         is_cpu_dirty_ = true;
@@ -95,6 +102,9 @@ void GPUVector<float>::gpu_scale(GPUContext &context, float scalar) {
 // GPU scale operation for double
 template <>
 void GPUVector<double>::gpu_scale(GPUContext &context, double scalar) {
+    log_debug("GPU scale operation: double vector size=", size_,
+              ", scalar=", scalar,
+              ", backend=", static_cast<int>(context.backend()));
 #if defined(__APPLE__) && defined(PSYNE_METAL_ENABLED)
     if (context.backend() == GPUBackend::Metal) {
         auto metal_context = static_cast<metal::MetalContext *>(&context);
@@ -149,7 +159,8 @@ void GPUVector<double>::gpu_scale(GPUContext &context, double scalar) {
         double *device_data = static_cast<double *>(cuda_buffer->device_ptr());
 
         // Use actual CUDA kernel for GPU acceleration
-        cuda::launch_scale_double_kernel(device_data, scalar, size_, cuda_buffer->stream());
+        cuda::launch_scale_double_kernel(device_data, scalar, size_,
+                                         cuda_buffer->stream());
         cuda_buffer->synchronize();
 
         // Mark CPU data as dirty
@@ -162,7 +173,12 @@ void GPUVector<double>::gpu_scale(GPUContext &context, double scalar) {
 template <>
 void GPUVector<float>::gpu_add(GPUContext &context,
                                const GPUVector<float> &other) {
+    log_debug("GPU add operation: float vectors size=", size_, " + ",
+              other.size_, ", backend=", static_cast<int>(context.backend()));
+
     if (size_ != other.size_) {
+        log_error("Vector size mismatch in GPU add: ", size_,
+                  " != ", other.size_);
         throw std::invalid_argument("Vector sizes must match for addition");
     }
 
@@ -230,12 +246,18 @@ void GPUVector<float>::gpu_add(GPUContext &context,
             static_cast<cuda::CudaBuffer *>(gpu_buffer_b.get());
 
         // Use actual CUDA kernel for GPU acceleration
-        float *device_data_a = static_cast<float *>(cuda_buffer_a->device_ptr());
-        float *device_data_b = static_cast<float *>(cuda_buffer_b->device_ptr());
+        float *device_data_a =
+            static_cast<float *>(cuda_buffer_a->device_ptr());
+        float *device_data_b =
+            static_cast<float *>(cuda_buffer_b->device_ptr());
 
         // Launch kernel for vector addition (result goes into first vector)
-        cuda::launch_add_float_kernel(device_data_a, device_data_a, device_data_b, size_, cuda_buffer_a->stream());
+        log_trace("Launching CUDA add kernel for ", size_, " elements");
+        cuda::launch_add_float_kernel(device_data_a, device_data_a,
+                                      device_data_b, size_,
+                                      cuda_buffer_a->stream());
         cuda_buffer_a->synchronize();
+        log_trace("CUDA add operation completed successfully");
 
         // Mark CPU data as dirty
         is_cpu_dirty_ = true;

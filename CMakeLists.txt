@@ -158,9 +158,9 @@ set(PSYNE_SOURCES
     # Public header
     "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
     
-    # Core implementation - minimal set
-    "${CMAKE_SOURCE_DIR}/src/psyne_minimal.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/webrtc_channel.cpp"
+    # Core implementation
+    "${CMAKE_SOURCE_DIR}/src/psyne.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/webrtc/webrtc_channel.cpp"
     "${CMAKE_SOURCE_DIR}/src/channel/webrtc/ice_agent.cpp"
     # "${CMAKE_SOURCE_DIR}/src/channel/lockfree_ipc_channel.cpp" # TODO: Fix for new API
     "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
@@ -176,7 +176,6 @@ set(PSYNE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/types/types.hpp"
     "${CMAKE_SOURCE_DIR}/src/types/enhanced_types.hpp"
     "${CMAKE_SOURCE_DIR}/src/types/advanced_types.hpp"
-    "${CMAKE_SOURCE_DIR}/src/psyne_impl.hpp"
     
     # SIMD optimizations
     "${CMAKE_SOURCE_DIR}/src/simd/simd_ops.cpp"
@@ -185,9 +184,10 @@ set(PSYNE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/transport/quic.cpp"
     
     # Channel implementations
-    "${CMAKE_SOURCE_DIR}/src/channel/quic_channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/multicast_factory.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/quic/quic_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/udp/multicast_factory.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/udp/udp_multicast_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/tcp/tcp_channel.cpp"
     
     # C API
     "${CMAKE_SOURCE_DIR}/src/c_api/psyne_c_api.cpp"

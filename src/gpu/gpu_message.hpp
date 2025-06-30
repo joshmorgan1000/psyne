@@ -17,7 +17,9 @@
 #include <span>
 #include <vector>
 // Forward declare to avoid circular includes
-namespace psyne { class Channel; }
+namespace psyne {
+class Channel;
+}
 
 namespace psyne {
 namespace gpu {

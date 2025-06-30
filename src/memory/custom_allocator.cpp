@@ -7,6 +7,7 @@
  */
 
 #include "custom_allocator.hpp"
+#include "../utils/logger.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -88,8 +89,14 @@ void CustomAllocator::platform_init() {
 
 void *CustomAllocator::allocate(size_t size, AllocFlags flags,
                                 size_t alignment) {
-    if (size == 0)
+    log_trace("Allocating memory: size=", size,
+              ", flags=", static_cast<uint32_t>(flags),
+              ", alignment=", alignment);
+
+    if (size == 0) {
+        log_warn("Attempted to allocate 0 bytes");
         return nullptr;
+    }
 
     // Update statistics
     stats_.allocation_count.fetch_add(1, std::memory_order_relaxed);
@@ -108,8 +115,10 @@ void *CustomAllocator::allocate(size_t size, AllocFlags flags,
     // Try pool allocation for small sizes
     if (!static_cast<uint32_t>(flags & AllocFlags::HugePage) &&
         size <= pool_sizes[pools_.size() - 1]) {
+        log_debug("Attempting pool allocation for size: ", size);
         void *ptr = allocate_from_pool(size);
         if (ptr) {
+            log_trace("Pool allocation successful: ptr=", ptr, ", size=", size);
             // Track allocation
             std::lock_guard<std::mutex> lock(allocations_mutex_);
             allocations_[ptr] = {size, flags, ptr, size};
@@ -126,7 +135,14 @@ void *CustomAllocator::allocate(size_t size, AllocFlags flags,
             }
 
             return ptr;
+        } else {
+            log_debug(
+                "Pool allocation failed, falling back to system allocation");
         }
+    } else if (static_cast<uint32_t>(flags & AllocFlags::HugePage)) {
+        log_debug("Huge page allocation requested for size: ", size);
+    } else {
+        log_debug("Large allocation (size=", size, ") bypassing pools");
     }
 
     void *ptr = nullptr;
@@ -135,8 +151,8 @@ void *CustomAllocator::allocate(size_t size, AllocFlags flags,
 
 #ifdef __linux__
     // Try huge page allocation
-    if (static_cast<uint32_t>(flags & AllocFlags::HugePage) && huge_pages_enabled_ &&
-        size >= 2 * 1024 * 1024) {
+    if (static_cast<uint32_t>(flags & AllocFlags::HugePage) &&
+        huge_pages_enabled_ && size >= 2 * 1024 * 1024) {
         ptr = allocate_huge_page(size, preferred_numa_node_);
         if (ptr) {
             actual_ptr = ptr;
@@ -200,24 +216,34 @@ void *CustomAllocator::allocate(size_t size, AllocFlags flags,
 }
 
 void CustomAllocator::deallocate(void *ptr) {
-    if (!ptr)
+    log_trace("Deallocating memory: ptr=", ptr);
+
+    if (!ptr) {
+        log_trace("Attempted to deallocate null pointer");
         return;
+    }
 
     AllocInfo info;
     {
         std::lock_guard<std::mutex> lock(allocations_mutex_);
         auto it = allocations_.find(ptr);
         if (it == allocations_.end()) {
+            log_warn("Attempted to deallocate untracked pointer: ", ptr);
             return; // Not our allocation
         }
         info = it->second;
         allocations_.erase(it);
     }
 
+    log_trace("Deallocating tracked allocation: size=", info.size,
+              ", flags=", static_cast<uint32_t>(info.flags));
+
     // Update statistics
     stats_.free_count.fetch_add(1, std::memory_order_relaxed);
     stats_.total_freed.fetch_add(info.size, std::memory_order_relaxed);
     stats_.current_usage.fetch_sub(info.size, std::memory_order_relaxed);
+
+    log_trace("Updated allocation statistics after deallocation");
 
     // Unpin memory if it was pinned
     if (static_cast<uint32_t>(info.flags & AllocFlags::Pinned)) {

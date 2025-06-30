@@ -49,7 +49,7 @@ struct SIMDCapabilities {
     bool has_avx2 = false;
     bool has_avx512f = false;
     bool has_neon = false;
-    
+
     static SIMDCapabilities detect();
 };
 
@@ -408,15 +408,14 @@ public:
             dst[i] = static_cast<float>(src[i]) * scale;
         }
     }
-    
+
     // Additional operations used in cpp file
     static void scale(const float *a, float alpha, float *b, size_t count);
-    static void matmul(const float *a, const float *b, float *c,
-                      size_t m, size_t n, size_t k);
-    static void transpose_layout(const float *src, float *dst, size_t n, size_t m);
+    static void matmul(const float *a, const float *b, float *c, size_t m,
+                       size_t n, size_t k);
+    static void transpose_layout(const float *src, float *dst, size_t n,
+                                 size_t m);
 };
-
-
 
 /**
  * @brief SIMD compression utilities
@@ -424,10 +423,10 @@ public:
 class SIMDCompression {
 public:
     static size_t compress_rle(const uint8_t *src, size_t src_size,
-                              uint8_t *dst, size_t dst_size);
+                               uint8_t *dst, size_t dst_size);
     static void delta_encode(const float *src, float *dst, size_t count);
     static void quantize_int8(const float *src, int8_t *dst, size_t count,
-                             float scale);
+                              float scale);
 };
 
 /**

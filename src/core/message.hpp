@@ -6,17 +6,17 @@
  *
  * This header provides the minimal interface needed for enhanced message types
  * to inherit from the Message base class without circular dependencies.
- * 
+ *
  * Uses modern C++20 features:
  * - Concepts for type safety
  * - std::span for zero-copy data views
  * - constexpr/consteval for compile-time optimization
  */
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include <concepts>
 #include <type_traits>
 
 namespace psyne {
@@ -31,12 +31,12 @@ class RingBuffer;
  * @concept MessageType
  * @brief Concept defining requirements for zero-copy message types
  */
-template<typename T>
+template <typename T>
 concept MessageType = requires {
     // Must have static size calculation
     { T::calculate_size() } -> std::convertible_to<size_t>;
     // Must be default constructible with channel
-    requires std::is_constructible_v<T, Channel&>;
+    requires std::is_constructible_v<T, Channel &>;
     // Must be move-only (no copies for zero-copy)
     requires std::is_move_constructible_v<T>;
     requires !std::is_copy_constructible_v<T>;
@@ -46,25 +46,25 @@ concept MessageType = requires {
  * @concept FixedSizeMessage
  * @brief Concept for compile-time sized messages (maximum performance)
  */
-template<typename T>
+template <typename T>
 concept FixedSizeMessage = MessageType<T> && requires {
     // Size must be compile-time constant
     requires std::same_as<decltype(T::calculate_size()), const size_t>;
     // Size must be > 0
-    requires (T::calculate_size() > 0);
+    requires(T::calculate_size() > 0);
 };
 
 /**
  * @concept DynamicSizeMessage
  * @brief Concept for runtime-sized messages (flexibility with performance cost)
  */
-template<typename T>
+template <typename T>
 concept DynamicSizeMessage = MessageType<T> && (!FixedSizeMessage<T>);
 
 /**
  * @brief Base class for all zero-copy messages
  * @tparam Derived The derived message type (CRTP pattern)
- * 
+ *
  * Messages are typed views over ring buffer memory. They do not own data,
  * but provide typed access to pre-allocated ring buffer slots.
  */
@@ -82,7 +82,7 @@ public:
      * @param slab Pointer to ring buffer
      * @param offset Offset within ring buffer where message data starts
      */
-    Message(RingBuffer* slab, uint32_t offset);
+    Message(RingBuffer *slab, uint32_t offset);
 
     /**
      * @brief Move constructor
@@ -105,7 +105,7 @@ public:
 
     /**
      * @brief Send the message (notify receiver of ready message)
-     * 
+     *
      * Data is already written directly to ring buffer by user.
      * This just sends a notification that message is ready at offset.
      */
@@ -126,12 +126,13 @@ public:
      * @return Span over message data for zero-copy access
      */
     std::span<uint8_t> data_span() noexcept {
-        auto* ptr = data();
+        auto *ptr = data();
         return ptr ? std::span<uint8_t>{ptr, size()} : std::span<uint8_t>{};
     }
     std::span<const uint8_t> data_span() const noexcept {
-        auto* ptr = data();
-        return ptr ? std::span<const uint8_t>{ptr, size()} : std::span<const uint8_t>{};
+        auto *ptr = data();
+        return ptr ? std::span<const uint8_t>{ptr, size()}
+                   : std::span<const uint8_t>{};
     }
 
     /**
@@ -139,15 +140,16 @@ public:
      * @tparam T Type to cast data to
      * @return Span over typed data
      */
-    template<typename T>
+    template <typename T>
     std::span<T> typed_data_span() noexcept {
-        auto* ptr = reinterpret_cast<T*>(data());
+        auto *ptr = reinterpret_cast<T *>(data());
         return ptr ? std::span<T>{ptr, size() / sizeof(T)} : std::span<T>{};
     }
-    template<typename T>
+    template <typename T>
     std::span<const T> typed_data_span() const noexcept {
-        auto* ptr = reinterpret_cast<const T*>(data());
-        return ptr ? std::span<const T>{ptr, size() / sizeof(T)} : std::span<const T>{};
+        auto *ptr = reinterpret_cast<const T *>(data());
+        return ptr ? std::span<const T>{ptr, size() / sizeof(T)}
+                   : std::span<const T>{};
     }
 
     /**
@@ -160,7 +162,9 @@ public:
     /**
      * @brief Get the message size at compile time (for fixed-size messages)
      */
-    static consteval size_t static_size() noexcept requires FixedSizeMessage<Derived> {
+    static consteval size_t static_size() noexcept
+        requires FixedSizeMessage<Derived>
+    {
         return Derived::calculate_size();
     }
 
@@ -191,9 +195,9 @@ public:
     static constexpr uint32_t BUFFER_FULL = 0xFFFFFFFF;
 
 protected:
-    RingBuffer* slab_;    ///< Pointer to ring buffer
-    uint32_t offset_;     ///< Offset within ring buffer where message starts
-    Channel* channel_;    ///< Channel for sending notifications
+    RingBuffer *slab_; ///< Pointer to ring buffer
+    uint32_t offset_;  ///< Offset within ring buffer where message starts
+    Channel *channel_; ///< Channel for sending notifications
 
     friend class Channel;
 };

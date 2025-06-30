@@ -12,20 +12,20 @@ Message<Derived>::Message(Channel &channel)
     : slab_(&channel.get_ring_buffer()), offset_(0), channel_(&channel) {
     // Reserve space in ring buffer and get offset - no allocation!
     offset_ = channel.reserve_write_slot(Derived::calculate_size());
-    
+
     if (offset_ == BUFFER_FULL) {
         throw std::runtime_error("Ring buffer full - cannot reserve space");
     }
-    
+
     // Message is now a typed view over ring buffer at offset
     // User writes directly to slab memory via data() method
-    
+
     // Let derived class initialize their data structure in ring buffer
     static_cast<Derived *>(this)->initialize();
 }
 
 template <typename Derived>
-Message<Derived>::Message(RingBuffer* slab, uint32_t offset)
+Message<Derived>::Message(RingBuffer *slab, uint32_t offset)
     : slab_(slab), offset_(offset), channel_(nullptr) {
     // For incoming messages, create view into ring buffer at offset
     // Message is just a typed view over existing ring buffer data
@@ -68,7 +68,7 @@ void Message<Derived>::send() {
     // Data is already written by user directly to ring buffer
     // Just notify receiver that there's a message ready at this offset
     channel_->notify_message_ready(offset_, Derived::calculate_size());
-    
+
     // Message object can be destroyed - data lives in ring buffer
     // No pointer nulling needed - message is just a view
 }

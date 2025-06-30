@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "../webrtc_channel.hpp"
+#include "webrtc_channel.hpp"
 #include <atomic>
 #include <chrono>
 #include <deque>

@@ -1055,6 +1055,44 @@ create_channel(const std::string &uri, size_t buffer_size = 64 * 1024 * 1024,
                            compression_config);
 }
 
+/**
+ * @brief Create an IPC server (creates shared memory)
+ * @param name IPC channel name (without ipc:// prefix)
+ * @param buffer_size Buffer size (minimum 64MB)
+ * @param mode Channel mode (default: SPSC)
+ * @param type Channel type (default: MultiType)
+ * @return Unique pointer to the channel
+ * 
+ * @note Only the server creates the shared memory segment. 
+ *       Clients should use create_ipc_client() to attach.
+ */
+inline std::unique_ptr<Channel>
+create_ipc_server(const std::string &name, size_t buffer_size = 64 * 1024 * 1024,
+                  ChannelMode mode = ChannelMode::SPSC,
+                  ChannelType type = ChannelType::MultiType) {
+    if (buffer_size < 64 * 1024 * 1024) {
+        buffer_size = 64 * 1024 * 1024; // Enforce 64MB minimum
+    }
+    return Channel::create("ipc://" + name, buffer_size, mode, type, false, {});
+}
+
+/**
+ * @brief Create an IPC client (attaches to existing shared memory)
+ * @param name IPC channel name (without ipc:// prefix)  
+ * @param mode Channel mode (must match server)
+ * @param type Channel type (must match server)
+ * @return Unique pointer to the channel
+ * 
+ * @note Clients attach to shared memory created by the server.
+ *       The buffer size is determined by the server.
+ */
+inline std::unique_ptr<Channel>
+create_ipc_client(const std::string &name, ChannelMode mode = ChannelMode::SPSC,
+                  ChannelType type = ChannelType::MultiType) {
+    // Buffer size of 0 indicates client mode - attach to existing shared memory
+    return Channel::create("ipc://" + name, 0, mode, type, false, {});
+}
+
 // ============================================================================
 // Convenience Type Aliases
 // ============================================================================
@@ -2566,6 +2604,9 @@ void deallocate_tensor(void* ptr);
 } // namespace memory
 
 } // namespace psyne
+
+// Include logging utilities
+// #include "logging.hpp"  // TODO: Fix logging include path
 
 // Include SIMD operations implementation
 #include "../../src/simd/simd_ops.hpp"

@@ -3,7 +3,7 @@
  * @brief Simple compile test for WebRTC components
  */
 
-#include "../webrtc_channel.hpp"
+#include "webrtc_channel.hpp"
 #include "ice_agent.hpp"
 #include <iostream>
 

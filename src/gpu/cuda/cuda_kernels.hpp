@@ -24,7 +24,8 @@ namespace cuda {
  * @param size Number of elements
  * @param stream CUDA stream (optional, uses default stream if nullptr)
  */
-void launch_scale_float_kernel(float *device_data, float scalar, size_t size, cudaStream_t stream = nullptr);
+void launch_scale_float_kernel(float *device_data, float scalar, size_t size,
+                               cudaStream_t stream = nullptr);
 
 /**
  * @brief Launch CUDA kernel for scaling double vectors
@@ -33,7 +34,8 @@ void launch_scale_float_kernel(float *device_data, float scalar, size_t size, cu
  * @param size Number of elements
  * @param stream CUDA stream (optional, uses default stream if nullptr)
  */
-void launch_scale_double_kernel(double *device_data, double scalar, size_t size, cudaStream_t stream = nullptr);
+void launch_scale_double_kernel(double *device_data, double scalar, size_t size,
+                                cudaStream_t stream = nullptr);
 
 /**
  * @brief Launch CUDA kernel for adding float vectors
@@ -43,7 +45,8 @@ void launch_scale_double_kernel(double *device_data, double scalar, size_t size,
  * @param size Number of elements
  * @param stream CUDA stream (optional, uses default stream if nullptr)
  */
-void launch_add_float_kernel(float *result, const float *a, const float *b, size_t size, cudaStream_t stream = nullptr);
+void launch_add_float_kernel(float *result, const float *a, const float *b,
+                             size_t size, cudaStream_t stream = nullptr);
 
 /**
  * @brief Launch CUDA kernel for adding double vectors
@@ -53,7 +56,8 @@ void launch_add_float_kernel(float *result, const float *a, const float *b, size
  * @param size Number of elements
  * @param stream CUDA stream (optional, uses default stream if nullptr)
  */
-void launch_add_double_kernel(double *result, const double *a, const double *b, size_t size, cudaStream_t stream = nullptr);
+void launch_add_double_kernel(double *result, const double *a, const double *b,
+                              size_t size, cudaStream_t stream = nullptr);
 
 } // namespace cuda
 } // namespace gpu

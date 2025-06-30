@@ -1,6 +1,5 @@
 #pragma once
 
-#include "types.hpp"
 #include <chrono>
 #include <cstdint>
 #include <random>

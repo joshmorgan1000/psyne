@@ -7,6 +7,7 @@
 #include <psyne/psyne.hpp>
 #include <string>
 #include <vector>
+#include "../utils/logger.hpp"
 
 namespace psyne {
 namespace debug {

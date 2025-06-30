@@ -14,8 +14,8 @@
  * @license MIT License
  */
 
-#include "channel_impl.hpp"
-#include "../transport/quic.hpp"
+#include "../channel_impl.hpp"
+#include "../../transport/quic.hpp"
 #include <boost/asio.hpp>
 #include <memory>
 #include <thread>

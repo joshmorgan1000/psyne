@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstring>
 #include <psyne/psyne.hpp>
+#include "../utils/logger.hpp"
 
 namespace psyne {
 namespace compression {
@@ -12,21 +13,32 @@ SimpleCompressor::SimpleCompressor(CompressionType type) : type_(type) {}
 
 size_t SimpleCompressor::compress(const void *src, size_t src_size, void *dst,
                                   size_t dst_capacity) {
+    log_debug("Compressing data: type=", static_cast<int>(type_), ", src_size=", src_size, ", dst_capacity=", dst_capacity);
+    
     if (!src || !dst || src_size == 0 || dst_capacity == 0) {
+        log_warn("Invalid compression parameters: src=", src, ", dst=", dst, ", src_size=", src_size, ", dst_capacity=", dst_capacity);
         return 0;
     }
 
     switch (type_) {
     case CompressionType::None:
-        if (dst_capacity < src_size)
+        log_trace("No compression applied");
+        if (dst_capacity < src_size) {
+            log_warn("Insufficient destination capacity for uncompressed data");
             return 0;
+        }
         std::memcpy(dst, src, src_size);
         return src_size;
 
-    case CompressionType::LZ4:
+    case CompressionType::LZ4: {
+        log_trace("Applying RLE compression (LZ4 demo implementation)");
         // For demonstration, use simple RLE compression
-        return compress_rle(static_cast<const uint8_t *>(src), src_size,
+        auto result = compress_rle(static_cast<const uint8_t *>(src), src_size,
                             static_cast<uint8_t *>(dst), dst_capacity);
+        log_debug("RLE compression result: ", result, " bytes (ratio: ", 
+                 result > 0 ? (double)result/src_size : 0.0, ")");
+        return result;
+    }
 
     default:
         // Fallback to no compression
@@ -39,21 +51,31 @@ size_t SimpleCompressor::compress(const void *src, size_t src_size, void *dst,
 
 size_t SimpleCompressor::decompress(const void *src, size_t src_size, void *dst,
                                     size_t dst_capacity) {
+    log_debug("Decompressing data: type=", static_cast<int>(type_), ", src_size=", src_size, ", dst_capacity=", dst_capacity);
+    
     if (!src || !dst || src_size == 0 || dst_capacity == 0) {
+        log_warn("Invalid decompression parameters: src=", src, ", dst=", dst, ", src_size=", src_size, ", dst_capacity=", dst_capacity);
         return 0;
     }
 
     switch (type_) {
     case CompressionType::None:
-        if (dst_capacity < src_size)
+        log_trace("No decompression applied");
+        if (dst_capacity < src_size) {
+            log_warn("Insufficient destination capacity for uncompressed data");
             return 0;
+        }
         std::memcpy(dst, src, src_size);
         return src_size;
 
-    case CompressionType::LZ4:
+    case CompressionType::LZ4: {
+        log_trace("Applying RLE decompression (LZ4 demo implementation)");
         // For demonstration, use simple RLE decompression
-        return decompress_rle(static_cast<const uint8_t *>(src), src_size,
+        auto result = decompress_rle(static_cast<const uint8_t *>(src), src_size,
                               static_cast<uint8_t *>(dst), dst_capacity);
+        log_debug("RLE decompression result: ", result, " bytes");
+        return result;
+    }
 
     default:
         // Fallback to no compression
@@ -172,7 +194,14 @@ bool CompressionManager::should_compress(size_t data_size) const {
 size_t
 CompressionManager::compress_message(const void *src, size_t src_size,
                                      std::vector<uint8_t> &compressed_buffer) {
+    log_debug("Compression manager compress: src_size=", src_size, ", should_compress=", should_compress(src_size));
+    
     if (!should_compress(src_size) || !compressor_) {
+        if (!should_compress(src_size)) {
+            log_trace("Skipping compression: size ", src_size, " below threshold ", config_.min_size_threshold);
+        } else {
+            log_warn("No compressor available");
+        }
         return 0;
     }
 
@@ -184,8 +213,11 @@ CompressionManager::compress_message(const void *src, size_t src_size,
 
     if (compressed_size == 0 || compressed_size >= src_size) {
         // Compression failed or not beneficial
+        log_debug("Compression not beneficial: compressed_size=", compressed_size, " >= src_size=", src_size);
         return 0;
     }
+    
+    log_info("Message compressed successfully: ", src_size, " -> ", compressed_size, " bytes (ratio: ", (double)compressed_size/src_size, ")");
 
     compressed_buffer.resize(compressed_size);
     return compressed_size;
@@ -193,7 +225,10 @@ CompressionManager::compress_message(const void *src, size_t src_size,
 
 size_t CompressionManager::decompress_message(const void *src, size_t src_size,
                                               void *dst, size_t dst_capacity) {
+    log_debug("Compression manager decompress: src_size=", src_size, ", dst_capacity=", dst_capacity);
+    
     if (!compressor_) {
+        log_warn("No compressor available for decompression");
         return 0;
     }
 
@@ -201,7 +236,10 @@ size_t CompressionManager::decompress_message(const void *src, size_t src_size,
 }
 
 void CompressionManager::set_config(const CompressionConfig &config) {
+    log_info("Setting compression config: type=", static_cast<int>(config.type), ", min_threshold=", config.min_size_threshold);
+    
     if (config.type != config_.type) {
+        log_debug("Compression type changed from ", static_cast<int>(config_.type), " to ", static_cast<int>(config.type), ", recreating compressor");
         config_ = config;
         create_compressor();
     } else {
@@ -210,11 +248,18 @@ void CompressionManager::set_config(const CompressionConfig &config) {
 }
 
 void CompressionManager::create_compressor() {
+    log_debug("Creating compressor for type: ", static_cast<int>(config_.type));
     compressor_ = ::psyne::compression::create_compressor(config_.type);
+    if (compressor_) {
+        log_info("Compressor created successfully");
+    } else {
+        log_error("Failed to create compressor");
+    }
 }
 
 // Factory function
 std::unique_ptr<Compressor> create_compressor(CompressionType type) {
+    log_debug("Factory creating compressor for type: ", static_cast<int>(type));
     return std::make_unique<SimpleCompressor>(type);
 }
 

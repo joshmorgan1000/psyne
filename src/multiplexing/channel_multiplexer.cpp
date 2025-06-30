@@ -5,11 +5,18 @@
 namespace psyne {
 namespace multiplexing {
 
-// Multiplexed message format
+// Multiplexed message format - zero-copy friendly
 struct ChannelMultiplexer::MultiplexedMessage {
     uint8_t channel_id;
     uint32_t type;
-    std::vector<uint8_t> data;
+    std::shared_ptr<const std::vector<uint8_t>>
+        data; // Shared ownership, no copy
+    size_t data_size;
+
+    MultiplexedMessage(uint8_t id, uint32_t msg_type,
+                       std::shared_ptr<const std::vector<uint8_t>> msg_data)
+        : channel_id(id), type(msg_type), data(msg_data),
+          data_size(msg_data ? msg_data->size() : 0) {}
 };
 
 // Logical channel implementation
@@ -146,22 +153,34 @@ void ChannelMultiplexer::SendLoop() {
             send_queue_.pop();
             lock.unlock();
 
-            // Create multiplexed message format:
-            // [1 byte channel_id][4 bytes type][4 bytes size][data...]
-            ByteVector mux_msg(*physical_channel_);
-            size_t total_size = 1 + 4 + 4 + msg.data.size();
-            mux_msg.resize(total_size);
+            // Zero-copy approach: Send header and data separately
+            const size_t header_size = 1 + 4 + 4; // channel_id + type + size
+            ByteVector header(*physical_channel_);
+            header.resize(header_size);
 
-            uint8_t *ptr = mux_msg.data();
+            uint8_t *ptr = header.data();
             *ptr++ = msg.channel_id;
             *reinterpret_cast<uint32_t *>(ptr) = msg.type;
             ptr += 4;
             *reinterpret_cast<uint32_t *>(ptr) =
-                static_cast<uint32_t>(msg.data.size());
-            ptr += 4;
-            std::memcpy(ptr, msg.data.data(), msg.data.size());
+                static_cast<uint32_t>(msg.data_size);
 
-            physical_channel_->send(mux_msg);
+            // Send header
+            physical_channel_->send(header);
+
+            // Send data without copying using shared pointer
+            if (msg.data && !msg.data->empty()) {
+                // TODO: Implement true zero-copy by using physical channel's
+                // native support for scatter-gather I/O or memory mapping
+                // For now, create a minimal wrapper that could be optimized
+                ByteVector data_msg(*physical_channel_);
+                data_msg.resize(msg.data->size());
+                // This is still a copy - need to enhance ByteVector to support
+                // shared data ownership for true zero-copy
+                std::memcpy(data_msg.data(), msg.data->data(),
+                            msg.data->size());
+                physical_channel_->send(data_msg);
+            }
 
             // Update stats
             {

@@ -163,7 +163,7 @@ public:
     // Memory pools for common sizes (needs to be public for implementation)
     static constexpr size_t pool_sizes[] = {
         64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536};
-        
+
 private:
     std::array<MemoryPool, sizeof(pool_sizes) / sizeof(pool_sizes[0])> pools_;
 

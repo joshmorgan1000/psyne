@@ -15,13 +15,13 @@
 
 #pragma once
 
+#include "../channel/channel_impl.hpp"
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <memory>
 #include <mutex>
-#include "../channel/channel_impl.hpp"
 #include <queue>
 #include <string>
 #include <thread>
@@ -220,7 +220,7 @@ public:
     QUICConnectionState state() const {
         return state_;
     }
-    
+
     // Allow QUICServer to set connection state (friend access)
     void set_state(QUICConnectionState new_state) {
         state_ = new_state;
@@ -362,11 +362,12 @@ class QUICClient {
 public:
     QUICClient(const QUICConfig &config = {});
     ~QUICClient();
-    
+
     /**
      * @brief Connect to a QUIC server
      */
-    std::shared_ptr<QUICConnection> connect(const std::string &host, uint16_t port);
+    std::shared_ptr<QUICConnection> connect(const std::string &host,
+                                            uint16_t port);
 
 private:
     class Impl;

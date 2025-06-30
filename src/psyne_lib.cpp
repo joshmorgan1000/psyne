@@ -76,39 +76,44 @@ private:
 std::string get_performance_summary() {
     // Basic performance summary with runtime information
     std::ostringstream summary;
-    
+
     summary << "=== Psyne Performance Summary ===\n";
     summary << "Version: " << version() << "\n";
     summary << "Build Configuration:\n";
-    
-    // Check compile-time features
-    #ifdef PSYNE_CUDA_SUPPORT
+
+// Check compile-time features
+#ifdef PSYNE_CUDA_SUPPORT
     summary << "  - CUDA support: ENABLED\n";
-    #else
+#else
     summary << "  - CUDA support: DISABLED\n";
-    #endif
-    
-    #ifdef PSYNE_ASYNC_SUPPORT
+#endif
+
+#ifdef PSYNE_ASYNC_SUPPORT
     summary << "  - Async support: ENABLED\n";
-    #else
+#else
     summary << "  - Async support: DISABLED\n";
-    #endif
-    
-    #ifdef NDEBUG
+#endif
+
+#ifdef NDEBUG
     summary << "  - Build type: RELEASE\n";
-    #else
+#else
     summary << "  - Build type: DEBUG\n";
-    #endif
-    
+#endif
+
     // System information
     summary << "System Information:\n";
-    summary << "  - Hardware concurrency: " << std::thread::hardware_concurrency() << " threads\n";
-    
+    summary << "  - Hardware concurrency: "
+            << std::thread::hardware_concurrency() << " threads\n";
+
     // Memory alignment for zero-copy operations
     summary << "Memory Configuration:\n";
-    summary << "  - Cache line size: " << std::hardware_destructive_interference_size << " bytes\n";
-    summary << "  - Zero-copy aligned: " << (std::hardware_destructive_interference_size >= 64 ? "YES" : "NO") << "\n";
-    
+    summary << "  - Cache line size: "
+            << std::hardware_destructive_interference_size << " bytes\n";
+    summary << "  - Zero-copy aligned: "
+            << (std::hardware_destructive_interference_size >= 64 ? "YES"
+                                                                  : "NO")
+            << "\n";
+
     // Transport availability
     summary << "Transport Support:\n";
     summary << "  - Memory channels: AVAILABLE\n";
@@ -118,9 +123,9 @@ std::string get_performance_summary() {
     summary << "  - WebRTC: AVAILABLE\n";
     summary << "  - QUIC: AVAILABLE\n";
     summary << "  - WebSocket: AVAILABLE\n";
-    
+
     summary << "\nFor detailed benchmarks, run psyne performance tests.";
-    
+
     return summary.str();
 }
 

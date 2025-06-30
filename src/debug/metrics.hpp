@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include "../utils/logger.hpp"
 
 namespace psyne {
 namespace debug {
@@ -50,6 +51,7 @@ struct AtomicChannelMetrics {
      * @brief Get current metrics as non-atomic struct for calculations
      */
     ChannelMetrics current() const {
+        log_trace("Collecting current channel metrics");
         ChannelMetrics result;
         result.messages_sent = messages_sent.load(std::memory_order_relaxed);
         result.bytes_sent = bytes_sent.load(std::memory_order_relaxed);
@@ -58,7 +60,45 @@ struct AtomicChannelMetrics {
         result.bytes_received = bytes_received.load(std::memory_order_relaxed);
         result.send_blocks = send_blocks.load(std::memory_order_relaxed);
         result.receive_blocks = receive_blocks.load(std::memory_order_relaxed);
+        
+        log_debug("Metrics collected - sent: ", result.messages_sent, " msgs (", result.bytes_sent, " bytes), ",
+                 "received: ", result.messages_received, " msgs (", result.bytes_received, " bytes), ",
+                 "blocks: ", result.send_blocks, "/", result.receive_blocks);
         return result;
+    }
+    
+    /**
+     * @brief Update send metrics with logging
+     */
+    void record_send(uint64_t message_size) {
+        messages_sent.fetch_add(1, std::memory_order_relaxed);
+        bytes_sent.fetch_add(message_size, std::memory_order_relaxed);
+        log_trace("Recorded send: size=", message_size, ", total_msgs=", messages_sent.load(), ", total_bytes=", bytes_sent.load());
+    }
+    
+    /**
+     * @brief Update receive metrics with logging
+     */
+    void record_receive(uint64_t message_size) {
+        messages_received.fetch_add(1, std::memory_order_relaxed);
+        bytes_received.fetch_add(message_size, std::memory_order_relaxed);
+        log_trace("Recorded receive: size=", message_size, ", total_msgs=", messages_received.load(), ", total_bytes=", bytes_received.load());
+    }
+    
+    /**
+     * @brief Record a send block event
+     */
+    void record_send_block() {
+        auto count = send_blocks.fetch_add(1, std::memory_order_relaxed) + 1;
+        log_warn("Send blocked (buffer full) - total send blocks: ", count);
+    }
+    
+    /**
+     * @brief Record a receive block event
+     */
+    void record_receive_block() {
+        auto count = receive_blocks.fetch_add(1, std::memory_order_relaxed) + 1;
+        log_debug("Receive blocked (no data) - total receive blocks: ", count);
     }
 };
 

@@ -7,6 +7,7 @@
  */
 
 #include "simd_ops.hpp"
+#include "../utils/logger.hpp"
 #include <cstring>
 
 #ifdef __x86_64__
@@ -17,31 +18,39 @@ namespace psyne {
 namespace simd {
 
 SIMDCapabilities SIMDCapabilities::detect() {
+    log_info("Detecting SIMD capabilities");
     SIMDCapabilities caps;
 
 #ifdef __x86_64__
+    log_debug("Detecting x86_64 SIMD features");
     unsigned int eax, ebx, ecx, edx;
 
     // Check for SSE2
     if (__get_cpuid(1, &eax, &ebx, &ecx, &edx)) {
         caps.has_sse2 = (edx & (1 << 26)) != 0;
+        log_debug("SSE2 support: ", caps.has_sse2 ? "yes" : "no");
 
         // Check for AVX
         caps.has_avx = (ecx & (1 << 28)) != 0;
+        log_debug("AVX support: ", caps.has_avx ? "yes" : "no");
     }
 
     // Check for AVX2
     if (__get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx)) {
         caps.has_avx2 = (ebx & (1 << 5)) != 0;
         caps.has_avx512f = (ebx & (1 << 16)) != 0;
+        log_debug("AVX2 support: ", caps.has_avx2 ? "yes" : "no");
+        log_debug("AVX512F support: ", caps.has_avx512f ? "yes" : "no");
     }
 #elif defined(__aarch64__) || defined(__arm__)
+    log_debug("ARM/AArch64 platform detected");
     caps.has_neon = true; // NEON is mandatory on AArch64
+    log_debug("NEON support: yes (mandatory on AArch64)");
 #endif
 
+    log_info("SIMD capabilities detection completed");
     return caps;
 }
-
 
 // Template instantiations for TensorOps
 // multiply with different signature is now element-wise multiply in the header
@@ -175,7 +184,8 @@ void TensorOps<float>::matmul(const float *a, const float *b, float *c,
 }
 */
 
-// transpose_layout() implementation - commented out as it's not declared in header
+// transpose_layout() implementation - commented out as it's not declared in
+// header
 /*
 template <>
 void TensorOps<float>::transpose_layout(const float *src, float *dst, size_t n,
@@ -242,9 +252,9 @@ size_t SIMDCompression::compress_rle(const uint8_t *src, size_t src_size,
 }
 
 #ifdef __x86_64__
-  #ifdef __GNUC__
-    __attribute__((target("avx2,fma,avx512f")))
-  #endif
+#ifdef __GNUC__
+__attribute__((target("avx2,fma,avx512f")))
+#endif
 #endif
 void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
     if (count == 0)
@@ -255,7 +265,7 @@ void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
 #ifdef __x86_64__
     static SIMDCapabilities caps = SIMDCapabilities::detect();
     size_t i = 1;
-    
+
 #ifdef __AVX512F__
     if (caps.has_avx512f) {
         // Use AVX-512 if both compile-time and runtime support available
@@ -268,7 +278,7 @@ void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
         }
     } else
 #endif
-    if (caps.has_avx2) {
+        if (caps.has_avx2) {
         // Fallback to AVX2
         const size_t simd_width = 8;
         for (; i + simd_width <= count; i += simd_width) {
@@ -292,16 +302,16 @@ void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
 }
 
 #ifdef __x86_64__
-  #ifdef __GNUC__
-    __attribute__((target("avx2,fma,avx512f")))
-  #endif
+#ifdef __GNUC__
+__attribute__((target("avx2,fma,avx512f")))
+#endif
 #endif
 void SIMDCompression::quantize_int8(const float *src, int8_t *dst, size_t count,
                                     float scale) {
 #ifdef __x86_64__
     static SIMDCapabilities caps = SIMDCapabilities::detect();
     size_t i = 0;
-    
+
 #ifdef __AVX512F__
     if (caps.has_avx512f) {
         // Use AVX-512 if both compile-time and runtime support available
@@ -326,7 +336,7 @@ void SIMDCompression::quantize_int8(const float *src, int8_t *dst, size_t count,
         }
     } else
 #endif
-    if (caps.has_avx2) {
+        if (caps.has_avx2) {
         // Fallback to AVX2
         const size_t simd_width = 8;
         __m256 vscale = _mm256_set1_ps(scale);
@@ -363,11 +373,12 @@ void SIMDCompression::quantize_int8(const float *src, int8_t *dst, size_t count,
 
 // Checksum implementations
 #ifdef __x86_64__
-  #ifdef __GNUC__
-    __attribute__((target("crc32")))
-  #endif
+#ifdef __GNUC__
+__attribute__((target("crc32")))
 #endif
-uint32_t SIMDChecksum::crc32(const uint8_t *data, size_t size) {
+#endif
+uint32_t
+SIMDChecksum::crc32(const uint8_t *data, size_t size) {
     uint32_t crc = 0xFFFFFFFF;
 
 #ifdef __x86_64__

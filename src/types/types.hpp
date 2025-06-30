@@ -32,15 +32,5 @@ using SparseMatrix = SparseMatrixF;
 using QInt8 = Int8Vector;
 using QUInt8 = UInt8Vector;
 
-// Internal logging levels (prefixed to avoid conflict with public API)
-enum class InternalLogLevel : uint8_t {
-    TRACE = 0,
-    DEBUG = 1,
-    INFO = 2,
-    WARN = 3,
-    ERROR = 4,
-    CRITICAL = 5
-};
-
 } // namespace types
 } // namespace psyne

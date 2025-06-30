@@ -106,9 +106,10 @@ void MetalBuffer::upload(const void *data, size_t size, size_t offset) {
         throw std::runtime_error("Failed to map buffer for upload");
     }
 
-    // On Apple Silicon unified memory, this is zero-copy - CPU and GPU share same memory
-    // NOTE: For true zero-copy, callers should use map() to get direct pointer access
-    // and avoid this upload() method entirely when working with unified memory
+    // On Apple Silicon unified memory, this is zero-copy - CPU and GPU share
+    // same memory NOTE: For true zero-copy, callers should use map() to get
+    // direct pointer access and avoid this upload() method entirely when
+    // working with unified memory
     std::memcpy(static_cast<uint8_t *>(dst) + offset, data, size);
     unmap();
     flush();
@@ -124,8 +125,8 @@ void MetalBuffer::download(void *data, size_t size, size_t offset) {
         throw std::runtime_error("Failed to map buffer for download");
     }
 
-    // On unified memory, this could be avoided with direct pointer access patterns
-    // For now, keeping the copy for API compatibility
+    // On unified memory, this could be avoided with direct pointer access
+    // patterns For now, keeping the copy for API compatibility
     std::memcpy(data, static_cast<uint8_t *>(src) + offset, size);
     unmap();
 }
