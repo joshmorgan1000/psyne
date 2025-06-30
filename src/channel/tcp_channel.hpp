@@ -45,9 +45,13 @@ public:
     // Zero-copy interface
     uint32_t reserve_write_slot(size_t size) noexcept override;
     void notify_message_ready(uint32_t offset, size_t size) noexcept override;
-    std::span<uint8_t> get_write_span(size_t size) noexcept override;
-    std::span<const uint8_t> buffer_span() const noexcept override;
+    RingBuffer& get_ring_buffer() noexcept override;
+    const RingBuffer& get_ring_buffer() const noexcept override;
     void advance_read_pointer(size_t size) noexcept override;
+    
+    // TCP-specific zero-copy methods
+    std::span<uint8_t> get_write_span(size_t size) noexcept;
+    std::span<const uint8_t> buffer_span() const noexcept;
 
 private:
     /**
@@ -117,6 +121,9 @@ private:
 
     // Helper to calculate checksum
     uint64_t calculate_checksum(const uint8_t *data, size_t size);
+    
+    // Get or create ring buffer for TCP operations
+    mutable std::unique_ptr<RingBuffer> dummy_ring_buffer_;
 };
 
 // Factory function to create TCP channels from URI

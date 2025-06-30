@@ -499,8 +499,8 @@ Channel::create(const std::string &uri, size_t buffer_size, ChannelMode mode,
     if (protocol == "ipc") {
         return std::make_unique<IPCChannel>(uri, buffer_size, type);
     } else if (protocol == "tcp") {
-        return detail::create_tcp_channel(uri, buffer_size, mode, type,
-                                          compression_config);
+        // TCP channel stub - not implemented in minimal build
+        throw std::runtime_error("TCP channels require full psyne library, not available in minimal build");
     } else if (protocol == "webrtc") {
         // Create WebRTC channel with default configuration
         detail::WebRTCConfig webrtc_config;

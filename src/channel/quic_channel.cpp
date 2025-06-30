@@ -4,7 +4,26 @@
 #include <stdexcept>
 
 namespace psyne {
+
+// Define RingBuffer interface inline since it's not included
+class RingBuffer {
+public:
+    virtual ~RingBuffer() = default;
+    virtual uint8_t* base_ptr() = 0;
+    virtual const uint8_t* base_ptr() const = 0;
+    virtual uint32_t reserve_slot(size_t size) = 0;
+    virtual void advance_write_pointer(size_t new_write_pos) = 0;
+    virtual void advance_read_pointer(size_t size) = 0;
+    virtual size_t write_position() const = 0;
+    virtual size_t read_position() const = 0;
+    virtual bool has_space(size_t size) const = 0;
+    virtual size_t capacity() const = 0;
+};
+
 namespace detail {
+
+// QUIC doesn't actually use ring buffers - we'll work around this
+// by using direct message queues instead
 
 QUICChannel::QUICChannel(const std::string& uri, size_t buffer_size,
                          ChannelMode mode, ChannelType type, bool is_server)
@@ -75,16 +94,24 @@ void QUICChannel::notify_message_ready(uint32_t offset, size_t size) noexcept {
 
 RingBuffer& QUICChannel::get_ring_buffer() noexcept {
     // QUIC uses message queues instead of ring buffers
-    // Return a dummy ring buffer that delegates to queue operations
-    static RingBuffer dummy_ring_buffer;
-    return dummy_ring_buffer;
+    // This is a violation of the zero-copy design, but necessary for network channels
+    static struct : RingBuffer {
+        uint8_t* base_ptr() override { return nullptr; }
+        const uint8_t* base_ptr() const override { return nullptr; }
+        uint32_t reserve_slot(size_t) override { return 0xFFFFFFFF; }
+        void advance_write_pointer(size_t) override {}
+        void advance_read_pointer(size_t) override {}
+        size_t write_position() const override { return 0; }
+        size_t read_position() const override { return 0; }
+        bool has_space(size_t) const override { return false; }
+        size_t capacity() const override { return 0; }
+    } dummy;
+    return dummy;
 }
 
 const RingBuffer& QUICChannel::get_ring_buffer() const noexcept {
     // QUIC uses message queues instead of ring buffers
-    // Return a dummy ring buffer that delegates to queue operations
-    static const RingBuffer dummy_ring_buffer;
-    return dummy_ring_buffer;
+    return const_cast<QUICChannel*>(this)->get_ring_buffer();
 }
 
 void QUICChannel::advance_read_pointer(size_t size) noexcept {

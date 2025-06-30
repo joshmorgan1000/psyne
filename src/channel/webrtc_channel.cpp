@@ -728,5 +728,11 @@ std::unique_ptr<WebRTCChannel> create_webrtc_channel(
                                            compression_config);
 }
 
+// Implement const version of get_ring_buffer
+const RingBuffer& detail::WebRTCChannel::get_ring_buffer() const {
+    // WebRTC uses message queues, return the same mutable ring buffer
+    return const_cast<WebRTCChannel*>(this)->get_ring_buffer();
+}
+
 } // namespace detail
 } // namespace psyne

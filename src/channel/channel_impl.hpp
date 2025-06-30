@@ -27,6 +27,7 @@ public:
     virtual uint32_t reserve_write_slot(size_t size) = 0;
     virtual void notify_message_ready(uint32_t offset, size_t size) = 0;
     virtual RingBuffer& get_ring_buffer() = 0;
+    virtual const RingBuffer& get_ring_buffer() const = 0;
     virtual void advance_read_pointer(size_t size) = 0;
     
     // Legacy operations - DEPRECATED (violate zero-copy principles)

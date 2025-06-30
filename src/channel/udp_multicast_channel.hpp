@@ -80,7 +80,7 @@ public:
     std::span<const uint8_t> buffer_span() const noexcept;
     void advance_read_pointer(size_t size) noexcept override;
     RingBuffer& get_ring_buffer() override;
-    const RingBuffer& get_ring_buffer() const;
+    const RingBuffer& get_ring_buffer() const override;
     
     // Legacy interface (deprecated)
     [[deprecated("Use reserve_write_slot() instead")]]

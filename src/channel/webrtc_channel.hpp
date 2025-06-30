@@ -263,6 +263,7 @@ public:
     uint32_t reserve_write_slot(size_t size) override;
     void notify_message_ready(uint32_t offset, size_t size) override;
     RingBuffer& get_ring_buffer() override;
+    const RingBuffer& get_ring_buffer() const override;
     void advance_read_pointer(size_t size) override;
     std::span<uint8_t> get_write_span(size_t size) noexcept;
 

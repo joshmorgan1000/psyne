@@ -5,7 +5,46 @@
 #include <regex>
 
 namespace psyne {
+
+// Define RingBuffer interface inline since it's not included
+class RingBuffer {
+public:
+    virtual ~RingBuffer() = default;
+    virtual uint8_t* base_ptr() = 0;
+    virtual const uint8_t* base_ptr() const = 0;
+    virtual uint32_t reserve_slot(size_t size) = 0;
+    virtual void advance_write_pointer(size_t new_write_pos) = 0;
+    virtual void advance_read_pointer(size_t size) = 0;
+    virtual size_t write_position() const = 0;
+    virtual size_t read_position() const = 0;
+    virtual bool has_space(size_t size) const = 0;
+    virtual size_t capacity() const = 0;
+    static constexpr uint32_t BUFFER_FULL = 0xFFFFFFFF;
+};
+
 namespace detail {
+
+// Minimal RingBuffer stub for TCP (which uses its own message queues)
+class TCPDummyRingBuffer : public RingBuffer {
+public:
+    explicit TCPDummyRingBuffer(size_t) {}
+    
+    uint8_t* base_ptr() override { return nullptr; }
+    const uint8_t* base_ptr() const override { return nullptr; }
+    uint32_t reserve_slot(size_t) override { return BUFFER_FULL; }
+    void advance_write_pointer(size_t) override {}
+    void advance_read_pointer(size_t) override {}
+    size_t write_position() const override { return 0; }
+    size_t read_position() const override { return 0; }
+    bool has_space(size_t) const override { return false; }
+    size_t capacity() const override { return 0; }
+    
+    // Additional methods for TCP compatibility
+    uint32_t reserve_write_space(size_t) { return BUFFER_FULL; }
+    std::span<const uint8_t> get_read_span(uint32_t, size_t) const { return {}; }
+    std::span<uint8_t> get_write_span(uint32_t, size_t) { return {}; }
+    std::span<const uint8_t> available_read_span() const { return {}; }
+};
 
 // Server constructor
 TCPChannel::TCPChannel(const std::string &uri, size_t buffer_size,
@@ -338,6 +377,24 @@ void TCPChannel::run_io_service() {
 
 uint64_t TCPChannel::calculate_checksum(const uint8_t *data, size_t size) {
     return utils::tcp::calculate_checksum(data, size);
+}
+
+RingBuffer& TCPChannel::get_ring_buffer() noexcept {
+    // TCP uses its own message queues instead of ring buffers
+    // Return a dummy ring buffer to satisfy the interface
+    if (!dummy_ring_buffer_) {
+        dummy_ring_buffer_ = std::make_unique<TCPDummyRingBuffer>(1024);
+    }
+    return *dummy_ring_buffer_;
+}
+
+const RingBuffer& TCPChannel::get_ring_buffer() const noexcept {
+    // TCP uses its own message queues instead of ring buffers
+    // Return a dummy ring buffer to satisfy the interface
+    if (!dummy_ring_buffer_) {
+        dummy_ring_buffer_ = std::make_unique<TCPDummyRingBuffer>(1024);
+    }
+    return *dummy_ring_buffer_;
 }
 
 // Factory function to create TCP channels from URI
