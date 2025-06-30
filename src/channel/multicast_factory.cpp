@@ -32,6 +32,27 @@ public:
         return impl_->mode();
     }
 
+    // Zero-copy interface forwarding
+    uint32_t reserve_write_slot(size_t size) noexcept override {
+        return impl_->reserve_write_slot(size);
+    }
+
+    void notify_message_ready(uint32_t offset, size_t size) noexcept override {
+        impl_->notify_message_ready(offset, size);
+    }
+
+    RingBuffer& get_ring_buffer() noexcept override {
+        return impl_->get_ring_buffer();
+    }
+
+    const RingBuffer& get_ring_buffer() const noexcept override {
+        return impl_->get_ring_buffer();
+    }
+
+    void advance_read_pointer(size_t size) noexcept override {
+        impl_->advance_read_pointer(size);
+    }
+
     void *receive_raw_message(size_t &size, uint32_t &type) override {
         return impl_->receive_message(size, type);
     }

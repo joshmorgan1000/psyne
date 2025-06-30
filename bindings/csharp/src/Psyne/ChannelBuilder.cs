@@ -227,6 +227,17 @@ namespace Psyne
         }
 
         /// <summary>
+        /// Creates a WebRTC channel for peer-to-peer communication.
+        /// </summary>
+        /// <param name="peerId">The target peer identifier.</param>
+        /// <param name="signalingServerUri">The WebSocket signaling server URI (default: ws://localhost:8080).</param>
+        /// <returns>This builder instance for method chaining.</returns>
+        public ChannelBuilder WebRtc(string peerId, string signalingServerUri = "ws://localhost:8080")
+        {
+            return WithUri($"webrtc://{peerId}?signaling={signalingServerUri}");
+        }
+
+        /// <summary>
         /// Creates the channel with the configured settings.
         /// </summary>
         /// <returns>A new channel instance.</returns>

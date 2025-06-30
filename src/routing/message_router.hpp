@@ -332,6 +332,27 @@ public:
         inner_->reset_metrics();
     }
 
+    // Zero-copy interface forwarding
+    uint32_t reserve_write_slot(size_t size) noexcept override {
+        return inner_->reserve_write_slot(size);
+    }
+
+    void notify_message_ready(uint32_t offset, size_t size) noexcept override {
+        inner_->notify_message_ready(offset, size);
+    }
+
+    RingBuffer& get_ring_buffer() noexcept override {
+        return inner_->get_ring_buffer();
+    }
+
+    const RingBuffer& get_ring_buffer() const noexcept override {
+        return inner_->get_ring_buffer();
+    }
+
+    void advance_read_pointer(size_t size) noexcept override {
+        inner_->advance_read_pointer(size);
+    }
+
 protected:
     detail::ChannelImpl *impl() override {
         return inner_->get_impl();

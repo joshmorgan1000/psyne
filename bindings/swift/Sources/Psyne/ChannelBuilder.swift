@@ -90,6 +90,30 @@ public final class ChannelBuilder {
         return self
     }
     
+    // ===================================================================
+    // v1.3.0 Transport Methods
+    // ===================================================================
+    
+    /// Set the channel to use UDP multicast transport
+    /// - Parameters:
+    ///   - multicastAddress: The multicast group address (e.g., "239.255.0.1")
+    ///   - port: The port number
+    /// - Returns: Self for chaining
+    public func multicast(multicastAddress: String, port: Int) -> ChannelBuilder {
+        self.uri = "udp://\(multicastAddress):\(port)"
+        return self
+    }
+    
+    /// Set the channel to use WebRTC transport for peer-to-peer communication
+    /// - Parameters:
+    ///   - peerId: The target peer identifier
+    ///   - signalingServerUri: The WebSocket signaling server URI (default: ws://localhost:8080)
+    /// - Returns: Self for chaining
+    public func webrtc(peerId: String, signalingServerUri: String = "ws://localhost:8080") -> ChannelBuilder {
+        self.uri = "webrtc://\(peerId)?signaling=\(signalingServerUri)"
+        return self
+    }
+    
     /// Set a custom URI for the channel
     /// - Parameter uri: The custom URI
     /// - Returns: Self for chaining

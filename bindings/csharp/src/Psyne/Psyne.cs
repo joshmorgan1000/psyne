@@ -110,6 +110,51 @@ namespace Psyne
         }
 
         /// <summary>
+        /// Creates a UDP multicast publisher channel.
+        /// </summary>
+        /// <param name="multicastAddress">The multicast group address (e.g., "239.255.0.1").</param>
+        /// <param name="port">The port number.</param>
+        /// <param name="bufferSize">The buffer size in bytes (default: 1MB).</param>
+        /// <returns>A new Channel instance configured for multicast publishing.</returns>
+        public static Channel CreateMulticastPublisher(string multicastAddress, int port, long bufferSize = 1024 * 1024)
+        {
+            return CreateChannel()
+                .UdpMulticast(multicastAddress, port)
+                .WithBufferSize(bufferSize)
+                .Build();
+        }
+
+        /// <summary>
+        /// Creates a UDP multicast subscriber channel.
+        /// </summary>
+        /// <param name="multicastAddress">The multicast group address (e.g., "239.255.0.1").</param>
+        /// <param name="port">The port number.</param>
+        /// <param name="bufferSize">The buffer size in bytes (default: 1MB).</param>
+        /// <returns>A new Channel instance configured for multicast subscription.</returns>
+        public static Channel CreateMulticastSubscriber(string multicastAddress, int port, long bufferSize = 1024 * 1024)
+        {
+            return CreateChannel()
+                .UdpMulticast(multicastAddress, port)
+                .WithBufferSize(bufferSize)
+                .Build();
+        }
+
+        /// <summary>
+        /// Creates a WebRTC channel for peer-to-peer communication.
+        /// </summary>
+        /// <param name="peerId">The target peer identifier.</param>
+        /// <param name="bufferSize">The buffer size in bytes (default: 1MB).</param>
+        /// <param name="signalingServerUri">The WebSocket signaling server URI (default: ws://localhost:8080).</param>
+        /// <returns>A new Channel instance configured for WebRTC communication.</returns>
+        public static Channel CreateWebRtcChannel(string peerId, long bufferSize = 1024 * 1024, string signalingServerUri = "ws://localhost:8080")
+        {
+            return CreateChannel()
+                .WebRtc(peerId, signalingServerUri)
+                .WithBufferSize(bufferSize)
+                .Build();
+        }
+
+        /// <summary>
         /// Gets the description for an error code.
         /// </summary>
         /// <param name="errorCode">The error code.</param>

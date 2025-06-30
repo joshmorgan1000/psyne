@@ -270,6 +270,67 @@ namespace Psyne
         }
 
         /// <summary>
+        /// Reserves space in the ring buffer and returns the offset (zero-copy API).
+        /// </summary>
+        /// <param name="size">Size of message to reserve.</param>
+        /// <returns>Offset within ring buffer, or uint.MaxValue if buffer is full.</returns>
+        public uint ReserveWriteSlot(int size)
+        {
+            if (size < 0)
+                throw new ArgumentOutOfRangeException(nameof(size), "Size cannot be negative");
+
+            ThrowIfDisposed();
+            var result = PsyneNative.psyne_channel_reserve_write_slot(_handle, (UIntPtr)size, out var offset);
+            PsyneException.ThrowIfError(result);
+            return offset;
+        }
+
+        /// <summary>
+        /// Notifies the receiver that a message is ready at the specified offset (zero-copy API).
+        /// </summary>
+        /// <param name="offset">Offset within ring buffer where message data starts.</param>
+        /// <param name="size">Size of the message.</param>
+        public void NotifyMessageReady(uint offset, int size)
+        {
+            if (size < 0)
+                throw new ArgumentOutOfRangeException(nameof(size), "Size cannot be negative");
+
+            ThrowIfDisposed();
+            var result = PsyneNative.psyne_channel_notify_message_ready(_handle, offset, (UIntPtr)size);
+            PsyneException.ThrowIfError(result);
+        }
+
+        /// <summary>
+        /// Consumer advances read pointer after processing a message (zero-copy API).
+        /// </summary>
+        /// <param name="size">Size of message that was consumed.</param>
+        public void AdvanceReadPointer(int size)
+        {
+            if (size < 0)
+                throw new ArgumentOutOfRangeException(nameof(size), "Size cannot be negative");
+
+            ThrowIfDisposed();
+            var result = PsyneNative.psyne_channel_advance_read_pointer(_handle, (UIntPtr)size);
+            PsyneException.ThrowIfError(result);
+        }
+
+        /// <summary>
+        /// Gets a span over the entire ring buffer for zero-copy access.
+        /// </summary>
+        /// <returns>A span over the ring buffer, or empty span if not available.</returns>
+        public unsafe Span<byte> GetBufferSpan()
+        {
+            ThrowIfDisposed();
+            var result = PsyneNative.psyne_channel_get_buffer_span(_handle, out var ptr, out var size);
+            PsyneException.ThrowIfError(result);
+            
+            if (ptr == IntPtr.Zero || size == UIntPtr.Zero)
+                return Span<byte>.Empty;
+                
+            return new Span<byte>(ptr.ToPointer(), (int)size);
+        }
+
+        /// <summary>
         /// Sets a callback to be invoked when messages are received.
         /// </summary>
         /// <param name="callback">The callback to invoke, or null to disable.</param>

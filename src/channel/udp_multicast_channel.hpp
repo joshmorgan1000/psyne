@@ -76,9 +76,11 @@ public:
     // Zero-copy interface
     uint32_t reserve_write_slot(size_t size) noexcept override;
     void notify_message_ready(uint32_t offset, size_t size) noexcept override;
-    std::span<uint8_t> get_write_span(size_t size) noexcept override;
-    std::span<const uint8_t> buffer_span() const noexcept override;
+    std::span<uint8_t> get_write_span(size_t size) noexcept;
+    std::span<const uint8_t> buffer_span() const noexcept;
     void advance_read_pointer(size_t size) noexcept override;
+    RingBuffer& get_ring_buffer() override;
+    const RingBuffer& get_ring_buffer() const;
     
     // Legacy interface (deprecated)
     [[deprecated("Use reserve_write_slot() instead")]]
@@ -174,6 +176,9 @@ private:
     // Compression support
     compression::CompressionManager compression_manager_;
     std::vector<uint8_t> compression_buffer_;
+    
+    // Delegate to memory channel for ring buffer operations
+    std::unique_ptr<Channel> memory_channel_;
 
     // Statistics
     mutable std::mutex stats_mutex_;

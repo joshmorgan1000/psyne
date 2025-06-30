@@ -425,6 +425,66 @@ impl Channel {
             }
         }
     }
+
+    // ===================================================================
+    // Zero-copy API methods (v1.3.0)
+    // ===================================================================
+
+    /// Reserve space in ring buffer and return offset (zero-copy API)
+    pub fn reserve_write_slot(&self, size: usize) -> Result<u32> {
+        let mut offset = 0u32;
+        unsafe {
+            let err = psyne_channel_reserve_write_slot(self.ptr, size, &mut offset);
+            if err == psyne_error_PSYNE_OK {
+                Ok(offset)
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+
+    /// Notify receiver that message is ready at offset (zero-copy API)
+    pub fn notify_message_ready(&self, offset: u32, size: usize) -> Result<()> {
+        unsafe {
+            let err = psyne_channel_notify_message_ready(self.ptr, offset, size);
+            if err == psyne_error_PSYNE_OK {
+                Ok(())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+
+    /// Consumer advances read pointer after processing message (zero-copy API)
+    pub fn advance_read_pointer(&self, size: usize) -> Result<()> {
+        unsafe {
+            let err = psyne_channel_advance_read_pointer(self.ptr, size);
+            if err == psyne_error_PSYNE_OK {
+                Ok(())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+
+    /// Get a slice view of the ring buffer for zero-copy access
+    /// 
+    /// # Safety
+    /// The returned slice is only valid while the channel exists and
+    /// the ring buffer is not reallocated. Use with extreme caution.
+    pub unsafe fn get_buffer_view(&self) -> Result<&mut [u8]> {
+        let mut ptr: *mut std::ffi::c_void = ptr::null_mut();
+        let mut size = 0usize;
+        
+        let err = psyne_channel_get_buffer_span(self.ptr, &mut ptr, &mut size);
+        if err == psyne_error_PSYNE_OK && !ptr.is_null() && size > 0 {
+            Ok(slice::from_raw_parts_mut(ptr as *mut u8, size))
+        } else if err == psyne_error_PSYNE_OK {
+            Ok(&mut [])
+        } else {
+            Err(err.into())
+        }
+    }
 }
 
 impl Drop for Channel {
@@ -570,6 +630,79 @@ impl ChannelBuilder {
                 self.channel_type,
             ),
         }
+    }
+}
+
+// ===================================================================
+// v1.3.0 Transport Factory Functions
+// ===================================================================
+
+impl Channel {
+    /// Create a UDP multicast publisher channel
+    pub fn create_multicast_publisher(
+        multicast_address: &str,
+        port: u16,
+        buffer_size: usize,
+        compression: Option<CompressionConfig>,
+    ) -> Result<Self> {
+        let uri = format!("udp://{}:{}", multicast_address, port);
+        match compression {
+            Some(config) => Self::create_compressed(&uri, buffer_size, ChannelMode::Spsc, ChannelType::Multi, config),
+            None => Self::create(&uri, buffer_size, ChannelMode::Spsc, ChannelType::Multi),
+        }
+    }
+
+    /// Create a UDP multicast subscriber channel
+    pub fn create_multicast_subscriber(
+        multicast_address: &str,
+        port: u16,
+        buffer_size: usize,
+        interface_address: Option<&str>,
+    ) -> Result<Self> {
+        let mut uri = format!("udp://{}:{}", multicast_address, port);
+        if let Some(interface) = interface_address {
+            uri.push_str(&format!("?interface={}", interface));
+        }
+        Self::create(&uri, buffer_size, ChannelMode::Spsc, ChannelType::Multi)
+    }
+
+    /// Create a WebRTC channel for peer-to-peer communication
+    pub fn create_webrtc_channel(
+        peer_id: &str,
+        buffer_size: usize,
+        signaling_server_uri: Option<&str>,
+    ) -> Result<Self> {
+        let signaling = signaling_server_uri.unwrap_or("ws://localhost:8080");
+        let uri = format!("webrtc://{}?signaling={}", peer_id, signaling);
+        Self::create(&uri, buffer_size, ChannelMode::Spsc, ChannelType::Multi)
+    }
+}
+
+impl ChannelBuilder {
+    /// Configure for memory channel
+    pub fn memory(name: &str) -> Self {
+        Self::new(format!("memory://{}", name))
+    }
+
+    /// Configure for TCP channel
+    pub fn tcp(host: &str, port: u16) -> Self {
+        Self::new(format!("tcp://{}:{}", host, port))
+    }
+
+    /// Configure for UDP multicast channel
+    pub fn multicast(multicast_address: &str, port: u16) -> Self {
+        Self::new(format!("udp://{}:{}", multicast_address, port))
+    }
+
+    /// Configure for WebRTC channel
+    pub fn webrtc(peer_id: &str, signaling_server_uri: Option<&str>) -> Self {
+        let signaling = signaling_server_uri.unwrap_or("ws://localhost:8080");
+        Self::new(format!("webrtc://{}?signaling={}", peer_id, signaling))
+    }
+
+    /// Configure for Unix domain socket
+    pub fn unix(path: &str) -> Self {
+        Self::new(format!("unix://{}", path))
     }
 }
 

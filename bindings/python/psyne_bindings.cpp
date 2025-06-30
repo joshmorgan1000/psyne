@@ -174,6 +174,34 @@ public:
     void reset_metrics() {
         channel_->reset_metrics();
     }
+    
+    // Zero-copy API methods (v1.3.0)
+    uint32_t reserve_write_slot(size_t size) {
+        return channel_->reserve_write_slot(size);
+    }
+    
+    void notify_message_ready(uint32_t offset, size_t size) {
+        channel_->notify_message_ready(offset, size);
+    }
+    
+    void advance_read_pointer(size_t size) {
+        channel_->advance_read_pointer(size);
+    }
+    
+    py::object get_buffer_view() {
+        auto span = channel_->buffer_span();
+        if (span.empty()) {
+            return py::none();
+        }
+        
+        // Create read-only numpy array view of the ring buffer
+        return py::array_t<uint8_t>(
+            span.size(),
+            {sizeof(uint8_t)},
+            span.data(),
+            py::none()
+        );
+    }
 
 private:
     std::unique_ptr<Channel> channel_;
@@ -182,7 +210,7 @@ private:
 PYBIND11_MODULE(psyne, m) {
     m.doc() = "Psyne - High-performance zero-copy messaging library for Python";
     
-    m.attr("__version__") = "1.2.0";
+    m.attr("__version__") = "1.3.0";
     
     // Version functions
     m.def("version", &version, "Get library version string");
@@ -255,6 +283,15 @@ PYBIND11_MODULE(psyne, m) {
         .def("is_stopped", &PyChannel::is_stopped, "Check if channel is stopped")
         .def("get_metrics", &PyChannel::get_metrics, "Get channel metrics")
         .def("reset_metrics", &PyChannel::reset_metrics, "Reset channel metrics")
+        // Zero-copy API methods (v1.3.0)
+        .def("reserve_write_slot", &PyChannel::reserve_write_slot, 
+             "Reserve space in ring buffer (zero-copy API)", py::arg("size"))
+        .def("notify_message_ready", &PyChannel::notify_message_ready,
+             "Notify that message is ready (zero-copy API)", py::arg("offset"), py::arg("size"))
+        .def("advance_read_pointer", &PyChannel::advance_read_pointer,
+             "Advance read pointer after consuming message", py::arg("size"))
+        .def("get_buffer_view", &PyChannel::get_buffer_view,
+             "Get NumPy view of ring buffer for zero-copy access")
         .def("__repr__", [](const PyChannel& c) {
             return "<Channel uri='" + c.uri() + "'>";
         });
@@ -302,6 +339,26 @@ PYBIND11_MODULE(psyne, m) {
     }, "Create UDP multicast subscriber", 
        py::arg("address"), py::arg("port"), py::arg("buffer_size") = 1024*1024, 
        py::arg("interface_address") = "");
+    
+    // WebRTC support
+    m.def("create_webrtc_channel", [](const std::string& peer_id, size_t buffer_size, 
+                                     const std::string& signaling_server_uri) {
+        auto channel = webrtc::create_channel(peer_id, buffer_size, signaling_server_uri);
+        return std::make_unique<PyChannel>(std::move(channel));
+    }, "Create WebRTC channel for peer-to-peer communication", 
+       py::arg("peer_id"), py::arg("buffer_size") = 1024*1024, 
+       py::arg("signaling_server_uri") = "ws://localhost:8080");
+    
+    // Zero-copy API support
+    m.def("create_channel", [](const std::string& uri, size_t buffer_size, ChannelMode mode, 
+                              ChannelType type, bool enable_metrics, 
+                              const compression::CompressionConfig& compression_config) {
+        auto channel = create_channel(uri, buffer_size, mode, type, enable_metrics, compression_config);
+        return std::make_unique<PyChannel>(std::move(channel));
+    }, "Create channel with full v1.3.0 API support", 
+       py::arg("uri"), py::arg("buffer_size") = 1024*1024, py::arg("mode") = ChannelMode::SPSC,
+       py::arg("type") = ChannelType::MultiType, py::arg("enable_metrics") = false,
+       py::arg("compression_config") = compression::CompressionConfig{});
     
     // Debugging utilities
     py::class_<debug::ChannelInspector>(m, "ChannelInspector")

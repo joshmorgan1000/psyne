@@ -24,6 +24,9 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <errno.h>
+#include <cstring>
+#include <net/if.h>
 #ifdef __APPLE__
 #include <libkern/OSByteOrder.h>
 #include <machine/endian.h>
@@ -33,6 +36,18 @@
 #define be32toh(x) OSSwapBigToHostInt32(x)
 #define htobe16(x) OSSwapHostToBigInt16(x)
 #define be16toh(x) OSSwapBigToHostInt16(x)
+#elif defined(__linux__)
+#include <endian.h>
+// Linux should have these in endian.h, but provide fallbacks if needed
+#ifndef htobe64
+#include <byteswap.h>
+#define htobe64(x) __bswap_64(x)
+#define be64toh(x) __bswap_64(x)
+#define htobe32(x) __bswap_32(x)
+#define be32toh(x) __bswap_32(x)
+#define htobe16(x) __bswap_16(x)
+#define be16toh(x) __bswap_16(x)
+#endif
 #else
 #include <endian.h>
 #endif
@@ -74,16 +89,43 @@ void STUNClient::initialize_socket() {
 
     socket_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
     if (socket_fd_ < 0) {
-        throw std::runtime_error("Failed to create UDP socket for STUN client");
+        std::string error = "Failed to create UDP socket for STUN client: ";
+#ifdef __linux__
+        error += std::string(strerror(errno));
+#endif
+        throw std::runtime_error(error);
     }
+
+    // Set socket options for better Linux compatibility
+#ifndef _WIN32
+    // Allow address reuse (important for Linux)
+    int reuse = 1;
+    if (setsockopt(socket_fd_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        std::cerr << "Warning: Failed to set SO_REUSEADDR on STUN socket" << std::endl;
+    }
+    
+    // On Linux, also set SO_REUSEPORT if available
+#ifdef SO_REUSEPORT
+    if (setsockopt(socket_fd_, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0) {
+        // This is not critical, just log
+        std::cerr << "Note: SO_REUSEPORT not available on this system" << std::endl;
+    }
+#endif
+#endif
 
     // Set non-blocking
 #ifdef _WIN32
     u_long mode = 1;
-    ioctlsocket(socket_fd_, FIONBIO, &mode);
+    if (ioctlsocket(socket_fd_, FIONBIO, &mode) != 0) {
+        throw std::runtime_error("Failed to set non-blocking mode on Windows");
+    }
 #else
     int flags = fcntl(socket_fd_, F_GETFL, 0);
-    fcntl(socket_fd_, F_SETFL, flags | O_NONBLOCK);
+    if (flags == -1 || fcntl(socket_fd_, F_SETFL, flags | O_NONBLOCK) == -1) {
+        std::string error = "Failed to set non-blocking mode: ";
+        error += std::string(strerror(errno));
+        throw std::runtime_error(error);
+    }
 #endif
 
     // Start worker thread
@@ -114,6 +156,17 @@ void STUNClient::send_binding_request(
     if (sent < 0) {
         std::lock_guard<std::mutex> lock(transactions_mutex_);
         pending_transactions_.erase(transaction_id);
+#ifdef __linux__
+        std::cerr << "STUN sendto failed: " << strerror(errno) << " (errno=" << errno << ")" << std::endl;
+        // Common Linux networking issues
+        if (errno == ENETUNREACH) {
+            std::cerr << "Network unreachable - check routing table" << std::endl;
+        } else if (errno == EACCES) {
+            std::cerr << "Permission denied - check firewall settings" << std::endl;
+        } else if (errno == ENOBUFS) {
+            std::cerr << "No buffer space available - system overloaded?" << std::endl;
+        }
+#endif
         callback(false, {});
     }
 }
@@ -171,8 +224,28 @@ void STUNClient::run_worker() {
                     }
                 }
             }
+        } else if (received == -1) {
+            // Handle different error conditions
+#ifdef __linux__
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // No data available, this is normal for non-blocking socket
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            } else if (errno == EINTR) {
+                // Interrupted by signal, continue
+                continue;
+            } else if (errno == ECONNREFUSED) {
+                std::cerr << "STUN server connection refused" << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            } else {
+                std::cerr << "STUN recvfrom error: " << strerror(errno) << std::endl;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+#else
+            // Small delay to avoid busy waiting on other platforms
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#endif
         } else {
-            // Small delay to avoid busy waiting
+            // received == 0, should not happen with UDP
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
@@ -571,9 +644,15 @@ std::vector<NetworkAddress> ICEAgent::get_local_interfaces() {
 
             std::string addr_string(addr_str);
 
-            // Skip loopback and other special addresses
-            if (addr_string != "127.0.0.1" &&
-                addr_string.substr(0, 3) != "169") {
+            // Skip loopback and invalid addresses, but include private IPs for WebRTC
+            // More comprehensive filtering for Linux compatibility
+            if (addr_string != "127.0.0.1" &&                     // Loopback
+                addr_string.substr(0, 3) != "169" &&               // Link-local (169.254.x.x)
+                addr_string != "0.0.0.0" &&                        // Invalid
+                addr_string != "255.255.255.255" &&                // Broadcast
+                ifa->ifa_flags & IFF_UP &&                         // Interface must be up
+                ifa->ifa_flags & IFF_RUNNING &&                    // Interface must be running
+                !(ifa->ifa_flags & IFF_LOOPBACK)) {                // Not loopback interface
                 NetworkAddress addr;
                 addr.family = NetworkAddress::IPv4;
                 addr.address = addr_string;

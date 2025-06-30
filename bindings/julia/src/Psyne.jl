@@ -60,6 +60,8 @@ module Psyne
 export PsyneChannel, ChannelMode, ChannelType, CompressionType, CompressionConfig,
        Metrics, PsyneError,
        channel, send, receive, stop!, is_stopped, get_metrics, reset_metrics!,
+       reserve_write_slot, notify_message_ready, advance_read_pointer, get_buffer_view,
+       create_multicast_publisher, create_multicast_subscriber, create_webrtc_channel,
        FloatVector, DoubleMatrix, ByteVector, ComplexVector
 
 # Standard library imports

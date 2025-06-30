@@ -301,6 +301,66 @@ public class Channel implements AutoCloseable {
     }
     
     /**
+     * Reserves space in the ring buffer and returns the offset (zero-copy API).
+     * 
+     * @param size Size of message to reserve
+     * @return Offset within ring buffer, or 0xFFFFFFFF if buffer is full
+     * @throws PsyneException if the operation fails
+     * @throws IllegalStateException if the channel is closed
+     */
+    public int reserveWriteSlot(int size) throws PsyneException {
+        checkNotClosed();
+        int result = reserveWriteSlotNative(nativeHandle, size);
+        if (result < 0) {
+            throw new PsyneException(PsyneException.ErrorCode.fromNativeCode(result));
+        }
+        return result;
+    }
+    
+    /**
+     * Notifies the receiver that a message is ready at the specified offset (zero-copy API).
+     * 
+     * @param offset Offset within ring buffer where message data starts
+     * @param size Size of the message
+     * @throws PsyneException if the operation fails
+     * @throws IllegalStateException if the channel is closed
+     */
+    public void notifyMessageReady(int offset, int size) throws PsyneException {
+        checkNotClosed();
+        int result = notifyMessageReadyNative(nativeHandle, offset, size);
+        if (result != 0) {
+            throw new PsyneException(PsyneException.ErrorCode.fromNativeCode(result));
+        }
+    }
+    
+    /**
+     * Consumer advances read pointer after processing a message (zero-copy API).
+     * 
+     * @param size Size of message that was consumed
+     * @throws PsyneException if the operation fails
+     * @throws IllegalStateException if the channel is closed
+     */
+    public void advanceReadPointer(int size) throws PsyneException {
+        checkNotClosed();
+        int result = advanceReadPointerNative(nativeHandle, size);
+        if (result != 0) {
+            throw new PsyneException(PsyneException.ErrorCode.fromNativeCode(result));
+        }
+    }
+    
+    /**
+     * Gets a direct ByteBuffer view of the ring buffer for zero-copy access.
+     * 
+     * @return A direct ByteBuffer over the ring buffer, or null if not available
+     * @throws PsyneException if the operation fails
+     * @throws IllegalStateException if the channel is closed
+     */
+    public ByteBuffer getBufferView() throws PsyneException {
+        checkNotClosed();
+        return getBufferViewNative(nativeHandle);
+    }
+    
+    /**
      * Closes the channel and releases native resources.
      */
     @Override
@@ -423,6 +483,38 @@ public class Channel implements AutoCloseable {
         }
         
         /**
+         * Configures the channel for UDP multicast communication.
+         * 
+         * @param multicastAddress The multicast group address (e.g., "239.255.0.1")
+         * @param port The port number
+         * @return This builder
+         */
+        public Builder multicast(String multicastAddress, int port) {
+            return uri("udp://" + multicastAddress + ":" + port);
+        }
+        
+        /**
+         * Configures the channel for WebRTC peer-to-peer communication.
+         * 
+         * @param peerId The target peer identifier
+         * @param signalingServerUri The WebSocket signaling server URI (default: ws://localhost:8080)
+         * @return This builder
+         */
+        public Builder webrtc(String peerId, String signalingServerUri) {
+            return uri("webrtc://" + peerId + "?signaling=" + signalingServerUri);
+        }
+        
+        /**
+         * Configures the channel for WebRTC peer-to-peer communication with default signaling server.
+         * 
+         * @param peerId The target peer identifier
+         * @return This builder
+         */
+        public Builder webrtc(String peerId) {
+            return webrtc(peerId, "ws://localhost:8080");
+        }
+        
+        /**
          * Builds the channel.
          * 
          * @return A new Channel instance
@@ -530,4 +622,9 @@ public class Channel implements AutoCloseable {
     private static native int receiveNative(long handle, int timeoutMs, long[] messageHandle, int[] type);
     private static native int receiveDataNative(long handle, byte[] buffer, int bufferSize, 
                                                int[] type, int timeoutMs);
+    // Zero-copy API methods (v1.3.0)
+    private static native int reserveWriteSlotNative(long handle, int size);
+    private static native int notifyMessageReadyNative(long handle, int offset, int size);
+    private static native int advanceReadPointerNative(long handle, int size);
+    private static native ByteBuffer getBufferViewNative(long handle);
 }

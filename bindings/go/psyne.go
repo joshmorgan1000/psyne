@@ -293,6 +293,80 @@ func (ch *Channel) ResetMetrics() error {
 	return handleError(C.psyne_channel_reset_metrics(ch.ptr))
 }
 
+// ===================================================================
+// Zero-copy API methods (v1.3.0)
+// ===================================================================
+
+// ReserveWriteSlot reserves space in the ring buffer and returns the offset
+func (ch *Channel) ReserveWriteSlot(size int) (uint32, error) {
+	var offset C.uint32_t
+	err := handleError(C.psyne_channel_reserve_write_slot(ch.ptr, C.size_t(size), &offset))
+	if err != nil {
+		return 0xFFFFFFFF, err
+	}
+	return uint32(offset), nil
+}
+
+// NotifyMessageReady notifies the receiver that a message is ready at the specified offset
+func (ch *Channel) NotifyMessageReady(offset uint32, size int) error {
+	return handleError(C.psyne_channel_notify_message_ready(ch.ptr, C.uint32_t(offset), C.size_t(size)))
+}
+
+// AdvanceReadPointer advances the read pointer after processing a message
+func (ch *Channel) AdvanceReadPointer(size int) error {
+	return handleError(C.psyne_channel_advance_read_pointer(ch.ptr, C.size_t(size)))
+}
+
+// GetBufferView returns a byte slice view of the ring buffer for zero-copy access
+func (ch *Channel) GetBufferView() ([]byte, error) {
+	var ptr unsafe.Pointer
+	var size C.size_t
+	
+	err := handleError(C.psyne_channel_get_buffer_span(ch.ptr, &ptr, &size))
+	if err != nil {
+		return nil, err
+	}
+	
+	if ptr == nil || size == 0 {
+		return nil, nil
+	}
+	
+	// Create a slice that references the ring buffer memory
+	// WARNING: This slice is only valid while the channel exists and isn't reallocated
+	return (*[1 << 30]byte)(ptr)[:size:size], nil
+}
+
+// ===================================================================
+// Factory functions for v1.3.0 transports
+// ===================================================================
+
+// NewMulticastPublisher creates a UDP multicast publisher channel
+func NewMulticastPublisher(multicastAddress string, port int, bufferSize int, compression *CompressionConfig) (*Channel, error) {
+	uri := fmt.Sprintf("udp://%s:%d", multicastAddress, port)
+	if compression != nil {
+		return NewChannelWithCompression(uri, bufferSize, ModeSPSC, TypeMulti, *compression)
+	}
+	return NewChannel(uri, bufferSize, ModeSPSC, TypeMulti)
+}
+
+// NewMulticastSubscriber creates a UDP multicast subscriber channel
+func NewMulticastSubscriber(multicastAddress string, port int, bufferSize int, interfaceAddress string) (*Channel, error) {
+	uri := fmt.Sprintf("udp://%s:%d", multicastAddress, port)
+	if interfaceAddress != "" {
+		uri += "?interface=" + interfaceAddress
+	}
+	return NewChannel(uri, bufferSize, ModeSPSC, TypeMulti)
+}
+
+// NewWebRTCChannel creates a WebRTC channel for peer-to-peer communication
+func NewWebRTCChannel(peerID string, bufferSize int, signalingServerURI string) (*Channel, error) {
+	if signalingServerURI == "" {
+		signalingServerURI = "ws://localhost:8080"
+	}
+	uri := fmt.Sprintf("webrtc://%s?signaling=%s", peerID, signalingServerURI)
+	return NewChannel(uri, bufferSize, ModeSPSC, TypeMulti)
+}
+
 // Message represents a manual message for zero-copy operations
 type Message struct {
 	ptr     *C.psyne_message_t

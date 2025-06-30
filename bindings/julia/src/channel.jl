@@ -312,3 +312,278 @@ end
 Base.IteratorSize(::Type{<:ChannelIterator}) = Base.SizeUnknown()
 Base.IteratorEltype(::Type{ChannelIterator{T}}) where T = Base.HasEltype()
 Base.eltype(::Type{ChannelIterator{T}}) where T = T
+
+# ===================================================================
+# Zero-copy API methods (v1.3.0)
+# ===================================================================
+
+"""
+    reserve_write_slot(channel::PsyneChannel, size::Integer) -> UInt32
+
+Reserve space in ring buffer and return offset (zero-copy API).
+
+This is part of the zero-copy API for maximum performance. After reserving
+a slot, you can write directly to the buffer and then notify when ready.
+
+# Arguments
+- `channel`: The channel to reserve space in
+- `size`: Size of message to reserve in bytes
+
+# Returns
+Offset within ring buffer where data should be written, or UInt32(0xFFFFFFFF) if buffer is full.
+
+# Throws
+- `PsyneError`: If reservation fails
+
+# Examples
+
+```julia
+ch = channel("memory://zerocopy")
+offset = reserve_write_slot(ch, 1024)
+if offset != 0xFFFFFFFF
+    # Write data at offset...
+    notify_message_ready(ch, offset, 1024)
+end
+```
+"""
+function reserve_write_slot(channel::PsyneChannel, size::Integer)
+    channel.handle == C_NULL && throw(PsyneError("Channel is closed", -1))
+    
+    offset_ref = Ref{UInt32}()
+    code = ccall((:psyne_channel_reserve_write_slot, libpsyne), Int32,
+                (Ptr{Cvoid}, UInt64, Ptr{UInt32}),
+                channel.handle, UInt64(size), offset_ref)
+    check_error(code)
+    
+    return offset_ref[]
+end
+
+"""
+    notify_message_ready(channel::PsyneChannel, offset::UInt32, size::Integer)
+
+Notify receiver that message is ready at offset (zero-copy API).
+
+This completes the zero-copy send operation after writing data to the
+reserved buffer location.
+
+# Arguments
+- `channel`: The channel containing the message
+- `offset`: Offset within ring buffer where message data starts
+- `size`: Size of the message in bytes
+
+# Throws
+- `PsyneError`: If notification fails
+
+# Examples
+
+```julia
+ch = channel("memory://zerocopy")
+offset = reserve_write_slot(ch, 1024)
+# ... write data to buffer at offset ...
+notify_message_ready(ch, offset, 1024)
+```
+"""
+function notify_message_ready(channel::PsyneChannel, offset::UInt32, size::Integer)
+    channel.handle == C_NULL && throw(PsyneError("Channel is closed", -1))
+    
+    code = ccall((:psyne_channel_notify_message_ready, libpsyne), Int32,
+                (Ptr{Cvoid}, UInt32, UInt64),
+                channel.handle, offset, UInt64(size))
+    check_error(code)
+end
+
+"""
+    advance_read_pointer(channel::PsyneChannel, size::Integer)
+
+Consumer advances read pointer after processing message (zero-copy API).
+
+This completes the zero-copy receive operation after processing the data
+directly from the ring buffer.
+
+# Arguments
+- `channel`: The channel to advance the read pointer in
+- `size`: Size of message that was consumed in bytes
+
+# Throws
+- `PsyneError`: If advancing read pointer fails
+
+# Examples
+
+```julia
+ch = channel("memory://zerocopy")
+buffer_view = get_buffer_view(ch)
+if buffer_view !== nothing
+    # ... process data directly from buffer_view ...
+    advance_read_pointer(ch, processed_size)
+end
+```
+"""
+function advance_read_pointer(channel::PsyneChannel, size::Integer)
+    channel.handle == C_NULL && throw(PsyneError("Channel is closed", -1))
+    
+    code = ccall((:psyne_channel_advance_read_pointer, libpsyne), Int32,
+                (Ptr{Cvoid}, UInt64),
+                channel.handle, UInt64(size))
+    check_error(code)
+end
+
+"""
+    get_buffer_view(channel::PsyneChannel) -> Union{Vector{UInt8}, Nothing}
+
+Get a view of the ring buffer for zero-copy access.
+
+# Arguments
+- `channel`: The channel to get buffer view from
+
+# Returns
+A `Vector{UInt8}` view of the ring buffer, or `nothing` if not available.
+
+# Throws
+- `PsyneError`: If getting buffer view fails
+
+# Safety Warning
+The returned buffer view is only valid while the channel exists and
+the ring buffer is not reallocated. Use with extreme caution.
+
+# Examples
+
+```julia
+ch = channel("memory://zerocopy")
+buffer_view = get_buffer_view(ch)
+if buffer_view !== nothing
+    # Read/write directly to buffer_view
+    # Remember to call advance_read_pointer when done reading
+end
+```
+"""
+function get_buffer_view(channel::PsyneChannel)
+    channel.handle == C_NULL && throw(PsyneError("Channel is closed", -1))
+    
+    ptr_ref = Ref{Ptr{UInt8}}()
+    size_ref = Ref{UInt64}()
+    
+    code = ccall((:psyne_channel_get_buffer_span, libpsyne), Int32,
+                (Ptr{Cvoid}, Ptr{Ptr{UInt8}}, Ptr{UInt64}),
+                channel.handle, ptr_ref, size_ref)
+    check_error(code)
+    
+    ptr = ptr_ref[]
+    size = size_ref[]
+    
+    if ptr == C_NULL || size == 0
+        return nothing
+    end
+    
+    # Create a Julia array that wraps the C memory (unsafe!)
+    # This does not copy the data but creates a view
+    return unsafe_wrap(Array{UInt8}, ptr, size; own=false)
+end
+
+# ===================================================================
+# v1.3.0 Transport Factory Functions
+# ===================================================================
+
+"""
+    create_multicast_publisher(multicast_address::AbstractString, port::Integer; 
+                              buffer_size::Integer = 1024*1024,
+                              compression::Union{CompressionConfig, Nothing} = nothing) -> PsyneChannel
+
+Create a UDP multicast publisher channel for one-to-many messaging.
+
+# Arguments
+- `multicast_address`: The multicast group address (e.g., "239.255.0.1")
+- `port`: The port number
+- `buffer_size`: Size of internal buffer in bytes (default: 1MB)
+- `compression`: Optional compression configuration
+
+# Returns
+A new `PsyneChannel` configured for multicast publishing.
+
+# Examples
+
+```julia
+# Create basic multicast publisher
+pub = create_multicast_publisher("239.255.0.1", 12345)
+
+# Create compressed multicast publisher
+config = CompressionConfig(type=LZ4, level=3)
+pub = create_multicast_publisher("239.255.0.1", 12345, compression=config)
+```
+"""
+function create_multicast_publisher(multicast_address::AbstractString, port::Integer;
+                                  buffer_size::Integer = 1024*1024,
+                                  compression::Union{CompressionConfig, Nothing} = nothing)
+    uri = "udp://$(multicast_address):$(port)"
+    return channel(uri, buffer_size=buffer_size, mode=SPSC, type=MultiType, compression=compression)
+end
+
+"""
+    create_multicast_subscriber(multicast_address::AbstractString, port::Integer;
+                               buffer_size::Integer = 1024*1024,
+                               interface_address::Union{AbstractString, Nothing} = nothing) -> PsyneChannel
+
+Create a UDP multicast subscriber channel for receiving multicast messages.
+
+# Arguments
+- `multicast_address`: The multicast group address (e.g., "239.255.0.1")
+- `port`: The port number
+- `buffer_size`: Size of internal buffer in bytes (default: 1MB)
+- `interface_address`: Optional specific network interface to bind to
+
+# Returns
+A new `PsyneChannel` configured for multicast subscription.
+
+# Examples
+
+```julia
+# Create basic multicast subscriber
+sub = create_multicast_subscriber("239.255.0.1", 12345)
+
+# Create multicast subscriber bound to specific interface
+sub = create_multicast_subscriber("239.255.0.1", 12345, interface_address="192.168.1.100")
+```
+"""
+function create_multicast_subscriber(multicast_address::AbstractString, port::Integer;
+                                   buffer_size::Integer = 1024*1024,
+                                   interface_address::Union{AbstractString, Nothing} = nothing)
+    uri = "udp://$(multicast_address):$(port)"
+    if interface_address !== nothing
+        uri *= "?interface=$(interface_address)"
+    end
+    return channel(uri, buffer_size=buffer_size, mode=SPSC, type=MultiType)
+end
+
+"""
+    create_webrtc_channel(peer_id::AbstractString;
+                         buffer_size::Integer = 1024*1024,
+                         signaling_server_uri::AbstractString = "ws://localhost:8080") -> PsyneChannel
+
+Create a WebRTC channel for peer-to-peer communication with NAT traversal.
+
+WebRTC provides direct peer-to-peer communication that can traverse NAT and
+firewall boundaries, making it ideal for distributed applications.
+
+# Arguments
+- `peer_id`: The target peer identifier
+- `buffer_size`: Size of internal buffer in bytes (default: 1MB)
+- `signaling_server_uri`: The WebSocket signaling server URI (default: ws://localhost:8080)
+
+# Returns
+A new `PsyneChannel` configured for WebRTC communication.
+
+# Examples
+
+```julia
+# Create basic WebRTC channel
+peer = create_webrtc_channel("peer-123")
+
+# Create WebRTC channel with custom signaling server
+peer = create_webrtc_channel("peer-456", signaling_server_uri="wss://signaling.example.com:443")
+```
+"""
+function create_webrtc_channel(peer_id::AbstractString;
+                             buffer_size::Integer = 1024*1024,
+                             signaling_server_uri::AbstractString = "ws://localhost:8080")
+    uri = "webrtc://$(peer_id)?signaling=$(signaling_server_uri)"
+    return channel(uri, buffer_size=buffer_size, mode=SPSC, type=MultiType)
+end

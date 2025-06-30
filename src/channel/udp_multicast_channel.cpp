@@ -21,6 +21,12 @@ UDPMulticastChannel::UDPMulticastChannel(
       joined_group_(false), stopping_(false), sequence_number_(0),
       interface_address_(interface_address), ttl_(1), loopback_enabled_(false),
       compression_manager_(compression_config) {
+    
+    // Create memory channel for ring buffer operations
+    std::string memory_uri = "memory://multicast-" + std::to_string(12345) + "-" + 
+                             (role == MulticastRole::Publisher ? "pub" : "sub");
+    memory_channel_ = create_channel(memory_uri, buffer_size, mode, type);
+    
     parse_uri(uri);
     setup_socket();
 
@@ -195,8 +201,7 @@ uint32_t UDPMulticastChannel::reserve_write_slot(size_t size) noexcept {
     }
     
     // Reserve space directly in ring buffer for zero-copy
-    auto& ring_buffer = get_ring_buffer();
-    return ring_buffer.reserve_write_space(size);
+    return memory_channel_->reserve_write_slot(size);
 }
 
 void UDPMulticastChannel::notify_message_ready(uint32_t offset, size_t size) noexcept {
@@ -205,9 +210,9 @@ void UDPMulticastChannel::notify_message_ready(uint32_t offset, size_t size) noe
     }
     
     // Message is already in ring buffer at offset
-    // Stream directly from ring buffer for zero-copy UDP multicast
-    auto& ring_buffer = get_ring_buffer();
-    auto data_span = ring_buffer.get_read_span(offset, size);
+    // Get data from memory channel for UDP multicast
+    auto data_span = memory_channel_->get_write_span(size);
+    auto data_ptr = data_span.data();
     
     // Prepare UDP multicast header
     UDPMulticastHeader header{};
@@ -218,7 +223,7 @@ void UDPMulticastChannel::notify_message_ready(uint32_t offset, size_t size) noe
     header.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            std::chrono::steady_clock::now().time_since_epoch())
                            .count();
-    header.checksum = calculate_checksum(data_span.data(), data_span.size());
+    header.checksum = calculate_checksum(data_ptr, size);
     header.original_size = 0; // No compression in zero-copy path
     header.compression_type = 0;
     header.flags = 0;
@@ -231,23 +236,15 @@ void UDPMulticastChannel::notify_message_ready(uint32_t offset, size_t size) noe
 }
 
 std::span<uint8_t> UDPMulticastChannel::get_write_span(size_t size) noexcept {
-    uint32_t offset = reserve_write_slot(size);
-    if (offset == BUFFER_FULL) {
-        return {};
-    }
-    
-    auto& ring_buffer = get_ring_buffer();
-    return ring_buffer.get_write_span(offset, size);
+    return memory_channel_->get_write_span(size);
 }
 
 std::span<const uint8_t> UDPMulticastChannel::buffer_span() const noexcept {
-    auto& ring_buffer = get_ring_buffer();
-    return ring_buffer.available_read_span();
+    return memory_channel_->buffer_span();
 }
 
 void UDPMulticastChannel::advance_read_pointer(size_t size) noexcept {
-    auto& ring_buffer = get_ring_buffer();
-    ring_buffer.advance_read_pointer(size);
+    memory_channel_->advance_read_pointer(size);
 }
 
 void UDPMulticastChannel::start_zero_copy_multicast(const UDPMulticastHeader& header, uint32_t offset, size_t size) {
@@ -255,22 +252,21 @@ void UDPMulticastChannel::start_zero_copy_multicast(const UDPMulticastHeader& he
         return;
     }
     
-    // Get data directly from ring buffer
-    auto& ring_buffer = get_ring_buffer();
-    auto data_span = ring_buffer.get_read_span(offset, size);
+    // Get data from memory channel
+    auto data_span = memory_channel_->get_write_span(size);
+    auto data_ptr = data_span.data();
     
     // Create scatter-gather buffer for efficient UDP multicast (header + data)
     std::array<asio::const_buffer, 2> buffers = {
         asio::buffer(&header, sizeof(header)),
-        asio::buffer(data_span.data(), data_span.size())
+        asio::buffer(data_ptr, size)
     };
     
     socket_->async_send_to(buffers, multicast_endpoint_,
         [this, offset, size](const boost::system::error_code& error, size_t bytes_transferred) {
             if (!error) {
-                // Successfully sent, advance ring buffer read position
-                auto& ring_buffer = get_ring_buffer();
-                ring_buffer.advance_read_pointer(size);
+                // Successfully sent, advance memory channel write pointer
+                memory_channel_->notify_message_ready(offset, size);
                 update_stats_sent(bytes_transferred);
             } else {
                 update_stats_dropped();
@@ -338,12 +334,7 @@ void *UDPMulticastChannel::receive_message(size_t &size, uint32_t &type) {
 
 // Legacy deprecated methods (kept for compatibility)  
 void* UDPMulticastChannel::reserve_space(size_t size) {
-    uint32_t offset = reserve_write_slot(size);
-    if (offset == BUFFER_FULL) {
-        return nullptr;
-    }
-    auto& ring_buffer = get_ring_buffer();
-    auto span = ring_buffer.get_write_span(offset, size);
+    auto span = memory_channel_->get_write_span(size);
     return span.data();
 }
 
@@ -543,6 +534,14 @@ void UDPMulticastChannel::update_stats_dropped() {
 void UDPMulticastChannel::update_stats_sequence_error() {
     std::lock_guard<std::mutex> lock(stats_mutex_);
     stats_.sequence_errors++;
+}
+
+RingBuffer& UDPMulticastChannel::get_ring_buffer() {
+    return memory_channel_->get_ring_buffer();
+}
+
+const RingBuffer& UDPMulticastChannel::get_ring_buffer() const {
+    return memory_channel_->get_ring_buffer();
 }
 
 // Factory function

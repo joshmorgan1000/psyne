@@ -223,4 +223,56 @@ public final class Channel {
         try throwOnError(result, context: "Failed to get buffer size")
         return size
     }
+    
+    // ===================================================================
+    // Zero-copy API methods (v1.3.0)
+    // ===================================================================
+    
+    /// Reserve space in ring buffer and return offset (zero-copy API)
+    /// - Parameter size: Size of message to reserve
+    /// - Returns: Offset within ring buffer, or UInt32.max if buffer is full
+    /// - Throws: `PsyneError` if reservation fails
+    public func reserveWriteSlot(size: Int) throws -> UInt32 {
+        var offset: UInt32 = 0
+        let result = psyne_channel_reserve_write_slot(handle, size, &offset)
+        try throwOnError(result, context: "Failed to reserve write slot")
+        return offset
+    }
+    
+    /// Notify receiver that message is ready at offset (zero-copy API)
+    /// - Parameters:
+    ///   - offset: Offset within ring buffer where message data starts
+    ///   - size: Size of the message
+    /// - Throws: `PsyneError` if notification fails
+    public func notifyMessageReady(offset: UInt32, size: Int) throws {
+        let result = psyne_channel_notify_message_ready(handle, offset, size)
+        try throwOnError(result, context: "Failed to notify message ready")
+    }
+    
+    /// Consumer advances read pointer after processing message (zero-copy API)
+    /// - Parameter size: Size of message that was consumed
+    /// - Throws: `PsyneError` if advancing read pointer fails
+    public func advanceReadPointer(size: Int) throws {
+        let result = psyne_channel_advance_read_pointer(handle, size)
+        try throwOnError(result, context: "Failed to advance read pointer")
+    }
+    
+    /// Get a buffer pointer for zero-copy access to the ring buffer
+    /// - Returns: An `UnsafeMutableBufferPointer` to the ring buffer, or nil if not available
+    /// - Throws: `PsyneError` if getting buffer view fails
+    /// - Warning: The returned buffer is only valid while the channel exists and
+    ///   the ring buffer is not reallocated. Use with extreme caution.
+    public func getBufferView() throws -> UnsafeMutableBufferPointer<UInt8>? {
+        var ptr: UnsafeMutableRawPointer?
+        var size: Int = 0
+        
+        let result = psyne_channel_get_buffer_span(handle, &ptr, &size)
+        try throwOnError(result, context: "Failed to get buffer view")
+        
+        guard let baseAddress = ptr?.assumingMemoryBound(to: UInt8.self), size > 0 else {
+            return nil
+        }
+        
+        return UnsafeMutableBufferPointer(start: baseAddress, count: size)
+    }
 }

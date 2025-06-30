@@ -414,6 +414,60 @@ export class Channel extends EventEmitter {
     this.nativeChannel.resetMetrics();
   }
 
+  // ===================================================================
+  // Zero-copy API methods (v1.3.0)
+  // ===================================================================
+
+  /**
+   * @brief Reserve space in the ring buffer and return offset (zero-copy API)
+   * @param size Size of message to reserve
+   * @returns Offset within ring buffer, or 0xFFFFFFFF if buffer is full
+   * @throws {ChannelClosedError} If channel is closed
+   */
+  reserveWriteSlot(size: number): number {
+    if (this._closed) {
+      throw new ChannelClosedError('Cannot reserve slot on closed channel');
+    }
+    return this.nativeChannel.reserveWriteSlot(size);
+  }
+
+  /**
+   * @brief Notify receiver that message is ready at offset (zero-copy API)
+   * @param offset Offset within ring buffer where message data starts
+   * @param size Size of the message
+   * @throws {ChannelClosedError} If channel is closed
+   */
+  notifyMessageReady(offset: number, size: number): void {
+    if (this._closed) {
+      throw new ChannelClosedError('Cannot notify on closed channel');
+    }
+    this.nativeChannel.notifyMessageReady(offset, size);
+  }
+
+  /**
+   * @brief Consumer advances read pointer after processing message (zero-copy API)
+   * @param size Size of message that was consumed
+   * @throws {ChannelClosedError} If channel is closed
+   */
+  advanceReadPointer(size: number): void {
+    if (this._closed) {
+      throw new ChannelClosedError('Cannot advance pointer on closed channel');
+    }
+    this.nativeChannel.advanceReadPointer(size);
+  }
+
+  /**
+   * @brief Get a view of the ring buffer for zero-copy access
+   * @returns ArrayBuffer view of the ring buffer, or null if not available
+   * @throws {ChannelClosedError} If channel is closed
+   */
+  getBufferView(): ArrayBuffer | null {
+    if (this._closed) {
+      throw new ChannelClosedError('Cannot get buffer view on closed channel');
+    }
+    return this.nativeChannel.getBufferView();
+  }
+
   /**
    * @brief Create a fluent builder for channel configuration
    * @returns ChannelBuilder instance
@@ -505,6 +559,54 @@ export class ChannelBuilder {
   compression(config: CompressionConfig): this {
     this.options.compression = config;
     return this;
+  }
+
+  /**
+   * @brief Configure for memory channel
+   * @param name Memory channel name
+   * @returns This builder for chaining
+   */
+  memory(name: string): this {
+    return this.uri(`memory://${name}`);
+  }
+
+  /**
+   * @brief Configure for TCP channel
+   * @param host Host address
+   * @param port Port number
+   * @returns This builder for chaining
+   */
+  tcp(host: string, port: number): this {
+    return this.uri(`tcp://${host}:${port}`);
+  }
+
+  /**
+   * @brief Configure for UDP multicast channel
+   * @param multicastAddress Multicast group address (e.g., "239.255.0.1")
+   * @param port Port number
+   * @returns This builder for chaining
+   */
+  multicast(multicastAddress: string, port: number): this {
+    return this.uri(`udp://${multicastAddress}:${port}`);
+  }
+
+  /**
+   * @brief Configure for WebRTC peer-to-peer channel
+   * @param peerId Target peer identifier
+   * @param signalingServerUri WebSocket signaling server URI (default: ws://localhost:8080)
+   * @returns This builder for chaining
+   */
+  webrtc(peerId: string, signalingServerUri: string = 'ws://localhost:8080'): this {
+    return this.uri(`webrtc://${peerId}?signaling=${signalingServerUri}`);
+  }
+
+  /**
+   * @brief Configure for Unix domain socket
+   * @param path Socket path
+   * @returns This builder for chaining
+   */
+  unix(path: string): this {
+    return this.uri(`unix://${path}`);
   }
 
   /**

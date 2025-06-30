@@ -165,6 +165,8 @@ set(PSYNE_SOURCES
     
     # Channel implementations
     "${CMAKE_SOURCE_DIR}/src/channel/quic_channel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/multicast_factory.cpp"
+    "${CMAKE_SOURCE_DIR}/src/channel/udp_multicast_channel.cpp"
     
     # Tensor transport optimizations - temporarily disabled due to constructor issues
     # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"
