@@ -568,6 +568,29 @@ void detail::WebRTCChannel::advance_read_pointer(size_t /*size*/) {
     // No-op for WebRTC - messages are consumed immediately
 }
 
+std::span<uint8_t> detail::WebRTCChannel::get_write_span(size_t size) noexcept {
+    if (!connected_.load()) {
+        return std::span<uint8_t>{};
+    }
+    
+    std::lock_guard<std::mutex> lock(message_mutex_);
+    
+    // Check if we have space in outgoing queue
+    if (outgoing_buffers_.size() >= 100) { // Arbitrary limit
+        return std::span<uint8_t>{};
+    }
+    
+    // Allocate buffer for the message
+    auto buffer = std::make_unique<uint8_t[]>(size);
+    uint8_t* buffer_ptr = buffer.get();
+    
+    // Store with next write ID for later retrieval
+    pending_writes_[next_write_id_] = std::move(buffer);
+    current_write_id_ = next_write_id_++;
+    
+    return std::span<uint8_t>(buffer_ptr, size);
+}
+
 // Deprecated legacy methods (required by ChannelImpl interface)
 void* detail::WebRTCChannel::reserve_space(size_t size) {
     // Use the new API internally

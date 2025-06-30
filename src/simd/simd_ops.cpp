@@ -42,113 +42,6 @@ SIMDCapabilities SIMDCapabilities::detect() {
     return caps;
 }
 
-void simd_memcpy(void *dst, const void *src, size_t size) {
-    if (size < 64) {
-        // For small sizes, use standard memcpy
-        std::memcpy(dst, src, size);
-        return;
-    }
-
-    auto *d = static_cast<uint8_t *>(dst);
-    const auto *s = static_cast<const uint8_t *>(src);
-
-#ifdef __x86_64__
-    // Align destination to 64-byte boundary
-    size_t misalign = reinterpret_cast<uintptr_t>(d) & 63;
-    if (misalign) {
-        size_t align_bytes = 64 - misalign;
-        std::memcpy(d, s, align_bytes);
-        d += align_bytes;
-        s += align_bytes;
-        size -= align_bytes;
-    }
-
-    // Process 64-byte chunks with AVX-512
-    const size_t chunks = size / 64;
-    for (size_t i = 0; i < chunks; ++i) {
-        // Prefetch next cache line
-        _mm_prefetch(s + 64, _MM_HINT_T0);
-
-        __m512i v = _mm512_loadu_si512(s);
-        _mm512_storeu_si512(d, v);
-
-        d += 64;
-        s += 64;
-    }
-    size %= 64;
-
-#elif defined(__aarch64__)
-    // Process 64-byte chunks with NEON
-    const size_t chunks = size / 64;
-    for (size_t i = 0; i < chunks; ++i) {
-        // Prefetch next cache line
-        __builtin_prefetch(s + 64, 0, 1);
-
-        // Load 4x 128-bit vectors
-        uint8x16_t v0 = vld1q_u8(s);
-        uint8x16_t v1 = vld1q_u8(s + 16);
-        uint8x16_t v2 = vld1q_u8(s + 32);
-        uint8x16_t v3 = vld1q_u8(s + 48);
-
-        // Store 4x 128-bit vectors
-        vst1q_u8(d, v0);
-        vst1q_u8(d + 16, v1);
-        vst1q_u8(d + 32, v2);
-        vst1q_u8(d + 48, v3);
-
-        d += 64;
-        s += 64;
-    }
-    size %= 64;
-#endif
-
-    // Handle remainder
-    if (size > 0) {
-        std::memcpy(d, s, size);
-    }
-}
-
-void simd_memset(void *dst, uint8_t value, size_t size) {
-    if (size < 64) {
-        std::memset(dst, value, size);
-        return;
-    }
-
-    auto *d = static_cast<uint8_t *>(dst);
-
-#ifdef __x86_64__
-    // Create 512-bit vector filled with value
-    __m512i fill = _mm512_set1_epi8(value);
-
-    // Process 64-byte chunks
-    const size_t chunks = size / 64;
-    for (size_t i = 0; i < chunks; ++i) {
-        _mm512_storeu_si512(d, fill);
-        d += 64;
-    }
-    size %= 64;
-
-#elif defined(__aarch64__)
-    // Create 128-bit vector filled with value
-    uint8x16_t fill = vdupq_n_u8(value);
-
-    // Process 64-byte chunks
-    const size_t chunks = size / 64;
-    for (size_t i = 0; i < chunks; ++i) {
-        vst1q_u8(d, fill);
-        vst1q_u8(d + 16, fill);
-        vst1q_u8(d + 32, fill);
-        vst1q_u8(d + 48, fill);
-        d += 64;
-    }
-    size %= 64;
-#endif
-
-    // Handle remainder
-    if (size > 0) {
-        std::memset(d, value, size);
-    }
-}
 
 // Template instantiations for TensorOps
 // multiply with different signature is now element-wise multiply in the header
@@ -355,23 +248,38 @@ void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
     dst[0] = src[0]; // First value unchanged
 
 #ifdef __x86_64__
-    const size_t simd_width = 16;
+    static SIMDCapabilities caps = SIMDCapabilities::detect();
     size_t i = 1;
-
-    // Process with SIMD where possible
-    for (; i + simd_width <= count; i += simd_width) {
-        __m512 current = _mm512_loadu_ps(src + i);
-        __m512 prev = _mm512_loadu_ps(src + i - 1);
-        __m512 delta = _mm512_sub_ps(current, prev);
-        _mm512_storeu_ps(dst + i, delta);
+    
+#ifdef __AVX512F__
+    if (caps.has_avx512f) {
+        // Use AVX-512 if both compile-time and runtime support available
+        const size_t simd_width = 16;
+        for (; i + simd_width <= count; i += simd_width) {
+            __m512 current = _mm512_loadu_ps(src + i);
+            __m512 prev = _mm512_loadu_ps(src + i - 1);
+            __m512 delta = _mm512_sub_ps(current, prev);
+            _mm512_storeu_ps(dst + i, delta);
+        }
+    } else
+#endif
+    if (caps.has_avx2) {
+        // Fallback to AVX2
+        const size_t simd_width = 8;
+        for (; i + simd_width <= count; i += simd_width) {
+            __m256 current = _mm256_loadu_ps(src + i);
+            __m256 prev = _mm256_loadu_ps(src + i - 1);
+            __m256 delta = _mm256_sub_ps(current, prev);
+            _mm256_storeu_ps(dst + i, delta);
+        }
     }
 
-    // Handle remainder
+    // Handle remainder with scalar code
     for (; i < count; ++i) {
         dst[i] = src[i] - src[i - 1];
     }
 #else
-    // Scalar fallback
+    // Scalar fallback for non-x86_64
     for (size_t i = 1; i < count; ++i) {
         dst[i] = src[i] - src[i - 1];
     }
@@ -381,34 +289,61 @@ void SIMDCompression::delta_encode(const float *src, float *dst, size_t count) {
 void SIMDCompression::quantize_int8(const float *src, int8_t *dst, size_t count,
                                     float scale) {
 #ifdef __x86_64__
-    const size_t simd_width = 16;
-    const size_t simd_count = count / simd_width;
-    __m512 vscale = _mm512_set1_ps(scale);
+    static SIMDCapabilities caps = SIMDCapabilities::detect();
+    size_t i = 0;
+    
+#ifdef __AVX512F__
+    if (caps.has_avx512f) {
+        // Use AVX-512 if both compile-time and runtime support available
+        const size_t simd_width = 16;
+        const size_t simd_count = count / simd_width;
+        __m512 vscale = _mm512_set1_ps(scale);
 
-    for (size_t i = 0; i < simd_count; ++i) {
-        __m512 vsrc = _mm512_loadu_ps(src + i * simd_width);
-        __m512 scaled = _mm512_mul_ps(vsrc, vscale);
-        __m512i quantized = _mm512_cvtps_epi32(scaled);
+        for (; i < simd_count * simd_width; i += simd_width) {
+            __m512 vsrc = _mm512_loadu_ps(src + i);
+            __m512 scaled = _mm512_mul_ps(vsrc, vscale);
+            __m512i quantized = _mm512_cvtps_epi32(scaled);
 
-        // Pack to int8
-        __m256i low = _mm512_extracti32x8_epi32(quantized, 0);
-        __m256i high = _mm512_extracti32x8_epi32(quantized, 1);
-        __m256i packed = _mm256_packs_epi32(low, high);
-        __m128i result =
-            _mm_packs_epi16(_mm256_extracti128_si256(packed, 0),
-                            _mm256_extracti128_si256(packed, 1));
+            // Pack to int8
+            __m256i low = _mm512_extracti32x8_epi32(quantized, 0);
+            __m256i high = _mm512_extracti32x8_epi32(quantized, 1);
+            __m256i packed = _mm256_packs_epi32(low, high);
+            __m128i result =
+                _mm_packs_epi16(_mm256_extracti128_si256(packed, 0),
+                                _mm256_extracti128_si256(packed, 1));
 
-        _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + i * simd_width),
-                         result);
+            _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + i), result);
+        }
+    } else
+#endif
+    if (caps.has_avx2) {
+        // Fallback to AVX2
+        const size_t simd_width = 8;
+        __m256 vscale = _mm256_set1_ps(scale);
+
+        for (; i + simd_width <= count; i += simd_width) {
+            __m256 vsrc = _mm256_loadu_ps(src + i);
+            __m256 scaled = _mm256_mul_ps(vsrc, vscale);
+            __m256i quantized = _mm256_cvtps_epi32(scaled);
+
+            // Pack to int8
+            __m128i low = _mm256_extracti128_si256(quantized, 0);
+            __m128i high = _mm256_extracti128_si256(quantized, 1);
+            __m128i packed = _mm_packs_epi32(low, high);
+            packed = _mm_packs_epi16(packed, packed);
+
+            // Store lower 8 bytes
+            *reinterpret_cast<int64_t *>(dst + i) = _mm_cvtsi128_si64(packed);
+        }
     }
 
-    // Handle remainder
-    for (size_t i = simd_count * simd_width; i < count; ++i) {
+    // Handle remainder with scalar code
+    for (; i < count; ++i) {
         int32_t quantized = static_cast<int32_t>(src[i] * scale + 0.5f);
         dst[i] = static_cast<int8_t>(std::max(-128, std::min(127, quantized)));
     }
 #else
-    // Scalar fallback
+    // Scalar fallback for non-x86_64
     for (size_t i = 0; i < count; ++i) {
         int32_t quantized = static_cast<int32_t>(src[i] * scale + 0.5f);
         dst[i] = static_cast<int8_t>(std::max(-128, std::min(127, quantized)));

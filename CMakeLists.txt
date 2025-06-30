@@ -27,11 +27,21 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
         if(NOT MSVC)
             add_compile_options("-march=native" "-mavx2" "-mfma")
-            # Enable AVX-512 if available
-            include(CheckCXXCompilerFlag)
-            CHECK_CXX_COMPILER_FLAG("-mavx512f" COMPILER_SUPPORTS_AVX512)
-            if(COMPILER_SUPPORTS_AVX512)
-                add_compile_options("-mavx512f" "-mavx512dq" "-mavx512bw" "-mavx512vl")
+            # Check if CPU actually supports AVX-512 at runtime (mainly Intel)
+            # AMD Ryzen doesn't support AVX-512, so skip for AMD
+            execute_process(COMMAND cat /proc/cpuinfo 
+                          COMMAND grep -i "vendor_id.*intel"
+                          RESULT_VARIABLE IS_INTEL_CPU 
+                          OUTPUT_QUIET ERROR_QUIET)
+            if(IS_INTEL_CPU EQUAL 0)
+                include(CheckCXXCompilerFlag)
+                CHECK_CXX_COMPILER_FLAG("-mavx512f" COMPILER_SUPPORTS_AVX512)
+                if(COMPILER_SUPPORTS_AVX512)
+                    add_compile_options("-mavx512f" "-mavx512dq" "-mavx512bw" "-mavx512vl")
+                    message(STATUS "AVX-512 enabled for Intel CPU")
+                endif()
+            else()
+                message(STATUS "AVX-512 disabled for non-Intel CPU")
             endif()
         else()
             add_compile_options("/arch:AVX2")
