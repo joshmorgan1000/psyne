@@ -6,6 +6,7 @@
 #include "unix_channel.hpp"
 #include "webrtc_channel.hpp"
 #include "websocket_channel.hpp"
+#include "quic_channel.hpp"
 #include <psyne/psyne.hpp>
 #include <regex>
 #include <stdexcept>

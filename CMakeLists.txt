@@ -160,6 +160,12 @@ set(PSYNE_SOURCES
     # SIMD optimizations
     "${CMAKE_SOURCE_DIR}/src/simd/simd_ops.cpp"
     
+    # Transport implementations
+    "${CMAKE_SOURCE_DIR}/src/transport/quic.cpp"
+    
+    # Channel implementations
+    "${CMAKE_SOURCE_DIR}/src/channel/quic_channel.cpp"
+    
     # Tensor transport optimizations - temporarily disabled due to constructor issues
     # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"
 )

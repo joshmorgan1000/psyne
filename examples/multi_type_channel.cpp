@@ -153,7 +153,7 @@ private:
             // Try to receive any message
             size_t msg_size;
             uint32_t msg_type;
-            void* msg_data = channel_->receive_message(msg_size, msg_type);
+            void* msg_data = channel_->receive_raw_message(msg_size, msg_type);
             
             if (!msg_data) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -182,7 +182,7 @@ private:
             }
             
             // Release message back to channel
-            channel_->release_message(msg_data);
+            channel_->release_raw_message(msg_data);
         }
     }
 

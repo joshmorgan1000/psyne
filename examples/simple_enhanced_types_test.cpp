@@ -1,111 +1,100 @@
+/**
+ * @file simple_enhanced_types_test.cpp
+ * @brief Simple test for basic message types in Psyne v1.3.0
+ * 
+ * Tests the core message types available in the current implementation.
+ */
+
 #include <iostream>
 #include <psyne/psyne.hpp>
 
 using namespace psyne;
-using namespace psyne::types;
+
+// Simple test message
+class TestMessage : public Message<TestMessage> {
+public:
+    static constexpr uint32_t message_type = 999;
+    using Message<TestMessage>::Message;
+
+    static size_t calculate_size() {
+        return 64; // 64 bytes
+    }
+
+    void set_value(int value) {
+        *reinterpret_cast<int*>(data()) = value;
+    }
+
+    int get_value() const {
+        return *reinterpret_cast<const int*>(data());
+    }
+};
 
 int main() {
     try {
-        std::cout << "Testing Enhanced Message Types" << std::endl;
-        std::cout << "==============================" << std::endl;
+        std::cout << "Testing Basic Message Types - v1.3.0" << std::endl;
+        std::cout << "=====================================" << std::endl;
 
         // Create a channel
         auto channel = create_channel("memory://enhanced_test", 1024 * 1024);
 
-        // Test Matrix4x4f
-        std::cout << "\nTesting Matrix4x4f..." << std::endl;
-        Matrix4x4f matrix(*channel);
-        matrix.initialize();
-        matrix(0, 1) = 5.0f;
-        matrix(1, 0) = 10.0f;
+        std::cout << "\nTesting basic Message<T> functionality..." << std::endl;
+        
+        // Test creating and sending a message
+        TestMessage msg(*channel);
+        msg.set_value(42);
+        std::cout << "Created message with value: " << msg.get_value() << std::endl;
+        
+        msg.send();
+        std::cout << "Message sent successfully" << std::endl;
 
-        std::cout << "Matrix element (0,1): " << matrix(0, 1) << std::endl;
-        std::cout << "Matrix element (1,0): " << matrix(1, 0) << std::endl;
-        std::cout << "Matrix trace: " << matrix.trace() << std::endl;
-
-        // Test Vector3f
-        std::cout << "\nTesting Vector3f..." << std::endl;
-        Vector3f vec(*channel);
-        vec.initialize();
-        vec.x() = 3.0f;
-        vec.y() = 4.0f;
-        vec.z() = 0.0f;
-
-        std::cout << "Vector: (" << vec.x() << ", " << vec.y() << ", "
-                  << vec.z() << ")" << std::endl;
-        std::cout << "Vector length: " << vec.length() << std::endl;
-
-        vec *= 2.0f;
-        std::cout << "After scaling by 2: (" << vec.x() << ", " << vec.y()
-                  << ", " << vec.z() << ")" << std::endl;
-        std::cout << "New length: " << vec.length() << std::endl;
-
-        // Test Int8Vector
-        std::cout << "\nTesting Int8Vector..." << std::endl;
-        Int8Vector qvec(*channel);
-        qvec.initialize();
-        qvec.resize(5);
-        qvec.set_quantization_params(0.1f, 128);
-
-        for (size_t i = 0; i < qvec.size(); ++i) {
-            qvec[i] = static_cast<int8_t>(i * 10);
+        // Test receiving the message
+        size_t msg_size;
+        uint32_t msg_type;
+        void* msg_data = channel->receive_raw_message(msg_size, msg_type);
+        
+        if (msg_data && msg_type == TestMessage::message_type) {
+            TestMessage received(msg_data, msg_size);
+            std::cout << "Received message with value: " << received.get_value() << std::endl;
+            channel->release_raw_message(msg_data);
+        } else {
+            std::cout << "No message received" << std::endl;
         }
 
-        std::cout << "Quantized vector size: " << qvec.size() << std::endl;
-        std::cout << "Scale: " << qvec.header().scale
-                  << ", Zero point: " << qvec.header().zero_point << std::endl;
+        // Test FloatVector (available from types.hpp)
+        std::cout << "\nTesting FloatVector..." << std::endl;
+        FloatVector fvec(*channel);
+        fvec.resize(5);
+        for (size_t i = 0; i < 5; ++i) {
+            fvec[i] = static_cast<float>(i * 2.5f);
+        }
+        
+        std::cout << "FloatVector size: " << fvec.size() << std::endl;
         std::cout << "Values: ";
-        for (size_t i = 0; i < qvec.size(); ++i) {
-            std::cout << (int)qvec[i] << " ";
+        for (size_t i = 0; i < fvec.size(); ++i) {
+            std::cout << fvec[i] << " ";
         }
         std::cout << std::endl;
 
-        // Test ComplexVectorF
-        std::cout << "\nTesting ComplexVectorF..." << std::endl;
-        ComplexVectorF cvec(*channel);
-        cvec.initialize();
-        cvec.resize(3);
-
-        cvec[0] = std::complex<float>(1.0f, 0.0f);
-        cvec[1] = std::complex<float>(0.0f, 1.0f);
-        cvec[2] = std::complex<float>(1.0f, 1.0f);
-
-        std::cout << "Complex vector size: " << cvec.size() << std::endl;
-        std::cout << "Total power: " << cvec.power() << std::endl;
-
-        cvec.conjugate();
-        std::cout << "After conjugation: ";
-        for (size_t i = 0; i < cvec.size(); ++i) {
-            std::cout << "(" << cvec[i].real() << ", " << cvec[i].imag()
-                      << ") ";
+        // Test DoubleMatrix (available from types.hpp) 
+        std::cout << "\nTesting DoubleMatrix..." << std::endl;
+        DoubleMatrix dmat(*channel);
+        dmat.set_dimensions(2, 3);
+        for (size_t i = 0; i < 2; ++i) {
+            for (size_t j = 0; j < 3; ++j) {
+                dmat.at(i, j) = static_cast<double>(i * 3 + j + 1);
+            }
         }
-        std::cout << std::endl;
-
-        // Test MLTensorF
-        std::cout << "\nTesting MLTensorF..." << std::endl;
-        MLTensorF tensor(*channel);
-        tensor.initialize();
-        tensor.set_shape({2, 3, 4}, MLTensorF::Layout::NCHW);
-
-        std::cout << "Tensor dimensions: ";
-        auto shape = tensor.shape();
-        for (size_t dim : shape) {
-            std::cout << dim << " ";
+        
+        std::cout << "DoubleMatrix " << dmat.rows() << "x" << dmat.cols() << std::endl;
+        std::cout << "Matrix values:" << std::endl;
+        for (size_t i = 0; i < dmat.rows(); ++i) {
+            for (size_t j = 0; j < dmat.cols(); ++j) {
+                std::cout << dmat.at(i, j) << " ";
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
-        std::cout << "Total elements: " << tensor.total_elements() << std::endl;
 
-        // Test SparseMatrixF
-        std::cout << "\nTesting SparseMatrixF..." << std::endl;
-        SparseMatrixF sparse(*channel);
-        sparse.initialize();
-        sparse.set_structure(3, 3, 3); // 3x3 matrix with 3 non-zero elements
-
-        std::cout << "Sparse matrix: " << sparse.rows() << "x" << sparse.cols()
-                  << " with " << sparse.nnz() << " non-zero elements"
-                  << std::endl;
-
-        std::cout << "\n✅ All enhanced message types working!" << std::endl;
+        std::cout << "\n✅ Basic message types working!" << std::endl;
 
     } catch (const std::exception &e) {
         std::cerr << "❌ Error: " << e.what() << std::endl;

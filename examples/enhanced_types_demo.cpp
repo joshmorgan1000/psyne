@@ -39,13 +39,13 @@ void demo_complex_vectors() {
     // Receive and verify
     size_t msg_size;
     uint32_t msg_type;
-    void* msg_data = channel->receive_message(msg_size, msg_type);
+    void* msg_data = channel->receive_raw_message(msg_size, msg_type);
     
     if (msg_data && msg_type == ComplexVectorF::message_type) {
         ComplexVectorF received(msg_data, msg_size);
         std::cout << "Received signal with " << received.size() << " samples\n";
         std::cout << "First sample: " << received[0] << std::endl;
-        channel->release_message(msg_data);
+        channel->release_raw_message(msg_data);
     }
 }
 
@@ -185,7 +185,7 @@ void demo_zero_copy_benefits() {
     // Receive
     size_t msg_size;
     uint32_t msg_type;
-    void* msg_data = channel->receive_message(msg_size, msg_type);
+    void* msg_data = channel->receive_raw_message(msg_size, msg_type);
     
     if (msg_data && msg_type == MLTensorF::message_type) {
         MLTensorF received(msg_data, msg_size);
@@ -195,7 +195,7 @@ void demo_zero_copy_benefits() {
         std::cout << "Same memory? " << (data_ptr == received_ptr ? "YES (zero-copy!)" : "NO") << "\n";
         std::cout << "Data size: " << received.total_elements() * sizeof(float) / (1024.0 * 1024.0) << " MB\n";
         
-        channel->release_message(msg_data);
+        channel->release_raw_message(msg_data);
     }
 }
 

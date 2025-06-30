@@ -115,7 +115,7 @@ void demonstrate_dynamic_messages() {
         for (int i = 0; i < 100; ++i) {
             size_t msg_size;
             uint32_t msg_type;
-            void* msg_data = channel->receive_message(msg_size, msg_type);
+            void* msg_data = channel->receive_raw_message(msg_size, msg_type);
             
             if (msg_data && msg_type == DynamicDataMessage::message_type) {
                 DynamicDataMessage msg(msg_data, msg_size);
@@ -150,7 +150,7 @@ void demonstrate_dynamic_messages() {
                               << ", size=" << header.data_size << " bytes\n";
                 }
                 
-                channel->release_message(msg_data);
+                channel->release_raw_message(msg_data);
             } else {
                 std::this_thread::sleep_for(10ms);
                 i--; // Retry
@@ -253,7 +253,7 @@ void demonstrate_zero_copy_benefits() {
         // Receive
         size_t msg_size;
         uint32_t msg_type;
-        void* recv_data = channel->receive_message(msg_size, msg_type);
+        void* recv_data = channel->receive_raw_message(msg_size, msg_type);
         
         if (recv_data) {
             auto elapsed = std::chrono::high_resolution_clock::now() - start;
@@ -266,7 +266,7 @@ void demonstrate_zero_copy_benefits() {
             std::cout << "  Recv pointer: " << recv_data << "\n";
             std::cout << "  Same memory? " << (send_ptr == recv_data ? "YES (zero-copy!)" : "NO") << "\n";
             
-            channel->release_message(recv_data);
+            channel->release_raw_message(recv_data);
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

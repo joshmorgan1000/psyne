@@ -62,6 +62,7 @@ add_psyne_example(test_bytevector)
 add_psyne_example(websocket_demo)
 add_psyne_example(webrtc_simple_example)
 add_psyne_example(webrtc_p2p_demo)
+add_psyne_example(quic_demo)
 add_psyne_example(windows_test)
 
 # GPU examples (optional)

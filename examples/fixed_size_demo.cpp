@@ -151,7 +151,7 @@ int main() {
     // Receive and process
     size_t msg_size;
     uint32_t msg_type;
-    void* msg_data = channel->receive_message(msg_size, msg_type);
+    void* msg_data = channel->receive_raw_message(msg_size, msg_type);
     
     if (msg_data && msg_type == Vec64f::message_type) {
         Vec64f received(msg_data, msg_size);
@@ -165,7 +165,7 @@ int main() {
         std::cout << "  Received at:   " << static_cast<void*>(received.data()) << "\n";
         std::cout << "  Message is a view into the ring buffer - no copying occurred\n";
         
-        channel->release_message(msg_data);
+        channel->release_raw_message(msg_data);
     }
 
     // Demonstrate matrix operations

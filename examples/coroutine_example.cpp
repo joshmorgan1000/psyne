@@ -51,7 +51,7 @@ asio::awaitable<void> message_processor(Channel* channel, asio::io_context& io) 
         // Try to receive message
         size_t msg_size;
         uint32_t msg_type;
-        void* msg_data = channel->receive_message(msg_size, msg_type);
+        void* msg_data = channel->receive_raw_message(msg_size, msg_type);
         
         if (msg_data && msg_type == TextMessage::message_type) {
             TextMessage msg(msg_data, msg_size);
@@ -65,7 +65,7 @@ asio::awaitable<void> message_processor(Channel* channel, asio::io_context& io) 
             std::cout << "[Processor] Processed: " << text << std::endl;
             
             // Release the message
-            channel->release_message(msg_data);
+            channel->release_raw_message(msg_data);
 
             if (text == "quit") {
                 break;
@@ -94,15 +94,20 @@ asio::awaitable<void> message_sender(Channel* channel, asio::io_context& io) {
         timer.expires_after(std::chrono::milliseconds(200));
         co_await timer.async_wait(asio::use_awaitable);
 
+        bool sent = false;
         try {
             // Create and send message
             TextMessage msg(*channel);
             msg.set_text(text);
             msg.send();
             std::cout << "[Sender] Sent: " << text << std::endl;
+            sent = true;
         } catch (const std::runtime_error& e) {
             std::cout << "[Sender] Buffer full, retrying..." << std::endl;
             // In production, implement proper backpressure handling
+        }
+        
+        if (!sent) {
             timer.expires_after(std::chrono::milliseconds(50));
             co_await timer.async_wait(asio::use_awaitable);
         }

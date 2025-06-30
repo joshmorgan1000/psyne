@@ -21,7 +21,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <psyne/channel.hpp>
+#include "../channel/channel_impl.hpp"
 #include <queue>
 #include <string>
 #include <thread>
@@ -220,6 +220,11 @@ public:
     QUICConnectionState state() const {
         return state_;
     }
+    
+    // Allow QUICServer to set connection state (friend access)
+    void set_state(QUICConnectionState new_state) {
+        state_ = new_state;
+    }
     bool is_connected() const {
         return state_ == QUICConnectionState::ESTABLISHED;
     }
@@ -351,6 +356,24 @@ private:
 };
 
 /**
+ * @brief QUIC client for creating connections
+ */
+class QUICClient {
+public:
+    QUICClient(const QUICConfig &config = {});
+    ~QUICClient();
+    
+    /**
+     * @brief Connect to a QUIC server
+     */
+    std::shared_ptr<QUICConnection> connect(const std::string &host, uint16_t port);
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+/**
  * @brief QUIC server for handling multiple connections
  */
 class QUICServer {
@@ -389,7 +412,7 @@ private:
     QUICConfig config_;
     std::atomic<bool> running_{false};
 
-    std::mutex connections_mutex_;
+    mutable std::mutex connections_mutex_;
     std::vector<std::shared_ptr<QUICConnection>> connections_;
 
     std::thread acceptor_thread_;
@@ -401,19 +424,19 @@ private:
 /**
  * @brief QUIC channel adapter for psyne Channel interface
  */
-class QUICChannel : public Channel {
+class QUICChannel {
 public:
     QUICChannel(std::shared_ptr<QUICConnection> connection);
-    ~QUICChannel() override;
+    ~QUICChannel();
 
     // Channel interface
-    size_t send(const void *data, size_t size, uint32_t type_id = 0) override;
+    size_t send(const void *data, size_t size, uint32_t type_id = 0);
     size_t receive(void *buffer, size_t buffer_size,
-                   uint32_t *type_id = nullptr) override;
-    bool try_send(const void *data, size_t size, uint32_t type_id = 0) override;
+                   uint32_t *type_id = nullptr);
+    bool try_send(const void *data, size_t size, uint32_t type_id = 0);
     bool try_receive(void *buffer, size_t buffer_size,
                      size_t *received_size = nullptr,
-                     uint32_t *type_id = nullptr) override;
+                     uint32_t *type_id = nullptr);
 
     // QUIC-specific access
     std::shared_ptr<QUICConnection> connection() const {

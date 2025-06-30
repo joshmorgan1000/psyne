@@ -20,6 +20,7 @@
 #include "../src/channel/tcp_channel_stub.hpp"
 #include "../src/compression/compression.hpp"
 #include "channel/webrtc_channel.hpp"
+#include "channel/quic_channel.hpp"
 
 namespace psyne {
 
@@ -436,7 +437,7 @@ Channel::create(const std::string &uri, size_t buffer_size, ChannelMode mode,
     std::string protocol = uri.substr(0, uri.find("://"));
     if (protocol != "memory" && protocol != "ipc" && protocol != "unix" &&
         protocol != "tcp" && protocol != "ws" && protocol != "wss" &&
-        protocol != "webrtc") {
+        protocol != "webrtc" && protocol != "quic") {
         throw std::invalid_argument("Unsupported protocol: " + protocol);
     }
 
@@ -493,6 +494,51 @@ Channel::create(const std::string &uri, size_t buffer_size, ChannelMode mode,
         };
         
         return std::make_unique<WebRTCChannelAdapter>(std::move(webrtc_impl));
+    } else if (protocol == "quic") {
+        // Create QUIC channel
+        auto quic_impl = detail::create_quic_channel(
+            uri, buffer_size, mode, type, compression_config);
+
+        // QUIC adapter similar to WebRTC
+        class QUICChannelAdapter : public Channel {
+        public:
+            explicit QUICChannelAdapter(std::unique_ptr<detail::ChannelImpl> impl) 
+                : Channel(impl->uri(), 65536, impl->type()) {
+                impl_.reset(static_cast<detail::QUICChannel*>(impl.release()));
+            }
+            
+            void stop() override { impl_->stop(); }
+            bool is_stopped() const override { return impl_->is_stopped(); }
+            void *receive_raw_message(size_t &size, uint32_t &type) override {
+                return impl_->receive_message(size, type);
+            }
+            void release_raw_message(void *handle) override {
+                impl_->release_message(handle);
+            }
+            bool has_metrics() const override { return false; }
+            debug::ChannelMetrics get_metrics() const override { return {}; }
+            void reset_metrics() override {}
+            uint32_t reserve_write_slot(size_t size) noexcept override {
+                return impl_->reserve_write_slot(size);
+            }
+            void notify_message_ready(uint32_t offset, size_t size) noexcept override {
+                impl_->notify_message_ready(offset, size);
+            }
+            RingBuffer& get_ring_buffer() noexcept override {
+                return impl_->get_ring_buffer();
+            }
+            const RingBuffer& get_ring_buffer() const noexcept override {
+                return const_cast<QUICChannelAdapter*>(this)->impl_->get_ring_buffer();
+            }
+            void advance_read_pointer(size_t size) noexcept override {
+                impl_->advance_read_pointer(size);
+            }
+            
+        private:
+            std::unique_ptr<detail::QUICChannel> impl_;
+        };
+        
+        return std::make_unique<QUICChannelAdapter>(std::move(quic_impl));
     } else {
         // Default to memory channel for all other protocols (for now)
         return std::make_unique<TestChannel>(uri, buffer_size, type);

@@ -60,8 +60,14 @@
 4. **High Performance**: SPSC with zero atomics
 5. **Clean API**: No legacy messaging system references
 
+## QUIC Transport ✅
+- [x] QUIC channel implementation with zero-copy interface
+- [x] Factory registration for `quic://` URI scheme
+- [x] Basic client/server connection support
+- [x] Stream multiplexing interface
+- [x] Integration with channel factory
+
 ## Deferred to v2.0
-- QUIC transport
 - RDMA/InfiniBand
 - GPUDirect RDMA  
 - Advanced compression

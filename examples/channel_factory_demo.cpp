@@ -115,12 +115,12 @@ void demo_memory_channel() {
         for (int i = 0; i < 5; ++i) {
             size_t msg_size;
             uint32_t msg_type;
-            void* msg_data = channel->receive_message(msg_size, msg_type);
+            void* msg_data = channel->receive_raw_message(msg_size, msg_type);
             
             if (msg_data && msg_type == CounterMessage::message_type) {
                 CounterMessage msg(msg_data, msg_size);
                 std::cout << "[Consumer] Received count: " << msg.get_count() << std::endl;
-                channel->release_message(msg_data);
+                channel->release_raw_message(msg_data);
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 i--; // Retry
