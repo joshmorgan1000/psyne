@@ -12,6 +12,7 @@
 #include <thread>
 #include <vector>
 #include <atomic>
+#include <iomanip>
 
 using namespace psyne;
 

@@ -6,7 +6,7 @@
  * and can be used for P2P gaming applications.
  */
 
-#include "include/psyne/psyne.hpp"
+#include <psyne/psyne.hpp>
 #include <chrono>
 #include <iostream>
 #include <thread>
