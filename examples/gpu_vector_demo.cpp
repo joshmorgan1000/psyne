@@ -1,3 +1,17 @@
+/**
+ * @file gpu_vector_demo.cpp
+ * @brief Demonstrates GPU-aware vector operations
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This example shows:
+ * - Creating GPU contexts with multiple backend support
+ * - Using FloatVector with GPU acceleration
+ * - Unified CPU/GPU data views
+ * - Integration with Eigen for linear algebra
+ * - Automatic fallback to CPU when GPU is unavailable
+ */
+
 #include <iostream>
 #include <psyne/psyne.hpp>
 #include <Eigen/Core>

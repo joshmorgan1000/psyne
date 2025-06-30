@@ -1,3 +1,24 @@
+/**
+ * @file tcp_server.cpp
+ * @brief TCP server example demonstrating network messaging
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This example shows:
+ * - Creating a TCP server that listens on port 9999
+ * - Receiving FloatVector messages from clients
+ * - Processing messages and sending replies (echo with 2x values)
+ * - Graceful timeout handling
+ * 
+ * Pairs with tcp_client.cpp for complete client-server communication.
+ * 
+ * @example
+ * @code
+ * ./tcp_server  # Start server first
+ * ./tcp_client  # In another terminal
+ * @endcode
+ */
+
 #include <chrono>
 #include <iostream>
 #include <psyne/psyne.hpp>
@@ -5,6 +26,10 @@
 
 using namespace psyne;
 
+/**
+ * @brief Main function for TCP server
+ * @return 0 on success, 1 on failure
+ */
 int main() {
     std::cout << "TCP Server Example\n";
     std::cout << "==================\n\n";

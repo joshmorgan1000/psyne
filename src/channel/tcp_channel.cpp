@@ -1,3 +1,15 @@
+/**
+ * @file tcp_channel.cpp
+ * @brief TCP/IP network channel implementation
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * Implementation of the TCPChannel class for network communication.
+ * This file provides the core TCP networking functionality using
+ * Boost.Asio, including server/client modes, message framing,
+ * compression support, and zero-copy I/O where possible.
+ */
+
 #include "tcp_channel.hpp"
 #include "../utils/checksum.hpp"
 #include <cstring>

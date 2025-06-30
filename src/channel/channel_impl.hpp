@@ -1,5 +1,15 @@
 #pragma once
 
+/**
+ * @file channel_impl.hpp
+ * @brief Base implementation class for all channel types
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This file contains the abstract base class for channel implementations.
+ * All transport-specific channels (TCP, IPC, Unix, etc.) derive from this class.
+ */
+
 #include "../memory/ring_buffer_impl.hpp"
 #include <atomic>
 #include <memory>
@@ -13,7 +23,17 @@ class RingBuffer;
 
 namespace detail {
 
-// Base implementation class
+/**
+ * @class ChannelImpl
+ * @brief Abstract base class for channel implementations
+ * 
+ * This class defines the core interface that all channel implementations must provide.
+ * It follows the zero-copy principles outlined in CORE_DESIGN.md, providing direct
+ * access to the underlying ring buffer for maximum performance.
+ * 
+ * @note The legacy reserve_space/commit_message interface is deprecated as it
+ *       violates zero-copy principles by requiring intermediate copies.
+ */
 class ChannelImpl {
 public:
     ChannelImpl(const std::string &uri, size_t buffer_size, ChannelMode mode,
@@ -23,11 +43,46 @@ public:
 
     virtual ~ChannelImpl() = default;
 
-    // Zero-copy core operations (aligned with CORE_DESIGN.md)
+    /**
+     * @brief Reserve a write slot in the ring buffer
+     * @param size Number of bytes to reserve
+     * @return Offset in ring buffer, or BUFFER_FULL if no space available
+     * 
+     * This is the core zero-copy write operation. It reserves space in the
+     * ring buffer without copying any data.
+     */
     virtual uint32_t reserve_write_slot(size_t size) = 0;
+    
+    /**
+     * @brief Notify that a message is ready at the given offset
+     * @param offset Offset in ring buffer where message starts
+     * @param size Size of the message in bytes
+     * 
+     * This completes a zero-copy write by updating the write pointer and
+     * notifying any waiting readers.
+     */
     virtual void notify_message_ready(uint32_t offset, size_t size) = 0;
+    
+    /**
+     * @brief Get direct access to the underlying ring buffer
+     * @return Reference to the ring buffer
+     * 
+     * Provides direct access for zero-copy operations.
+     */
     virtual RingBuffer& get_ring_buffer() = 0;
+    
+    /**
+     * @brief Get const access to the underlying ring buffer
+     * @return Const reference to the ring buffer
+     */
     virtual const RingBuffer& get_ring_buffer() const = 0;
+    
+    /**
+     * @brief Advance the read pointer after consuming data
+     * @param size Number of bytes consumed
+     * 
+     * This completes a zero-copy read by updating the read pointer.
+     */
     virtual void advance_read_pointer(size_t size) = 0;
     
     // Legacy operations - DEPRECATED (violate zero-copy principles)
@@ -41,10 +96,20 @@ public:
     // Buffer full constant for backpressure
     static constexpr uint32_t BUFFER_FULL = 0xFFFFFFFF;
 
-    // Control
+    /**
+     * @brief Stop the channel
+     * 
+     * Sets the stopped flag to signal channel shutdown.
+     * This is used for graceful termination.
+     */
     void stop() {
         stopped_.store(true);
     }
+    
+    /**
+     * @brief Check if the channel is stopped
+     * @return true if stopped, false otherwise
+     */
     bool is_stopped() const {
         return stopped_.load();
     }

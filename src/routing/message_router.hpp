@@ -1,5 +1,17 @@
 #pragma once
 
+/**
+ * @file message_router.hpp
+ * @brief Message routing and filtering framework
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This file provides a flexible message routing system that allows
+ * filtering and routing messages to different destinations based on
+ * type, size, content, or custom predicates. The router supports
+ * both synchronous and asynchronous routing modes.
+ */
+
 #include <atomic>
 #include <functional>
 #include <memory>

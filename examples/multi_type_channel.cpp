@@ -1,3 +1,16 @@
+/**
+ * @file multi_type_channel.cpp
+ * @brief Demonstrates using multiple message types on a single channel
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This example shows how to:
+ * - Define custom message types for different purposes
+ * - Send multiple message types over the same channel
+ * - Handle different message types on the receiving end
+ * - Use control messages to coordinate producers and consumers
+ */
+
 #include <algorithm>
 #include <atomic>
 #include <iostream>
@@ -7,7 +20,13 @@
 
 using namespace psyne;
 
-// Custom message type for control commands
+/**
+ * @class ControlMessage
+ * @brief Message type for sending control commands
+ * 
+ * Used to send commands like Start, Stop, Reset to coordinate
+ * between producers and consumers.
+ */
 class ControlMessage : public Message<ControlMessage> {
 public:
     static constexpr uint32_t message_type = 1001;

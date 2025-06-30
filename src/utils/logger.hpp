@@ -1,5 +1,19 @@
 #pragma once
 
+/**
+ * @file logger.hpp
+ * @brief Thread-safe logging utilities with progress bar support
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This file provides a comprehensive logging system with:
+ * - Multiple log levels (trace, debug, info, warn, error)
+ * - Thread-safe operation
+ * - Progress bar support for long-running operations
+ * - Colored output for better readability
+ * - Per-thread context tracking
+ */
+
 #include "random_utils.hpp"
 #include "time_utils.hpp"
 #include "types.hpp"
@@ -23,7 +37,13 @@ using namespace psyne::types;
 
 // Don't use 'using' to avoid conflicts - use InternalInternalLogLevel directly
 
-// Progress bar structure - exactly as you designed it
+/**
+ * @struct ProgressBar
+ * @brief Progress bar state for tracking long-running operations
+ * 
+ * Maintains the state of a progress bar including its position,
+ * progress percentage, and visual parameters.
+ */
 struct ProgressBar {
     std::string id;
     std::string thread_name;
@@ -35,8 +55,14 @@ struct ProgressBar {
     uint64_t start_time;
 };
 
-// GlobalContext - your complete design for multi-threaded progress bars and
-// logging
+/**
+ * @struct GlobalContext
+ * @brief Global context for thread-safe logging and progress tracking
+ * 
+ * This singleton structure maintains the global state for the logging system,
+ * including all active progress bars, log history, and thread-specific contexts.
+ * It ensures thread-safe operation through careful use of mutexes.
+ */
 struct GlobalContext {
     std::atomic<uint64_t> stdout_current_line{0};
     std::unique_lock<std::mutex> stdout_thread_lock;

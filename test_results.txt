@@ -1,0 +1,201 @@
+=== PSYNE EXAMPLES TEST REPORT ===
+Generated: Mon Jun 30 01:29:06 PM EDT 2025
+==================================
+
+=== Standalone Examples ===
+
+Testing arrow_demo... PASS
+Testing async_messaging_demo... PASS
+Testing c_api_demo... FAIL
+  > Psyne C API Demo
+  > Version: 1.2.0
+  > Created channel
+  > 
+  > === Basic Producer/Consumer Test ===
+Testing collective_simple_test... PASS
+Testing compression_demo... FAIL
+  > Psyne Compression Demo (EXPERIMENTAL)
+  > ====================================
+  > 
+  > ⚠️  WARNING: Compression is experimental for v2.0
+  > 
+Testing custom_allocator_demo... PASS
+Testing fixed_size_demo... PASS
+Testing performance_demo... PASS
+Testing simd_demo... PASS
+Testing tensor_optimization_demo... PASS
+Testing test_bytevector... PASS
+Testing test_floatvector... FAIL
+  > Testing FloatVector in single-type channel...
+  > Test failed: Channel buffer full
+Testing windows_test... PASS
+Testing simple_messaging_zero_copy... PASS
+Testing filtered_fanout_demo... PASS
+Testing pair_pattern_demo... PASS
+Testing modern_cpp20_demo... PASS
+Testing enhanced_types_demo... ./run_all_tests.sh: line 18: 72572 Aborted                 timeout ${timeout}s bash -c "$command" > /tmp/test_output_$$.txt 2>&1
+FAIL
+  > Psyne Enhanced Types Demo
+  > =========================
+  > Demonstrating advanced message types for AI/ML applications
+  > 
+  > === Complex Vector Demo ===
+Testing message_types_demo... PASS
+Testing simple_enhanced_types_test... FAIL
+  > Testing Basic Message Types - v1.3.0
+  > =====================================
+  > 
+  > Testing basic Message<T> functionality...
+  > Created message with value: 42
+Testing high_performance_messaging... PASS
+Testing metrics_demo... FAIL
+  > Created channel with metrics enabled
+  > Sending messages...
+  > Error: Channel buffer full
+Testing debug_demo... FAIL
+  > Psyne Debug Demo - v1.3.0
+  > =========================
+  > === Channel Metrics Demo ===
+  > Channel created with metrics enabled
+  > URI: memory://debug_test
+Testing zero_copy_showcase... FAIL
+  > 🚀 Psyne Zero-Copy Architecture Demo
+  > ====================================
+  > 
+  > ✅ Created SPSC channel with 64MB ring buffer
+  >    - Zero atomics for single producer/consumer
+Testing simple_messaging... ./run_all_tests.sh: line 18: 72618 Aborted                 timeout ${timeout}s bash -c "$command" > /tmp/test_output_$$.txt 2>&1
+FAIL
+  > terminate called after throwing an instance of 'std::runtime_error'
+  >   what():  Channel buffer full
+  > timeout: the monitored command dumped core
+Testing dynamic_allocation_demo... FAIL
+  > Psyne Dynamic Allocation Demo
+  > =============================
+  > Demonstrating dynamic message sizes and buffer management
+  > 
+  > === Dynamic Message Allocation Demo ===
+Testing multi_type_channel... PASS
+Testing coroutine_example... FAIL
+  > Psyne Coroutine Example
+  > =======================
+  > 
+  > Demonstrating C++20 coroutines with zero-copy messaging
+  > 
+Testing publish_subscribe_demo... ./run_all_tests.sh: line 18: 72648 Aborted                 timeout ${timeout}s bash -c "$command" > /tmp/test_output_$$.txt 2>&1
+FAIL
+  > terminate called after throwing an instance of 'std::invalid_argument'
+  >   what():  Unsupported protocol: udp
+  > timeout: the monitored command dumped core
+Testing request_reply_demo... FAIL
+Testing routing_demo_final... FAIL
+  > Psyne Message Routing and Filtering Demo
+  > ========================================
+  > === Basic Message Routing Demo ===
+  > 
+  > Sending messages...
+Testing rudp_demo... PASS
+
+=== Examples with Command Line Arguments ===
+
+Testing channel_factory_demo (memory)... FAIL
+  > Psyne Channel Factory Demo
+  > ==========================
+  > 
+  > === Memory Channel Demo ===
+  > Creating channel:
+Testing collective_demo... FAIL
+  > Usage: ./examples/collective_demo <rank> <world_size>
+  > Example: ./examples/collective_demo 0 3
+  > Note: This demo simulates collective operations using in-memory channels.
+  >       For true distributed operations, use network channels.
+Testing tcp_demo... PASS
+Testing unix_socket_demo... PASS
+Testing websocket_demo... FAIL
+  > Starting WebSocket client...
+  > Client connected to WebSocket server
+  > Error: Channel buffer full
+
+=== IPC Producer/Consumer Pair ===
+
+Testing ipc_producer_consumer... FAIL
+  > IPC Consumer Example
+  > ===================
+  > 
+  > Connected to IPC channel: ipc://demo_channel
+  > Waiting for messages...
+
+=== TCP Server/Client Pair ===
+
+Testing tcp_server_client... FAIL
+  > TCP Client Example
+  > ==================
+  > 
+  > Error: TCP channels require full psyne library, not available in minimal build
+
+=== Producer/Consumer (Threaded) ===
+
+Testing producer_consumer... ./run_all_tests.sh: line 18: 72727 Aborted                 timeout ${timeout}s bash -c "$command" > /tmp/test_output_$$.txt 2>&1
+FAIL
+  > terminate called after throwing an instance of 'std::runtime_error'
+  >   what():  Channel buffer full
+  > timeout: the monitored command dumped core
+
+=== Channel Patterns ===
+
+Testing channel_patterns_showcase... FAIL
+  > 🎯 Psyne Channel Patterns Showcase
+  > ===================================
+  > Demonstrating zero-copy optimizations across all transport types
+  > 
+  > 🚄 Local IPC Performance (SPSC Zero Atomics)
+
+=== Network Examples (May Fail Without Setup) ===
+
+Testing udp_multicast_demo... PASS
+Testing quic_demo... FAIL
+  > [1m[35mPsyne QUIC Transport Demo[0m
+  > Version 1.3.0 - Modern Transport Protocol
+  > 
+  > ============================================================
+  > [1m[36mQUIC TRANSPORT FEATURES[0m
+Testing webrtc_demo... FAIL
+  > 🚀 Psyne WebRTC Demo
+  > =====================
+  > 
+  > ✅ Creating WebRTC channel...
+  > Sending signaling message: 0 to peer demo-peer
+Testing webrtc_p2p_demo... FAIL
+  > Usage: ./examples/webrtc_p2p_demo <player_name>
+  > Example:
+  >   Terminal 1: ./examples/webrtc_p2p_demo player1
+  >   Terminal 2: ./examples/webrtc_p2p_demo player2
+Testing webrtc_simple_example... FAIL
+  > Usage: ./examples/webrtc_simple_example <role>
+  >   role: 'offerer' or 'answerer'
+Testing grpc_demo... FAIL
+  > Usage: ./examples/grpc_demo [server|native-client|tcp-client]
+  > Note: This demo shows TCP-based RPC, simulating gRPC behavior
+Testing debug_multicast... FAIL
+  > === Debug Messaging Demo ===
+  > Demonstrating message debugging techniques
+  > 
+  > Creating and debugging a FloatVector message...
+  > Debug demo failed: Channel buffer full
+
+=== IPC Demo (Special Case) ===
+
+Testing ipc_demo... PASS
+
+=== IPC Test ===
+
+Testing ipc_test... PASS
+
+==================================
+SUMMARY:
+  Passed: 23
+  Failed: 27
+  Total:  50
+==================================
+
+Some tests failed!

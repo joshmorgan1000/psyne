@@ -1,9 +1,31 @@
+/**
+ * @file simple_messaging.cpp
+ * @brief Basic example demonstrating Psyne's zero-copy messaging
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This example shows:
+ * - Creating a channel with a large buffer for FloatVector messages
+ * - Zero-copy message creation directly in the ring buffer
+ * - Sending and receiving messages without any memory copies
+ * - Dynamic sizing within pre-allocated capacity
+ * 
+ * @example
+ * @code
+ * ./simple_messaging
+ * @endcode
+ */
+
 #include <chrono>
 #include <iostream>
 #include <psyne/psyne.hpp>
 
 using namespace psyne;
 
+/**
+ * @brief Main function demonstrating basic Psyne messaging
+ * @return 0 on success, 1 on failure
+ */
 int main() {
     std::cout << "Psyne Simple Messaging Example\n";
     std::cout << "==============================\n\n";

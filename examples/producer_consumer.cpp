@@ -49,7 +49,14 @@ void sensor_producer(Channel &channel, std::atomic<bool> &running) {
     std::cout << "[Producer] Stopped\n";
 }
 
-// Process sensor data with zero-copy
+/**
+ * @brief Consumer thread function that processes sensor data
+ * @param channel Reference to the channel for receiving data
+ * @param running Atomic flag to control thread execution
+ * 
+ * Receives sensor data, computes running statistics (min/max/mean),
+ * and displays results periodically.
+ */
 void sensor_consumer(Channel &channel, std::atomic<bool> &running) {
     std::cout << "[Consumer] Starting sensor data processing...\n";
 

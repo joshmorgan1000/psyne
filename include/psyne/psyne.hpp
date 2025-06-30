@@ -362,23 +362,40 @@ public:
     }
 
 protected:
-    // Access to channel for derived classes
+    /**
+     * @brief Get reference to the channel that owns this message
+     * @return Reference to the channel
+     * 
+     * This is used by derived classes that need to interact with the channel,
+     * for example to check buffer sizes or channel capabilities.
+     */
     Channel &channel() {
         return *channel_;
     }
+    
+    /**
+     * @brief Get const reference to the channel that owns this message
+     * @return Const reference to the channel
+     */
     const Channel &channel() const {
         return *channel_;
     }
 
-    // Called before sending
+    /**
+     * @brief Hook called before sending the message
+     * 
+     * Derived classes can override this to perform validation or
+     * finalization before the message is sent. Default implementation
+     * does nothing.
+     */
     virtual void before_send() {}
 
     // Protected data members - accessible by derived classes
-    uint8_t *data_;  // Pointer into channel's ring buffer
-    size_t size_;    // Size of this message
-    Channel *channel_; // Channel that owns the ring buffer
-    void *handle_;   // Reserved for future use
-    uint32_t offset_; // Offset in ring buffer for zero-copy
+    uint8_t *data_;    ///< Pointer into channel's ring buffer (zero-copy)
+    size_t size_;      ///< Size of this message in bytes
+    Channel *channel_; ///< Channel that owns the ring buffer (null for received messages)
+    void *handle_;     ///< Reserved for future use (legacy compatibility)
+    uint32_t offset_;  ///< Offset in ring buffer for zero-copy operations
 };
 
 // ============================================================================
@@ -408,40 +425,125 @@ public:
 
     using Message<FloatVector>::Message;
 
-    // Calculate required size (must be provided by derived classes)
+    /**
+     * @brief Calculate the required buffer size for FloatVector
+     * @return Size in bytes (64MB)
+     * 
+     * Returns the maximum size needed for a FloatVector message.
+     * This is set to 64MB to accommodate massive GPU workloads
+     * (up to 16,777,216 floats plus header).
+     * 
+     * @note This large size is designed for AI/ML tensor operations.
+     *       For smaller messages, consider using a custom message type.
+     */
     static size_t calculate_size() {
         // Large buffer for 16M+ floats (64MB)
         // 16,777,216 floats * 4 bytes + 8 bytes header = 67,108,872 bytes
         return 64 * 1024 * 1024; // 64MB buffer for massive GPU workloads
     }
 
-    // Array access
+    /**
+     * @brief Array subscript operator for element access
+     * @param index Element index
+     * @return Reference to the element at the specified index
+     * @throws std::out_of_range if index >= size()
+     */
     float &operator[](size_t index);
+    
+    /**
+     * @brief Const array subscript operator for element access
+     * @param index Element index
+     * @return Const reference to the element at the specified index
+     * @throws std::out_of_range if index >= size()
+     */
     const float &operator[](size_t index) const;
 
-    // STL interface
+    /**
+     * @brief Get iterator to the beginning of the vector
+     * @return Pointer to the first element
+     */
     float *begin();
+    
+    /**
+     * @brief Get iterator to the end of the vector
+     * @return Pointer to one past the last element
+     */
     float *end();
+    
+    /**
+     * @brief Get const iterator to the beginning of the vector
+     * @return Const pointer to the first element
+     */
     const float *begin() const;
+    
+    /**
+     * @brief Get const iterator to the end of the vector
+     * @return Const pointer to one past the last element
+     */
     const float *end() const;
 
-    // Size management
+    /**
+     * @brief Get the current number of elements
+     * @return Number of float elements in the vector
+     */
     size_t size() const;
+    
+    /**
+     * @brief Get the maximum possible number of elements
+     * @return Maximum capacity in number of floats
+     * 
+     * The capacity is determined by the buffer size minus the header.
+     */
     size_t capacity() const;
+    
+    /**
+     * @brief Resize the vector to contain new_size elements
+     * @param new_size New number of elements
+     * @throws std::runtime_error if new_size > capacity()
+     * 
+     * If new_size is greater than the current size, new elements
+     * are uninitialized. If smaller, the vector is truncated.
+     */
     void resize(size_t new_size);
 
-    // Assignment from initializer list
+    /**
+     * @brief Assign values from an initializer list
+     * @param values List of float values to assign
+     * @return Reference to this vector
+     * @throws std::runtime_error if values.size() > capacity()
+     * 
+     * Resizes the vector to match the initializer list size and
+     * copies all values.
+     */
     FloatVector &operator=(std::initializer_list<float> values);
 
-    // Initialize the message (called after allocation)
+    /**
+     * @brief Initialize the message after allocation
+     * 
+     * Sets up the header and initializes the size to 0.
+     * Called automatically by the Message constructor.
+     */
     void initialize();
 
-// Placeholder for Eigen integration (when PSYNE_ENABLE_EIGEN is defined)
+// Eigen integration for linear algebra operations
 #ifdef PSYNE_ENABLE_EIGEN
+    /**
+     * @brief Get an Eigen view of this vector
+     * @return Eigen::Map<Eigen::VectorXf> wrapping this vector's data
+     * 
+     * Provides zero-copy integration with Eigen for linear algebra operations.
+     * The returned map directly references this vector's data.
+     * 
+     * @warning The map becomes invalid if the vector is resized or destroyed.
+     */
     auto as_eigen() {
         return Eigen::Map<Eigen::VectorXf>(begin(), size());
     }
 
+    /**
+     * @brief Get a const Eigen view of this vector
+     * @return Eigen::Map<const Eigen::VectorXf> wrapping this vector's data
+     */
     auto as_eigen() const {
         return Eigen::Map<const Eigen::VectorXf>(begin(), size());
     }
@@ -684,21 +786,59 @@ public:
     }
 #endif // PSYNE_ASYNC_SUPPORT
 
-    // Channel control
+    /**
+     * @brief Stop the channel
+     * 
+     * Signals that the channel should stop processing messages.
+     * This is used for graceful shutdown. After calling stop(),
+     * is_stopped() will return true.
+     * 
+     * @note This does not immediately interrupt blocking operations.
+     *       Receivers should check is_stopped() periodically.
+     */
     virtual void stop() {
         stopped_ = true;
     }
+    
+    /**
+     * @brief Check if the channel has been stopped
+     * @return true if stop() has been called, false otherwise
+     */
     virtual bool is_stopped() const {
         return stopped_;
     }
 
-    // Properties
+    /**
+     * @brief Get the channel's URI
+     * @return The URI string (e.g., "memory://buffer1", "tcp://localhost:8080")
+     * 
+     * The URI uniquely identifies the channel and specifies its transport type.
+     */
     virtual const std::string &uri() const {
         return uri_;
     }
+    
+    /**
+     * @brief Get the channel type
+     * @return ChannelType::SingleType or ChannelType::MultiType
+     * 
+     * SingleType channels are optimized for one message type.
+     * MultiType channels can handle multiple message types with runtime dispatch.
+     */
     virtual ChannelType type() const {
         return type_;
     }
+    
+    /**
+     * @brief Get the synchronization mode
+     * @return The channel's ChannelMode (SPSC, SPMC, MPSC, or MPMC)
+     * 
+     * The mode determines thread-safety guarantees:
+     * - SPSC: Single Producer, Single Consumer (lock-free)
+     * - SPMC: Single Producer, Multiple Consumer
+     * - MPSC: Multiple Producer, Single Consumer
+     * - MPMC: Multiple Producer, Multiple Consumer
+     */
     virtual ChannelMode mode() const {
         return mode_;
     }
@@ -773,35 +913,85 @@ public:
     }
     virtual void release_raw_message(void * /*handle*/) {}
 
-    // Debug metrics (optional)
+    /**
+     * @brief Check if this channel has metrics collection enabled
+     * @return true if metrics are being collected, false otherwise
+     * 
+     * Metrics collection adds minimal overhead but provides valuable
+     * performance insights including throughput, latency, and blocking statistics.
+     */
     virtual bool has_metrics() const {
         return false;
     }
+    
+    /**
+     * @brief Get current channel metrics
+     * @return ChannelMetrics structure with performance statistics
+     * 
+     * Returns metrics including:
+     * - messages_sent/received: Total message counts
+     * - bytes_sent/received: Total data volume
+     * - send_blocks/receive_blocks: Times operations blocked
+     * 
+     * @note Returns empty metrics if has_metrics() is false
+     */
     virtual debug::ChannelMetrics get_metrics() const {
         return debug::ChannelMetrics{};
     }
+    
+    /**
+     * @brief Reset all metrics counters to zero
+     * 
+     * Useful for benchmarking specific sections of code or
+     * resetting statistics after warmup periods.
+     */
     virtual void reset_metrics() {}
 
-    // Implementation access for Python bindings
+    /**
+     * @brief Get pointer to implementation (for language bindings)
+     * @return Pointer to internal implementation
+     * 
+     * This method is primarily used by Python bindings and other
+     * language integrations to access the underlying implementation.
+     * 
+     * @warning Direct use of the implementation bypasses the public API
+     *          and may break with future versions.
+     */
     detail::ChannelImpl *get_impl() {
         return impl();
     }
+    
+    /**
+     * @brief Get const pointer to implementation
+     * @return Const pointer to internal implementation
+     */
     const detail::ChannelImpl *get_impl() const {
         return impl();
     }
 
 protected:
     // Member variables for basic implementation
-    std::string uri_;
-    size_t buffer_size_ = 0;
-    ChannelType type_ = ChannelType::MultiType;
-    ChannelMode mode_ = ChannelMode::SPSC;
-    bool stopped_ = false;
+    std::string uri_;                                ///< Channel URI (e.g., "memory://buffer1")
+    size_t buffer_size_ = 0;                         ///< Size of internal ring buffer in bytes
+    ChannelType type_ = ChannelType::MultiType;     ///< SingleType or MultiType channel
+    ChannelMode mode_ = ChannelMode::SPSC;           ///< Synchronization mode (SPSC, SPMC, etc.)
+    bool stopped_ = false;                           ///< Flag indicating channel is stopped
 
-    // Implementation pointer - protected so Message can access
+    /**
+     * @brief Get pointer to the implementation
+     * @return Pointer to implementation or nullptr for base class
+     * 
+     * Derived classes override this to return their specific implementation.
+     * The base Channel class returns nullptr.
+     */
     virtual detail::ChannelImpl *impl() {
         return nullptr;
     }
+    
+    /**
+     * @brief Get const pointer to the implementation
+     * @return Const pointer to implementation or nullptr for base class
+     */
     virtual const detail::ChannelImpl *impl() const {
         return nullptr;
     }

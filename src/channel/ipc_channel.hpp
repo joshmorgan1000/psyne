@@ -1,5 +1,15 @@
 #pragma once
 
+/**
+ * @file ipc_channel.hpp
+ * @brief Inter-Process Communication channel implementation
+ * @author Psyne Contributors
+ * @date 2025
+ * 
+ * This file implements IPC channels using Boost.Interprocess shared memory.
+ * IPC channels enable zero-copy message passing between processes on the same machine.
+ */
+
 #include "channel_impl.hpp"
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/deque.hpp>
@@ -16,20 +26,48 @@ namespace detail {
 
 namespace bip = boost::interprocess;
 
-// Simple IPC message structure
+/**
+ * @struct IPCMessage
+ * @brief Message header for IPC communication
+ * 
+ * This structure represents the header of an IPC message. The actual message
+ * data follows immediately after this header in memory.
+ */
 struct IPCMessage {
-    uint32_t type;
-    uint32_t size;
-    // Data follows immediately after
+    uint32_t type;  ///< Message type identifier
+    uint32_t size;  ///< Size of message data in bytes
+    
+    /**
+     * @brief Get pointer to message data
+     * @return Pointer to data immediately following the header
+     */
     uint8_t *data() {
         return reinterpret_cast<uint8_t *>(this + 1);
     }
+    
+    /**
+     * @brief Get const pointer to message data
+     * @return Const pointer to data immediately following the header
+     */
     const uint8_t *data() const {
         return reinterpret_cast<const uint8_t *>(this + 1);
     }
 };
 
-// IPC Channel using Boost.Interprocess shared memory
+/**
+ * @class IPCChannel
+ * @brief Channel implementation for inter-process communication
+ * 
+ * IPCChannel uses Boost.Interprocess to create shared memory segments that
+ * can be accessed by multiple processes. It implements a ring buffer in
+ * shared memory with named synchronization primitives for thread-safe access.
+ * 
+ * The shared memory segment is named based on the channel URI, allowing
+ * processes to connect by specifying the same URI.
+ * 
+ * @note The shared memory is created in /dev/shm/ on Linux systems
+ * @note The creator process is responsible for cleanup
+ */
 class IPCChannel : public ChannelImpl {
 public:
     IPCChannel(const std::string &uri, size_t buffer_size, ChannelMode mode,
