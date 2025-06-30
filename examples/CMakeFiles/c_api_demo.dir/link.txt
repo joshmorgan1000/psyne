@@ -1,0 +1,1 @@
+/usr/bin/cc -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/c_api_demo.dir/c_api_demo.c.o -o c_api_demo  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib

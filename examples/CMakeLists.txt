@@ -44,8 +44,7 @@ add_psyne_example(zero_copy_showcase)
 
 # Channel types and patterns
 add_psyne_example(channel_factory_demo)
-# TODO: channel_patterns_showcase has API compatibility issues - needs fixing by macOS
-# add_psyne_example(channel_patterns_showcase)
+add_psyne_example(channel_patterns_showcase)
 add_psyne_example(fixed_size_demo)
 add_psyne_example(dynamic_allocation_demo)
 
@@ -74,23 +73,20 @@ add_psyne_example(rudp_demo)
 
 # Messaging patterns
 add_psyne_example(publish_subscribe_demo)
-# TODO: request_reply_demo has API compatibility issues - needs fixing by macOS
-# add_psyne_example(request_reply_demo)
+add_psyne_example(request_reply_demo)
 add_psyne_example(routing_demo_final)
 
 # Advanced features
 add_psyne_example(async_messaging_demo)
 add_psyne_example(coroutine_example)
-# TODO: modern_cpp20_demo has API compatibility issues - needs fixing by macOS
-# add_psyne_example(modern_cpp20_demo)
+add_psyne_example(modern_cpp20_demo)
 
 # Type system examples
 add_psyne_example(enhanced_types_demo)
 add_psyne_example(message_types_demo)
 add_psyne_example(simple_enhanced_types_test)
 add_psyne_example(test_bytevector)
-# TODO: test_floatvector has API compatibility issues - needs fixing by macOS
-# add_psyne_example(test_floatvector)
+add_psyne_example(test_floatvector)
 
 # Performance and optimization
 add_psyne_example(performance_demo) 
@@ -98,8 +94,7 @@ add_psyne_example(high_performance_messaging)
 add_psyne_example(metrics_demo)
 add_psyne_example(simd_demo)
 add_psyne_example(custom_allocator_demo)
-# TODO: tensor_optimization_demo has API compatibility issues - needs fixing by macOS
-# add_psyne_example(tensor_optimization_demo)
+add_psyne_example(tensor_optimization_demo)
 
 # Compression and debugging
 add_psyne_example(compression_demo)
@@ -115,8 +110,7 @@ add_psyne_example(windows_test)
 
 # Integration examples
 add_psyne_example(arrow_demo)
-# TODO: grpc_demo has dependency issues - needs fixing by macOS
-# add_psyne_example(grpc_demo)
+add_psyne_example(grpc_demo)
 
 # C API example (requires special handling for .c file)
 add_executable(c_api_demo c_api_demo.c)

@@ -1,0 +1,1 @@
+/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/vulkan_gpu_demo.dir/vulkan_gpu_demo.cpp.o -o vulkan_gpu_demo  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib

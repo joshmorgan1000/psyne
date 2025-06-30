@@ -1,0 +1,1 @@
+/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/producer_consumer.dir/producer_consumer.cpp.o -o producer_consumer  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib

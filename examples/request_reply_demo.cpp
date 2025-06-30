@@ -17,7 +17,9 @@ using namespace psyne;
 // Request message type
 class Request : public Message<Request> {
 public:
-    static consteval size_t calculate_size() noexcept {
+    static constexpr uint32_t message_type = 301;
+    
+    static size_t calculate_size() noexcept {
         return sizeof(uint32_t) + 256; // ID + payload
     }
     
@@ -39,7 +41,9 @@ public:
 // Reply message type
 class Reply : public Message<Reply> {
 public:
-    static consteval size_t calculate_size() noexcept {
+    static constexpr uint32_t message_type = 302;
+    
+    static size_t calculate_size() noexcept {
         return sizeof(uint32_t) + sizeof(uint32_t) + 512; // ID + status + payload
     }
     
@@ -80,7 +84,6 @@ void run_server(Channel& request_channel, Channel& reply_channel) {
         
         // Process request (zero-copy view)
         Request req(request_channel);
-        req.set_data(req_span.data(), req_span.size());
         
         uint32_t req_id = req.get_request_id();
         std::cout << "📨 Server: Got request #" << req_id << "\n";
@@ -128,7 +131,6 @@ void run_client(Channel& request_channel, Channel& reply_channel) {
             auto reply_span = reply_channel.buffer_span();
             if (!reply_span.empty()) {
                 Reply reply(reply_channel);
-                reply.set_data(reply_span.data(), reply_span.size());
                 
                 if (reply.get_request_id() == i) {
                     std::cout << "✅ Client: Got reply for request #" << i 
