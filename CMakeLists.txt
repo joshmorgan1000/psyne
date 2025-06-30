@@ -243,6 +243,11 @@ if(WIN32)
     list(APPEND PSYNE_LIBRARIES ws2_32 iphlpapi)
 endif()
 
+# Add Linux-specific libraries
+if(UNIX AND NOT APPLE)
+    list(APPEND PSYNE_LIBRARIES numa)
+endif()
+
 target_link_libraries(psyne PRIVATE ${PSYNE_LIBRARIES})
 set(PSYNE_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/include

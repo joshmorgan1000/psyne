@@ -395,8 +395,8 @@ void SIMDCompression::quantize_int8(const float *src, int8_t *dst, size_t count,
         __m256i high = _mm512_extracti32x8_epi32(quantized, 1);
         __m256i packed = _mm256_packs_epi32(low, high);
         __m128i result =
-            _mm256_packs_epi16(_mm256_extracti128_si256(packed, 0),
-                               _mm256_extracti128_si256(packed, 1));
+            _mm_packs_epi16(_mm256_extracti128_si256(packed, 0),
+                            _mm256_extracti128_si256(packed, 1));
 
         _mm_storeu_si128(reinterpret_cast<__m128i *>(dst + i * simd_width),
                          result);
