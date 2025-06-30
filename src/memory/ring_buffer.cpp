@@ -1,6 +1,7 @@
 #include "ring_buffer_impl.hpp"
 #include <cstdlib>
 #include <new>
+#include <cstdio>
 #ifdef _WIN32
 #include <malloc.h>
 #endif
@@ -27,15 +28,35 @@ static size_t align_size(size_t size, size_t alignment) {
 
 // Portable aligned allocation
 static void *aligned_alloc_portable(size_t alignment, size_t size) {
+    // Ensure alignment is a power of 2 and at least sizeof(void*)
+    if (alignment < sizeof(void*)) {
+        alignment = sizeof(void*);
+    }
+    
 #if defined(_WIN32)
     return _aligned_malloc(size, alignment);
 #elif defined(__APPLE__) ||                                                    \
     (defined(__GLIBC__) &&                                                     \
      (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 16)))
-    return std::aligned_alloc(alignment, size);
+    // std::aligned_alloc requires size to be multiple of alignment
+    size_t aligned_size = align_size(size, alignment);
+    return std::aligned_alloc(alignment, aligned_size);
 #else
+    // Linux fallback - posix_memalign is more robust
     void *ptr = nullptr;
-    if (posix_memalign(&ptr, alignment, size) != 0) {
+    // posix_memalign requires alignment to be power of 2 and multiple of sizeof(void*)
+    if ((alignment & (alignment - 1)) != 0) {
+        // Not a power of 2, round up
+        alignment = 1;
+        while (alignment < sizeof(void*)) alignment <<= 1;
+        while (alignment < size && alignment < 4096) alignment <<= 1;
+    }
+    
+    int result = posix_memalign(&ptr, alignment, size);
+    if (result != 0) {
+        // Log the error for debugging
+        fprintf(stderr, "posix_memalign failed: alignment=%zu, size=%zu, error=%d\n", 
+                alignment, size, result);
         return nullptr;
     }
     return ptr;

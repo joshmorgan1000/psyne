@@ -1,6 +1,52 @@
 #include "ring_buffer.hpp"
 #include <cstdlib>
 #include <stdexcept>
+#include <cstdio>
+
+// Platform-specific aligned allocation (duplicated for now - should be moved to common header)
+static void *aligned_alloc_portable(size_t alignment, size_t size) {
+    // Ensure alignment is a power of 2 and at least sizeof(void*)
+    if (alignment < sizeof(void*)) {
+        alignment = sizeof(void*);
+    }
+    
+    // Ensure size is aligned properly for std::aligned_alloc
+    size_t aligned_size = ((size + alignment - 1) / alignment) * alignment;
+    
+#if defined(_WIN32)
+    return _aligned_malloc(aligned_size, alignment);
+#elif defined(__APPLE__) ||                                                    \
+    (defined(__GLIBC__) &&                                                     \
+     (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 16)))
+    return std::aligned_alloc(alignment, aligned_size);
+#else
+    // Linux fallback - posix_memalign is more robust
+    void *ptr = nullptr;
+    // posix_memalign requires alignment to be power of 2 and multiple of sizeof(void*)
+    if ((alignment & (alignment - 1)) != 0) {
+        // Not a power of 2, round up to next power of 2
+        size_t power = sizeof(void*);
+        while (power < alignment) power <<= 1;
+        alignment = power;
+    }
+    
+    int result = posix_memalign(&ptr, alignment, aligned_size);
+    if (result != 0) {
+        fprintf(stderr, "posix_memalign failed in ring_buffer_zero_copy: alignment=%zu, size=%zu, error=%d\n", 
+                alignment, aligned_size, result);
+        return nullptr;
+    }
+    return ptr;
+#endif
+}
+
+static void aligned_free_portable(void *ptr) {
+#if defined(_WIN32)
+    _aligned_free(ptr);
+#else
+    std::free(ptr);
+#endif
+}
 
 namespace psyne {
 
@@ -24,7 +70,7 @@ SPSCRingBuffer::SPSCRingBuffer(size_t size)
     , tail_(0) {
     
     // Allocate aligned memory for ring buffer slab
-    slab_ = static_cast<uint8_t*>(std::aligned_alloc(64, buffer_size_));
+    slab_ = static_cast<uint8_t*>(aligned_alloc_portable(64, buffer_size_));
     if (!slab_) {
         throw std::runtime_error("Failed to allocate ring buffer memory");
     }
@@ -32,7 +78,7 @@ SPSCRingBuffer::SPSCRingBuffer(size_t size)
 
 SPSCRingBuffer::~SPSCRingBuffer() {
     if (slab_) {
-        std::free(slab_);
+        aligned_free_portable(slab_);
     }
 }
 
