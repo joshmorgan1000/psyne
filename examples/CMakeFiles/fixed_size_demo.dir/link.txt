@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/fixed_size_demo.dir/fixed_size_demo.cpp.o -o fixed_size_demo  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib

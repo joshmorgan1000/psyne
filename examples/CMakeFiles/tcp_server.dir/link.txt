@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/tcp_server.dir/tcp_server.cpp.o -o tcp_server  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib

@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/debug_multicast.dir/debug_multicast.cpp.o -o debug_multicast  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib

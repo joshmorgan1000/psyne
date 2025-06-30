@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/message_types_demo.dir/message_types_demo.cpp.o -o message_types_demo  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib

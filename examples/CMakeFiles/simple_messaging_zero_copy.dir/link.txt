@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address -fno-omit-frame-pointer CMakeFiles/simple_messaging_zero_copy.dir/simple_messaging_zero_copy.cpp.o -o simple_messaging_zero_copy  -Wl,-rpath,/Users/joshmorgan/projects/psyne ../libpsyne.dylib
