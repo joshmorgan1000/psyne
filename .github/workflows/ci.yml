@@ -53,11 +53,11 @@ jobs:
       run: |
         echo "Building examples..."
         g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
-          examples/basic/simple_messaging.cpp -o simple_messaging
+          examples/behaviors_demo.cpp -o behaviors_demo
         g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
-          examples/basic/producer_consumer.cpp -o producer_consumer
+          examples/basic/ipc_example.cpp -o ipc_example
         g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
-          examples/patterns/behaviors_demo.cpp -o behaviors_demo
+          examples/basic/tcp_example.cpp -o tcp_example
     
     - name: Run tests
       run: |
@@ -155,14 +155,14 @@ jobs:
       shell: cmd
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        cl /std:c++20 /O2 /EHsc /Iinclude tests\test_spsc_basic.cpp /Fe:test_spsc_basic.exe
-        cl /std:c++20 /O2 /EHsc /Iinclude tests\test_all_patterns.cpp /Fe:test_all_patterns.exe
+        cl /std:c++20 /O2 /EHsc /Iinclude tests/test_spsc_basic.cpp /Fe:test_spsc_basic.exe
+        cl /std:c++20 /O2 /EHsc /Iinclude tests/test_all_patterns.cpp /Fe:test_all_patterns.exe
     
     - name: Build benchmarks
       shell: cmd
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        cl /std:c++20 /O2 /EHsc /Iinclude benchmarks\quick_all_substrates.cpp /Fe:quick_all_substrates.exe
+        cl /std:c++20 /O2 /EHsc /Iinclude benchmarks/quick_all_substrates.cpp /Fe:quick_all_substrates.exe
     
     - name: Run tests
       shell: cmd
