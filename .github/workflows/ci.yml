@@ -159,21 +159,38 @@ jobs:
     
     - name: Setup MSVC
       uses: microsoft/setup-msbuild@v1
+      
+    - name: Setup vcpkg with cache
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+    
+    - name: Install boost via vcpkg
+      run: |
+        vcpkg install boost-system:x64-windows boost-thread:x64-windows boost-chrono:x64-windows
     
     - name: Build tests
       shell: cmd
       run: |
-        echo "Skipping Windows build for now - needs boost dependency resolution"
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        echo Building Windows test with boost...
+        cl /std:c++20 /O2 /EHsc /I"%VCPKG_ROOT%\installed\x64-windows\include" tests/test_windows.cpp /Fe:test_windows.exe /link /LIBPATH:"%VCPKG_ROOT%\installed\x64-windows\lib"
     
-    - name: Build benchmarks
-      shell: cmd
+    - name: Build simple test
+      shell: cmd  
       run: |
-        echo "Skipping Windows benchmarks - needs boost dependency resolution"
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        echo Building simple channel test...
+        cl /std:c++20 /O2 /EHsc /I"%VCPKG_ROOT%\installed\x64-windows\include" tests/test_simple_channel.cpp /Fe:test_simple_channel.exe /link /LIBPATH:"%VCPKG_ROOT%\installed\x64-windows\lib"
     
     - name: Run tests
       shell: cmd
       run: |
-        echo "Skipping Windows tests - needs boost dependency resolution"
+        echo Running Windows test...
+        test_windows.exe
+        echo.
+        echo Running simple channel test...
+        test_simple_channel.exe
 
   header-only-validation:
     name: Header-Only Validation

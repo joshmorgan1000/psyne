@@ -103,6 +103,20 @@ target_link_libraries(your_app psyne::psyne)
 
 Requires C++20 (GCC 10+, Clang 12+, MSVC 2019+).
 
+### Windows Support
+
+On Windows, build with Visual Studio 2019 or later:
+
+```batch
+# Using provided build script
+scripts\build_windows.bat
+
+# Or manually with MSVC
+cl /std:c++20 /O2 /EHsc /I"include" your_app.cpp
+```
+
+Note: Full coroutine support on Windows requires Boost.Asio. Basic channel functionality works without Boost.
+
 ## Advanced Examples
 
 ### High-Throughput Pipeline

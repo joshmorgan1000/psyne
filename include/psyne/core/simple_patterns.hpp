@@ -8,10 +8,12 @@
  * requiring boost::asio for coroutine support.
  */
 
+#include "platform.hpp"
 #include "behaviors.hpp"
 #include <atomic>
 #include <vector>
 #include <mutex>
+#include <cstdlib>
 
 namespace psyne::simple_patterns {
 
