@@ -15,6 +15,7 @@
 #include <cstring>
 
 using namespace psyne::protocol;
+using namespace psyne;
 
 /**
  * @brief Benchmark configuration

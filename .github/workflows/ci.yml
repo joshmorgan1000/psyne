@@ -1,0 +1,237 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  linux-gcc:
+    name: Linux GCC
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        gcc-version: [10, 11, 12, 13]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install GCC ${{ matrix.gcc-version }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-${{ matrix.gcc-version }} g++-${{ matrix.gcc-version }}
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc-version }} 100
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc-version }} 100
+    
+    - name: Verify compiler
+      run: |
+        gcc --version
+        g++ --version
+    
+    - name: Build tests
+      run: |
+        echo "Building tests..."
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          tests/test_spsc_basic.cpp -o test_spsc_basic
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          tests/test_all_patterns.cpp -o test_all_patterns
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          tests/test_ipc_substrate.cpp -o test_ipc_substrate
+    
+    - name: Build benchmarks
+      run: |
+        echo "Building benchmarks..."
+        g++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+          benchmarks/quick_all_substrates.cpp -o quick_all_substrates
+        g++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+          benchmarks/all_patterns_test.cpp -o all_patterns_test
+        g++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+          benchmarks/quick_beast_test.cpp -o quick_beast_test
+    
+    - name: Build examples
+      run: |
+        echo "Building examples..."
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          examples/basic/simple_messaging.cpp -o simple_messaging
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          examples/basic/producer_consumer.cpp -o producer_consumer
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          examples/patterns/behaviors_demo.cpp -o behaviors_demo
+    
+    - name: Run tests
+      run: |
+        echo "Running tests..."
+        ./test_spsc_basic
+        ./test_all_patterns
+        # IPC test might need special permissions in CI
+        # ./test_ipc_substrate
+    
+    - name: Run quick benchmarks
+      run: |
+        echo "Running quick benchmarks..."
+        ./quick_all_substrates
+        ./all_patterns_test
+
+  linux-clang:
+    name: Linux Clang
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        clang-version: [12, 13, 14, 15, 16]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Clang ${{ matrix.clang-version }}
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{ matrix.clang-version }}
+        sudo apt-get install -y clang-${{ matrix.clang-version }}
+    
+    - name: Build tests
+      run: |
+        echo "Building tests with Clang..."
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          tests/test_spsc_basic.cpp -o test_spsc_basic
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          tests/test_all_patterns.cpp -o test_all_patterns
+    
+    - name: Build benchmarks
+      run: |
+        echo "Building benchmarks with Clang..."
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -march=native -pthread -Iinclude \
+          benchmarks/quick_all_substrates.cpp -o quick_all_substrates
+    
+    - name: Run tests
+      run: |
+        ./test_spsc_basic
+        ./test_all_patterns
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build tests
+      run: |
+        echo "Building tests on macOS..."
+        c++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          tests/test_spsc_basic.cpp -o test_spsc_basic
+        c++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+          tests/test_all_patterns.cpp -o test_all_patterns
+    
+    - name: Build benchmarks
+      run: |
+        echo "Building benchmarks on macOS..."
+        c++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+          benchmarks/quick_all_substrates.cpp -o quick_all_substrates
+        c++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+          benchmarks/all_patterns_test.cpp -o all_patterns_test
+    
+    - name: Run tests
+      run: |
+        ./test_spsc_basic
+        ./test_all_patterns
+    
+    - name: Run quick benchmarks
+      run: |
+        ./quick_all_substrates
+
+  windows-msvc:
+    name: Windows MSVC
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v1
+    
+    - name: Build tests
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        cl /std:c++20 /O2 /EHsc /Iinclude tests\test_spsc_basic.cpp /Fe:test_spsc_basic.exe
+        cl /std:c++20 /O2 /EHsc /Iinclude tests\test_all_patterns.cpp /Fe:test_all_patterns.exe
+    
+    - name: Build benchmarks
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        cl /std:c++20 /O2 /EHsc /Iinclude benchmarks\quick_all_substrates.cpp /Fe:quick_all_substrates.exe
+    
+    - name: Run tests
+      shell: cmd
+      run: |
+        test_spsc_basic.exe
+        test_all_patterns.exe
+
+  header-only-validation:
+    name: Header-Only Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Test single include compilation
+      run: |
+        echo '#include "psyne/psyne.hpp"' > test_include.cpp
+        echo 'int main() { return 0; }' >> test_include.cpp
+        g++ -std=c++20 -Wall -Wextra -Iinclude test_include.cpp -o test_include
+        ./test_include
+    
+    - name: Check header guards
+      run: |
+        echo "Checking header guards..."
+        for header in $(find include -name "*.hpp"); do
+          if ! grep -q "#pragma once\|#ifndef.*#define" "$header"; then
+            echo "Missing header guard in $header"
+            exit 1
+          fi
+        done
+    
+    - name: Check no implementation files
+      run: |
+        if find include -name "*.cpp" | grep -q .; then
+          echo "Found .cpp files in include directory!"
+          exit 1
+        fi
+
+  performance-regression:
+    name: Performance Regression Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build performance test
+      run: |
+        g++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+          benchmarks/quick_all_substrates.cpp -o perf_test
+    
+    - name: Run performance test
+      run: |
+        ./perf_test | tee performance_results.txt
+    
+    - name: Check performance thresholds
+      run: |
+        # Extract throughput from results
+        if grep -q "SPSC + InProcess" performance_results.txt; then
+          throughput=$(grep "SPSC + InProcess" performance_results.txt | grep -oE '[0-9]+' | head -1)
+          echo "SPSC throughput: ${throughput} msgs/s"
+          # Ensure we maintain at least 1M msgs/s
+          if [ "$throughput" -lt 1000000 ]; then
+            echo "Performance regression detected! Throughput below 1M msgs/s"
+            exit 1
+          fi
+        fi
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: performance_results.txt

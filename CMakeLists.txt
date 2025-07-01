@@ -88,26 +88,35 @@ endif()
 # ----------------------------------------------------------------------------------------
 # Eigen3
 # ----------------------------------------------------------------------------------------
-find_package(Eigen3 REQUIRED)
-if(NOT Eigen3_FOUND)
-    message(FATAL_ERROR "Eigen3 not found. Please install Eigen3 development libraries.")
+find_package(Eigen3 QUIET)
+if(Eigen3_FOUND)
+    message(STATUS "Eigen3 found - matrix operations enabled")
+    add_compile_definitions(PSYNE_HAS_EIGEN3)
+else()
+    message(STATUS "Eigen3 not found - matrix operations disabled")
 endif()
 
 # ----------------------------------------------------------------------------------------
 # OpenSSL
 # ----------------------------------------------------------------------------------------
-find_package(OpenSSL REQUIRED)
-if(NOT OpenSSL_FOUND)
-    message(FATAL_ERROR "OpenSSL not found. Please install OpenSSL development libraries.")
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+    message(STATUS "OpenSSL ${OPENSSL_VERSION} found - encryption enabled")
+    add_compile_definitions(PSYNE_HAS_OPENSSL)
+else()
+    message(STATUS "OpenSSL not found - encryption disabled")
 endif()
 
 
 # ----------------------------------------------------------------------------------------
 # Boost - Required for networking (Boost.Asio)
 # ----------------------------------------------------------------------------------------
-find_package(Boost REQUIRED COMPONENTS system thread)
-if(NOT Boost_FOUND)
-    message(FATAL_ERROR "Boost not found. Please install Boost development libraries.")
+find_package(Boost QUIET COMPONENTS system thread)
+if(Boost_FOUND)
+    message(STATUS "Boost found - network substrates enabled")
+    add_compile_definitions(PSYNE_HAS_BOOST)
+else()
+    message(STATUS "Boost not found - network substrates disabled")
 endif()
 
 # ----------------------------------------------------------------------------------------
@@ -282,20 +291,7 @@ message(STATUS "===================================================")
 # Source Files
 # ----------------------------------------------------------------------------------------
 set(PSYNE_CORE_SOURCES
-    # Memory management
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/memory_slab.cpp
-    
-    # Channel implementations
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/channel_base.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/spsc_channel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/mpsc_channel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/spmc_channel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/mpmc_channel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/ipc_channel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/tcp_channel.cpp
-    
-    # Core functionality
-    # Add more source files here as they are implemented
+    # Header-only library for now - add source files as they are created
 )
 
 set(PSYNE_INCLUDE_DIRS
@@ -308,59 +304,57 @@ set(PSYNE_INCLUDE_DIRS
 # ----------------------------------------------------------------------------------------
 option(PSYNE_BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(PSYNE_BUILD_TESTS "Build test suite" OFF)
-option(PSYNE_BUILD_EXAMPLES "Build examples" ON)
-option(PSYNE_BUILD_BENCHMARKS "Build benchmarks" OFF)
+option(PSYNE_BUILD_EXAMPLES "Build examples" OFF)
+option(PSYNE_BUILD_BENCHMARKS "Build benchmarks" ON)
 
-if(PSYNE_BUILD_SHARED_LIBS)
-    add_library(psyne SHARED ${PSYNE_CORE_SOURCES})
-else()
-    add_library(psyne STATIC ${PSYNE_CORE_SOURCES})
-endif()
+# Create header-only interface library
+add_library(psyne INTERFACE)
 
-# Set target properties
-set_target_properties(psyne PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-)
+# Interface library doesn't need most properties
 
 # Include directories
-target_include_directories(psyne PUBLIC
+target_include_directories(psyne INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/global>
     $<INSTALL_INTERFACE:include>
 )
 
 # Link libraries
-target_link_libraries(psyne PUBLIC
-    Eigen3::Eigen
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    Boost::system
-    Boost::thread
+target_link_libraries(psyne INTERFACE
     Threads::Threads
     ${PSYNE_LIBRARIES}
 )
 
+# Optional dependencies
+if(Eigen3_FOUND)
+    target_link_libraries(psyne INTERFACE Eigen3::Eigen)
+endif()
+
+if(OpenSSL_FOUND)
+    target_link_libraries(psyne INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
+if(Boost_FOUND)
+    target_link_libraries(psyne INTERFACE Boost::system Boost::thread)
+endif()
+
 # Compile definitions
-target_compile_definitions(psyne PUBLIC
+target_compile_definitions(psyne INTERFACE
     PSYNE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     PSYNE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     PSYNE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
 if(PSYNE_ENABLE_GPU)
-    target_compile_definitions(psyne PUBLIC PSYNE_ENABLE_GPU)
+    target_compile_definitions(psyne INTERFACE PSYNE_ENABLE_GPU)
     if(PSYNE_CUDA_ENABLED)
-        target_compile_definitions(psyne PUBLIC PSYNE_CUDA_ENABLED)
+        target_compile_definitions(psyne INTERFACE PSYNE_CUDA_ENABLED)
     endif()
     if(PSYNE_METAL_ENABLED)
-        target_compile_definitions(psyne PUBLIC PSYNE_METAL_ENABLED)
+        target_compile_definitions(psyne INTERFACE PSYNE_METAL_ENABLED)
     endif()
     if(PSYNE_VULKAN_ENABLED)
-        target_compile_definitions(psyne PUBLIC PSYNE_VULKAN_ENABLED)
+        target_compile_definitions(psyne INTERFACE PSYNE_VULKAN_ENABLED)
     endif()
 endif()
 
