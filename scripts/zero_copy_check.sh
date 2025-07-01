@@ -88,7 +88,8 @@ check_pattern "\.push_back\(.*std::string" "String push_back operations" "INFO"
 echo "=== MOVE SEMANTICS VERIFICATION ==="
 echo ""
 
-check_pattern "std::move\(" "Move semantics usage (good for zero-copy)" "INFO"
+check_pattern "std::move\(" "Move semantics usage (review necessity)" "WARNING"
+check_pattern "operator=" "Assignment operator overloads (potential copying)" "WARNING"
 check_pattern "&&" "Rvalue references (enables zero-copy)" "INFO"
 check_pattern "= std::make_unique" "Unique pointer usage (good practice)" "INFO"
 

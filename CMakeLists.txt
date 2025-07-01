@@ -1,8 +1,19 @@
-cmake_minimum_required(VERSION 3.16)
-project(psyne VERSION 1.3.0 LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.20)
+project(psyne VERSION 1.3.0 LANGUAGES CXX)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Compiler flags for performance
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fsanitize=address -fsanitize=undefined")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
+    set(CMAKE_CXX_FLAGS_DEBUG "/Od /Zi")
+endif()
+
 # ----------------------------------------------------------------------------------------
 # CMake configuration for the Psyne messaging library
 # ----------------------------------------------------------------------------------------
@@ -152,50 +163,7 @@ else()
     set(PSYNE_METAL_ENABLED OFF)
 endif()
 
-# ----------------------------------------------------------------------------------------
-# Main Psyne library
-set(PSYNE_SOURCES
-    # Public header
-    "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
-    
-    # Core implementation
-    "${CMAKE_SOURCE_DIR}/src/psyne.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/webrtc/webrtc_channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/webrtc/ice_agent.cpp"
-    # "${CMAKE_SOURCE_DIR}/src/channel/lockfree_ipc_channel.cpp" # TODO: Fix for new API
-    "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
-    
-    # Memory management
-    "${CMAKE_SOURCE_DIR}/src/memory/dynamic_slab_allocator.cpp"
-    "${CMAKE_SOURCE_DIR}/src/memory/custom_allocator.cpp"
-    
-    # Header-only files
-    "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"
-    "${CMAKE_SOURCE_DIR}/src/debug/metrics.hpp"
-    "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer_impl.hpp"
-    "${CMAKE_SOURCE_DIR}/src/types/types.hpp"
-    "${CMAKE_SOURCE_DIR}/src/types/enhanced_types.hpp"
-    "${CMAKE_SOURCE_DIR}/src/types/advanced_types.hpp"
-    
-    # SIMD optimizations
-    "${CMAKE_SOURCE_DIR}/src/simd/simd_ops.cpp"
-    
-    # Transport implementations
-    "${CMAKE_SOURCE_DIR}/src/transport/quic.cpp"
-    
-    # Channel implementations
-    "${CMAKE_SOURCE_DIR}/src/channel/quic/quic_channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/udp/multicast_factory.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/udp/udp_multicast_channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/tcp/tcp_channel.cpp"
-    
-    # C API
-    "${CMAKE_SOURCE_DIR}/src/c_api/psyne_c_api.cpp"
-    
-    # Tensor transport optimizations - temporarily disabled due to constructor issues
-    # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"  TODO: Fix constructor issues
-)
-
+# Find dependencies
 # Add GPU sources if enabled
 if(PSYNE_ENABLE_GPU)
     list(APPEND PSYNE_SOURCES
@@ -227,16 +195,6 @@ if(PSYNE_ENABLE_GPU)
         )
     endif()
 endif()
-
-add_library(psyne SHARED ${PSYNE_SOURCES})
-set(PSYNE_LIBRARIES
-    Eigen3::Eigen
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    Threads::Threads
-    Boost::system
-    Boost::thread
-)
 
 # Add GPU libraries if enabled
 if(PSYNE_ENABLE_GPU)
@@ -275,15 +233,6 @@ if(UNIX AND NOT APPLE)
     list(APPEND PSYNE_LIBRARIES numa)
 endif()
 
-target_link_libraries(psyne PRIVATE ${PSYNE_LIBRARIES})
-set(PSYNE_INCLUDE_DIRS
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/psyne
-    ${CMAKE_SOURCE_DIR}/src/utils
-    ${EIGEN3_INCLUDE_DIR}
-    ${Boost_INCLUDE_DIRS}
-)
-
 # Add GPU include directories if enabled
 if(PSYNE_ENABLE_GPU)
     if(PSYNE_CUDA_ENABLED)
@@ -293,156 +242,6 @@ if(PSYNE_ENABLE_GPU)
     if(PSYNE_VULKAN_ENABLED)
         list(APPEND PSYNE_INCLUDE_DIRS ${Vulkan_INCLUDE_DIRS})
     endif()
-endif()
-
-
-# Set up public and private include directories
-target_include_directories(psyne 
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/psyne>
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/utils>
-        $<INSTALL_INTERFACE:include>
-        $<INSTALL_INTERFACE:include/psyne>
-        $<INSTALL_INTERFACE:include/psyne/utils>
-    PRIVATE
-        ${EIGEN3_INCLUDE_DIR}
-        ${Boost_INCLUDE_DIRS}
-        $<$<BOOL:${PSYNE_CUDA_ENABLED}>:${CUDAToolkit_INCLUDE_DIRS}>
-        $<$<BOOL:${PSYNE_VULKAN_ENABLED}>:${Vulkan_INCLUDE_DIRS}>
-)
-
-# Add compile definitions for GPU support
-if(PSYNE_ENABLE_GPU)
-    target_compile_definitions(psyne PRIVATE PSYNE_GPU_ENABLED)
-    
-    if(PSYNE_METAL_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_METAL_ENABLED)
-    endif()
-    
-    if(PSYNE_CUDA_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_CUDA_ENABLED)
-    endif()
-    
-    if(PSYNE_VULKAN_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_VULKAN_ENABLED)
-        target_include_directories(psyne PRIVATE ${Vulkan_INCLUDE_DIRS})
-    endif()
-endif()
-
-# ------------------------------------------------------------------------------
-# Installation targets
-# ------------------------------------------------------------------------------
-include(GNUInstallDirs)
-
-# Install the shared library
-install(TARGETS psyne
-    EXPORT PsyneTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
-
-# Install the public header
-install(FILES
-    "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne
-)
-
-# Install utility headers that are part of the public API
-install(FILES
-    "${CMAKE_SOURCE_DIR}/src/utils/logger.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/time_utils.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/random_utils.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/pthread.hpp"
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne/utils
-)
-
-# Create and install package config files
-include(CMakePackageConfigHelpers)
-
-# Generate PsyneConfig.cmake
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PsyneConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake"
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
-)
-
-# Generate PsyneConfigVersion.cmake
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
-
-# Install CMake config files
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
-)
-
-# Install the export set
-install(EXPORT PsyneTargets
-    FILE PsyneTargets.cmake
-    NAMESPACE Psyne::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
-)
-
-# Create a pkg-config file
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/psyne.pc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/psyne.pc"
-    @ONLY
-)
-
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/psyne.pc"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
-)
-
-# ------------------------------------------------------------------------------
-# Examples (enabled by default)
-# ------------------------------------------------------------------------------
-option(PSYNE_BUILD_EXAMPLES "Build example programs" ON)
-if(PSYNE_BUILD_EXAMPLES)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
-endif()
-
-# ------------------------------------------------------------------------------
-# CUDA Test (optional) - only if examples are not built
-# ------------------------------------------------------------------------------
-if(PSYNE_CUDA_ENABLED AND NOT PSYNE_BUILD_EXAMPLES)
-    add_executable(test_cuda examples/test_cuda.cpp)
-    target_link_libraries(test_cuda PRIVATE psyne)
-    target_include_directories(test_cuda PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    target_compile_definitions(test_cuda PRIVATE PSYNE_GPU_ENABLED PSYNE_CUDA_ENABLED)
-endif()
-
-# ------------------------------------------------------------------------------
-# Tests (enabled by default)
-# ------------------------------------------------------------------------------
-option(PSYNE_BUILD_TESTS "Build unit tests" ON)
-if(PSYNE_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
-endif()
-
-# ------------------------------------------------------------------------------
-# Benchmarks (optional)
-# ------------------------------------------------------------------------------
-option(PSYNE_BUILD_BENCHMARKS "Build benchmark programs" OFF)
-if(PSYNE_BUILD_BENCHMARKS)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/benchmarks)
-endif()
-
-# ------------------------------------------------------------------------------
-# Python bindings (optional)
-# ------------------------------------------------------------------------------
-option(PSYNE_PYTHON_BINDINGS "Build Python bindings" OFF)
-if(PSYNE_PYTHON_BINDINGS)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/bindings/python)
 endif()
 
 # ------------------------------------------------------------------------------
@@ -478,3 +277,171 @@ message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=OFF to disable examples")
 message(STATUS "Use -DPSYNE_BUILD_TESTS=OFF to disable tests")
 message(STATUS "Use 'make install' to install library and headers")
 message(STATUS "===================================================")
+
+# ----------------------------------------------------------------------------------------
+# Source Files
+# ----------------------------------------------------------------------------------------
+set(PSYNE_CORE_SOURCES
+    # Memory management
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/memory/memory_slab.cpp
+    
+    # Channel implementations
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/channel_base.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/spsc_channel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/mpsc_channel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/spmc_channel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/mpmc_channel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/ipc_channel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/channel/tcp_channel.cpp
+    
+    # Core functionality
+    # Add more source files here as they are implemented
+)
+
+set(PSYNE_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/global
+)
+
+# ----------------------------------------------------------------------------------------
+# Create Psyne Library
+# ----------------------------------------------------------------------------------------
+option(PSYNE_BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(PSYNE_BUILD_TESTS "Build test suite" OFF)
+option(PSYNE_BUILD_EXAMPLES "Build examples" ON)
+option(PSYNE_BUILD_BENCHMARKS "Build benchmarks" OFF)
+
+if(PSYNE_BUILD_SHARED_LIBS)
+    add_library(psyne SHARED ${PSYNE_CORE_SOURCES})
+else()
+    add_library(psyne STATIC ${PSYNE_CORE_SOURCES})
+endif()
+
+# Set target properties
+set_target_properties(psyne PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+# Include directories
+target_include_directories(psyne PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/global>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Link libraries
+target_link_libraries(psyne PUBLIC
+    Eigen3::Eigen
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    Boost::system
+    Boost::thread
+    Threads::Threads
+    ${PSYNE_LIBRARIES}
+)
+
+# Compile definitions
+target_compile_definitions(psyne PUBLIC
+    PSYNE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    PSYNE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    PSYNE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+)
+
+if(PSYNE_ENABLE_GPU)
+    target_compile_definitions(psyne PUBLIC PSYNE_ENABLE_GPU)
+    if(PSYNE_CUDA_ENABLED)
+        target_compile_definitions(psyne PUBLIC PSYNE_CUDA_ENABLED)
+    endif()
+    if(PSYNE_METAL_ENABLED)
+        target_compile_definitions(psyne PUBLIC PSYNE_METAL_ENABLED)
+    endif()
+    if(PSYNE_VULKAN_ENABLED)
+        target_compile_definitions(psyne PUBLIC PSYNE_VULKAN_ENABLED)
+    endif()
+endif()
+
+# Alias for easier usage
+add_library(Psyne::psyne ALIAS psyne)
+
+# ----------------------------------------------------------------------------------------
+# Examples
+# ----------------------------------------------------------------------------------------
+if(PSYNE_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# ----------------------------------------------------------------------------------------
+# Tests
+# ----------------------------------------------------------------------------------------
+if(PSYNE_BUILD_TESTS)
+    enable_testing()
+    find_package(GTest)
+    if(NOT GTest_FOUND)
+        message(WARNING "Google Test not found. Tests will be disabled.")
+    else()
+        add_subdirectory(tests)
+    endif()
+endif()
+
+# ----------------------------------------------------------------------------------------
+# Benchmarks
+# ----------------------------------------------------------------------------------------
+if(PSYNE_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
+
+# ----------------------------------------------------------------------------------------
+# Installation
+# ----------------------------------------------------------------------------------------
+include(GNUInstallDirs)
+
+# Install library
+install(TARGETS psyne
+    EXPORT PsyneTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Install headers
+install(DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+# Install global headers
+install(DIRECTORY src/global/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne/global
+    FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
+)
+
+# Create and install CMake config files
+install(EXPORT PsyneTargets
+    FILE PsyneTargets.cmake
+    NAMESPACE Psyne::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
+)
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    PsyneConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/PsyneConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
+)
