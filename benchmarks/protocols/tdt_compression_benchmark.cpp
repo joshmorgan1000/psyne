@@ -7,7 +7,7 @@
  */
 
 #include "psyne/protocol/tdt_compression.hpp"
-#include "logger.hpp"
+#include "../../include/psyne/global/logger.hpp"
 #include <chrono>
 #include <vector>
 #include <random>

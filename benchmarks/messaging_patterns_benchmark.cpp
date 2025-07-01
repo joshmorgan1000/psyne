@@ -10,9 +10,9 @@
  * 5. Concurrent test - multiple producers/consumers
  */
 
-#include "psyne/psyne.hpp"
-#include "logger.hpp"
-#include "threadpool.hpp"
+#include "../include/psyne/core/behaviors.hpp"
+#include "../include/psyne/global/logger.hpp"
+#include "../include/psyne/global/threadpool.hpp"
 #include <atomic>
 #include <chrono>
 #include <cstring>

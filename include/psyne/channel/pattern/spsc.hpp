@@ -1,7 +1,7 @@
 #pragma once
 
 #include "pattern_base.hpp"
-#include "logger.hpp"
+#include "../../global/logger.hpp"
 #include <atomic>
 #include <vector>
 

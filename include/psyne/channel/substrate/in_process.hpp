@@ -1,7 +1,7 @@
 #pragma once
 
 #include "substrate_base.hpp"
-#include "global/logger.hpp"
+#include "../../global/logger.hpp"
 #include <cstdlib>
 
 namespace psyne::substrate {

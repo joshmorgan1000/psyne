@@ -12,7 +12,7 @@
 #pragma once
 
 #include "psyne/concepts/protocol_concepts.hpp"
-#include "logger.hpp"
+#include "../global/logger.hpp"
 #include <vector>
 #include <array>
 #include <memory>

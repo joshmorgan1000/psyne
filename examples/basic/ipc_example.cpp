@@ -3,16 +3,17 @@
  * @brief Example of inter-process communication using Psyne IPC channels
  *
  * This example demonstrates zero-copy IPC between two processes.
- * Run with argument "producer" or "consumer" to start each side.
+ * Shows the v2.0 substrate + pattern + message architecture.
  */
 
-#include "psyne/psyne.hpp"
-#include "logger.hpp"
+#include "../../include/psyne/core/behaviors.hpp"
+#include "../../include/psyne/channel/substrate/ipc.hpp"
+#include "../../include/psyne/channel/pattern/spsc.hpp"
+#include <iostream>
 #include <chrono>
 #include <cstring>
 #include <thread>
-
-using namespace psyne;
+#include <atomic>
 
 /**
  * @brief Simple message structure for testing
