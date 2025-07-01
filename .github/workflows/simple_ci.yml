@@ -1,0 +1,21 @@
+name: Simple CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build and run basic test
+      run: |
+        echo "Building basic test..."
+        g++ -std=c++20 -O3 tests/test_spsc_basic.cpp -o test_basic
+        echo "Running test..."
+        ./test_basic
+        echo "✅ Test passed!"

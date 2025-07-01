@@ -31,7 +31,7 @@ jobs:
     - name: Install GCC ${{ matrix.gcc-version }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-${{ matrix.gcc-version }} g++-${{ matrix.gcc-version }}
+        sudo apt-get install -y gcc-${{ matrix.gcc-version }} g++-${{ matrix.gcc-version }} libeigen3-dev
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc-version }} 100
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc-version }} 100
     
@@ -53,7 +53,7 @@ jobs:
       run: |
         echo "Building tests..."
         echo "Building test_spsc_basic..."
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread -DPSYNE_USE_EIGEN \
           tests/test_spsc_basic.cpp -o test_spsc_basic || exit 1
     
     - name: Build benchmarks
@@ -129,6 +129,9 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: brew install eigen
     
     - name: Build tests
       run: |
