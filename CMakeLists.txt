@@ -1,8 +1,19 @@
-cmake_minimum_required(VERSION 3.16)
-project(psyne VERSION 1.3.0 LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.20)
+project(psyne VERSION 2.0.0 LANGUAGES CXX)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Compiler flags for performance
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fsanitize=address -fsanitize=undefined")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
+    set(CMAKE_CXX_FLAGS_DEBUG "/Od /Zi")
+endif()
+
 # ----------------------------------------------------------------------------------------
 # CMake configuration for the Psyne messaging library
 # ----------------------------------------------------------------------------------------
@@ -77,26 +88,35 @@ endif()
 # ----------------------------------------------------------------------------------------
 # Eigen3
 # ----------------------------------------------------------------------------------------
-find_package(Eigen3 REQUIRED)
-if(NOT Eigen3_FOUND)
-    message(FATAL_ERROR "Eigen3 not found. Please install Eigen3 development libraries.")
+find_package(Eigen3 QUIET)
+if(Eigen3_FOUND)
+    message(STATUS "Eigen3 found - matrix operations enabled")
+    add_compile_definitions(PSYNE_HAS_EIGEN3)
+else()
+    message(STATUS "Eigen3 not found - matrix operations disabled")
 endif()
 
 # ----------------------------------------------------------------------------------------
 # OpenSSL
 # ----------------------------------------------------------------------------------------
-find_package(OpenSSL REQUIRED)
-if(NOT OpenSSL_FOUND)
-    message(FATAL_ERROR "OpenSSL not found. Please install OpenSSL development libraries.")
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+    message(STATUS "OpenSSL ${OPENSSL_VERSION} found - encryption enabled")
+    add_compile_definitions(PSYNE_HAS_OPENSSL)
+else()
+    message(STATUS "OpenSSL not found - encryption disabled")
 endif()
 
 
 # ----------------------------------------------------------------------------------------
 # Boost - Required for networking (Boost.Asio)
 # ----------------------------------------------------------------------------------------
-find_package(Boost REQUIRED COMPONENTS system thread)
-if(NOT Boost_FOUND)
-    message(FATAL_ERROR "Boost not found. Please install Boost development libraries.")
+find_package(Boost QUIET COMPONENTS system thread)
+if(Boost_FOUND)
+    message(STATUS "Boost found - network substrates enabled")
+    add_compile_definitions(PSYNE_HAS_BOOST)
+else()
+    message(STATUS "Boost not found - network substrates disabled")
 endif()
 
 # ----------------------------------------------------------------------------------------
@@ -128,9 +148,15 @@ if(PSYNE_ENABLE_GPU)
     
     # Check for Metal (macOS only)
     if(APPLE)
-        # Temporarily disable Metal until metal-cpp headers are added
-        set(PSYNE_METAL_ENABLED OFF)
-        message(STATUS "Metal support temporarily disabled (needs metal-cpp headers)")
+        find_library(METAL_FRAMEWORK Metal)
+        find_library(METALKIT_FRAMEWORK MetalKit)
+        if(METAL_FRAMEWORK AND METALKIT_FRAMEWORK)
+            set(PSYNE_METAL_ENABLED ON)
+            message(STATUS "Metal support enabled")
+        else()
+            set(PSYNE_METAL_ENABLED OFF)
+            message(STATUS "Metal support disabled (Metal framework not found)")
+        endif()
     else()
         set(PSYNE_METAL_ENABLED OFF)
     endif()
@@ -152,91 +178,7 @@ else()
     set(PSYNE_METAL_ENABLED OFF)
 endif()
 
-# ----------------------------------------------------------------------------------------
-# Main Psyne library
-set(PSYNE_SOURCES
-    # Public header
-    "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
-    
-    # Core implementation
-    "${CMAKE_SOURCE_DIR}/src/psyne.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/webrtc/webrtc_channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/webrtc/ice_agent.cpp"
-    # "${CMAKE_SOURCE_DIR}/src/channel/lockfree_ipc_channel.cpp" # TODO: Fix for new API
-    "${CMAKE_SOURCE_DIR}/src/compression/compression.cpp"
-    
-    # Memory management
-    "${CMAKE_SOURCE_DIR}/src/memory/dynamic_slab_allocator.cpp"
-    "${CMAKE_SOURCE_DIR}/src/memory/custom_allocator.cpp"
-    
-    # Header-only files
-    "${CMAKE_SOURCE_DIR}/src/channel/channel_impl.hpp"
-    "${CMAKE_SOURCE_DIR}/src/debug/metrics.hpp"
-    "${CMAKE_SOURCE_DIR}/src/memory/ring_buffer_impl.hpp"
-    "${CMAKE_SOURCE_DIR}/src/types/types.hpp"
-    "${CMAKE_SOURCE_DIR}/src/types/enhanced_types.hpp"
-    "${CMAKE_SOURCE_DIR}/src/types/advanced_types.hpp"
-    
-    # SIMD optimizations
-    "${CMAKE_SOURCE_DIR}/src/simd/simd_ops.cpp"
-    
-    # Transport implementations
-    "${CMAKE_SOURCE_DIR}/src/transport/quic.cpp"
-    
-    # Channel implementations
-    "${CMAKE_SOURCE_DIR}/src/channel/quic/quic_channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/udp/multicast_factory.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/udp/udp_multicast_channel.cpp"
-    "${CMAKE_SOURCE_DIR}/src/channel/tcp/tcp_channel.cpp"
-    
-    # C API
-    "${CMAKE_SOURCE_DIR}/src/c_api/psyne_c_api.cpp"
-    
-    # Tensor transport optimizations - temporarily disabled due to constructor issues
-    # "${CMAKE_SOURCE_DIR}/src/tensor/tensor_transport.cpp"  TODO: Fix constructor issues
-)
-
-# Add GPU sources if enabled
-if(PSYNE_ENABLE_GPU)
-    list(APPEND PSYNE_SOURCES
-        "${CMAKE_SOURCE_DIR}/src/gpu/gpu_context.cpp"
-        "${CMAKE_SOURCE_DIR}/src/gpu/gpu_message.cpp"
-    )
-    
-    # Add Metal sources for macOS
-    if(PSYNE_METAL_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/gpu/metal/metal_buffer.cpp"
-        )
-    endif()
-    
-    # Add CUDA sources if available
-    if(PSYNE_CUDA_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_buffer.cpp"
-            "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_context.cpp"
-            "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_kernels.cu"
-        )
-        
-    endif()
-    
-    # Add Vulkan sources if available
-    if(PSYNE_VULKAN_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/gpu/vulkan/vulkan_buffer.cpp"
-        )
-    endif()
-endif()
-
-add_library(psyne SHARED ${PSYNE_SOURCES})
-set(PSYNE_LIBRARIES
-    Eigen3::Eigen
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    Threads::Threads
-    Boost::system
-    Boost::thread
-)
+# Header-only library - no source files needed for GPU support
 
 # Add GPU libraries if enabled
 if(PSYNE_ENABLE_GPU)
@@ -275,15 +217,6 @@ if(UNIX AND NOT APPLE)
     list(APPEND PSYNE_LIBRARIES numa)
 endif()
 
-target_link_libraries(psyne PRIVATE ${PSYNE_LIBRARIES})
-set(PSYNE_INCLUDE_DIRS
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/psyne
-    ${CMAKE_SOURCE_DIR}/src/utils
-    ${EIGEN3_INCLUDE_DIR}
-    ${Boost_INCLUDE_DIRS}
-)
-
 # Add GPU include directories if enabled
 if(PSYNE_ENABLE_GPU)
     if(PSYNE_CUDA_ENABLED)
@@ -295,47 +228,123 @@ if(PSYNE_ENABLE_GPU)
     endif()
 endif()
 
-
-# Set up public and private include directories
-target_include_directories(psyne 
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include/psyne>
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/utils>
-        $<INSTALL_INTERFACE:include>
-        $<INSTALL_INTERFACE:include/psyne>
-        $<INSTALL_INTERFACE:include/psyne/utils>
-    PRIVATE
-        ${EIGEN3_INCLUDE_DIR}
-        ${Boost_INCLUDE_DIRS}
-        $<$<BOOL:${PSYNE_CUDA_ENABLED}>:${CUDAToolkit_INCLUDE_DIRS}>
-        $<$<BOOL:${PSYNE_VULKAN_ENABLED}>:${Vulkan_INCLUDE_DIRS}>
+# ----------------------------------------------------------------------------------------
+# Generate Configuration Header
+# ----------------------------------------------------------------------------------------
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/psyne/config.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/psyne/config.hpp
+    @ONLY
 )
 
-# Add compile definitions for GPU support
+# ----------------------------------------------------------------------------------------
+# Source Files
+# ----------------------------------------------------------------------------------------
+set(PSYNE_CORE_SOURCES
+    # Header-only library for now - add source files as they are created
+)
+
+set(PSYNE_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/psyne/global
+)
+
+# ----------------------------------------------------------------------------------------
+# Create Psyne Library
+# ----------------------------------------------------------------------------------------
+option(PSYNE_BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(PSYNE_BUILD_TESTS "Build test suite" OFF)
+option(PSYNE_BUILD_EXAMPLES "Build examples" OFF)
+option(PSYNE_BUILD_BENCHMARKS "Build benchmarks" ON)
+
+# Create header-only interface library
+add_library(psyne INTERFACE)
+
+# Interface library doesn't need most properties
+
+# Include directories
+target_include_directories(psyne INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/psyne/global>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Link libraries
+target_link_libraries(psyne INTERFACE
+    Threads::Threads
+    ${PSYNE_LIBRARIES}
+)
+
+# Optional dependencies
+if(Eigen3_FOUND)
+    target_link_libraries(psyne INTERFACE Eigen3::Eigen)
+endif()
+
+if(OpenSSL_FOUND)
+    target_link_libraries(psyne INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
+if(Boost_FOUND)
+    target_link_libraries(psyne INTERFACE Boost::system Boost::thread)
+endif()
+
+# Compile definitions
+target_compile_definitions(psyne INTERFACE
+    PSYNE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    PSYNE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    PSYNE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+)
+
 if(PSYNE_ENABLE_GPU)
-    target_compile_definitions(psyne PRIVATE PSYNE_GPU_ENABLED)
-    
-    if(PSYNE_METAL_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_METAL_ENABLED)
-    endif()
-    
+    target_compile_definitions(psyne INTERFACE PSYNE_ENABLE_GPU)
     if(PSYNE_CUDA_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_CUDA_ENABLED)
+        target_compile_definitions(psyne INTERFACE PSYNE_CUDA_ENABLED)
     endif()
-    
+    if(PSYNE_METAL_ENABLED)
+        target_compile_definitions(psyne INTERFACE PSYNE_METAL_ENABLED)
+    endif()
     if(PSYNE_VULKAN_ENABLED)
-        target_compile_definitions(psyne PRIVATE PSYNE_VULKAN_ENABLED)
-        target_include_directories(psyne PRIVATE ${Vulkan_INCLUDE_DIRS})
+        target_compile_definitions(psyne INTERFACE PSYNE_VULKAN_ENABLED)
     endif()
 endif()
 
-# ------------------------------------------------------------------------------
-# Installation targets
-# ------------------------------------------------------------------------------
+# Alias for easier usage
+add_library(Psyne::psyne ALIAS psyne)
+
+# ----------------------------------------------------------------------------------------
+# Examples
+# ----------------------------------------------------------------------------------------
+if(PSYNE_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# ----------------------------------------------------------------------------------------
+# Tests
+# ----------------------------------------------------------------------------------------
+if(PSYNE_BUILD_TESTS)
+    enable_testing()
+    find_package(GTest)
+    if(NOT GTest_FOUND)
+        message(WARNING "Google Test not found. Tests will be disabled.")
+    else()
+        add_subdirectory(tests)
+    endif()
+endif()
+
+# ----------------------------------------------------------------------------------------
+# Benchmarks
+# ----------------------------------------------------------------------------------------
+if(PSYNE_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
+
+# ----------------------------------------------------------------------------------------
+# Installation
+# ----------------------------------------------------------------------------------------
 include(GNUInstallDirs)
 
-# Install the shared library
+# Install library
 install(TARGETS psyne
     EXPORT PsyneTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -344,106 +353,40 @@ install(TARGETS psyne
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-# Install the public header
-install(FILES
-    "${CMAKE_SOURCE_DIR}/include/psyne/psyne.hpp"
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne
+# Install headers
+install(DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.hpp"
 )
 
-# Install utility headers that are part of the public API
-install(FILES
-    "${CMAKE_SOURCE_DIR}/src/utils/logger.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/time_utils.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/random_utils.hpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/pthread.hpp"
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne/utils
-)
+# Global headers are already part of the include directory
+# No separate installation needed as they're in include/psyne/global/
 
-# Create and install package config files
-include(CMakePackageConfigHelpers)
-
-# Generate PsyneConfig.cmake
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PsyneConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake"
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
-)
-
-# Generate PsyneConfigVersion.cmake
-write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
-
-# Install CMake config files
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
-)
-
-# Install the export set
+# Create and install CMake config files
 install(EXPORT PsyneTargets
     FILE PsyneTargets.cmake
     NAMESPACE Psyne::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
 )
 
-# Create a pkg-config file
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/psyne.pc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/psyne.pc"
-    @ONLY
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    PsyneConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/PsyneConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
 )
 
 install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/psyne.pc"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+    ${CMAKE_CURRENT_BINARY_DIR}/PsyneConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
 )
-
-# ------------------------------------------------------------------------------
-# Examples (enabled by default)
-# ------------------------------------------------------------------------------
-option(PSYNE_BUILD_EXAMPLES "Build example programs" ON)
-if(PSYNE_BUILD_EXAMPLES)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/examples)
-endif()
-
-# ------------------------------------------------------------------------------
-# CUDA Test (optional) - only if examples are not built
-# ------------------------------------------------------------------------------
-if(PSYNE_CUDA_ENABLED AND NOT PSYNE_BUILD_EXAMPLES)
-    add_executable(test_cuda examples/test_cuda.cpp)
-    target_link_libraries(test_cuda PRIVATE psyne)
-    target_include_directories(test_cuda PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    target_compile_definitions(test_cuda PRIVATE PSYNE_GPU_ENABLED PSYNE_CUDA_ENABLED)
-endif()
-
-# ------------------------------------------------------------------------------
-# Tests (enabled by default)
-# ------------------------------------------------------------------------------
-option(PSYNE_BUILD_TESTS "Build unit tests" ON)
-if(PSYNE_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(${CMAKE_SOURCE_DIR}/tests)
-endif()
-
-# ------------------------------------------------------------------------------
-# Benchmarks (optional)
-# ------------------------------------------------------------------------------
-option(PSYNE_BUILD_BENCHMARKS "Build benchmark programs" OFF)
-if(PSYNE_BUILD_BENCHMARKS)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/benchmarks)
-endif()
-
-# ------------------------------------------------------------------------------
-# Python bindings (optional)
-# ------------------------------------------------------------------------------
-option(PSYNE_PYTHON_BINDINGS "Build Python bindings" OFF)
-if(PSYNE_PYTHON_BINDINGS)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/bindings/python)
-endif()
 
 # ------------------------------------------------------------------------------
 # Status

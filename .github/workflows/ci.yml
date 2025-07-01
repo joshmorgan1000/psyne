@@ -1,91 +1,111 @@
-name: Build
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop, v2.0.0-rc ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  build-linux:
+  linux-clang:
+    name: Linux Clang
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        clang-version: [16, 17, 18]
+    
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Install Clang ${{ matrix.clang-version }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-${{ matrix.clang-version }} libboost-all-dev libeigen3-dev
+    
+    - name: Build tests
+      run: |
+        echo "Building tests with Clang..."
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread \
+          tests/test_simple_channel.cpp -o test_simple_channel
+    
+    - name: Build benchmarks
+      run: |
+        echo "Building benchmarks with Clang..."
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -march=native -pthread \
+          benchmarks/quick_all_substrates.cpp -o quick_all_substrates
+    
+    - name: Run tests
+      run: |
+        ./test_simple_channel
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            cmake \
-            libeigen3-dev \
-            libboost-all-dev \
-            libssl-dev \
-            libvulkan-dev \
-            vulkan-tools
-
-      - name: Install Apache Arrow
-        run: |
-          sudo apt-get install -y ca-certificates lsb-release wget
-          wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-          sudo apt-get install -y ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-          sudo apt-get update
-          sudo apt-get install -y libarrow-dev libparquet-dev
-
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build -j$(nproc)
-
-  build-macos:
+  macos:
+    name: macOS
     runs-on: macos-latest
+    
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: brew install eigen boost
+    
+    - name: Build tests
+      run: |
+        echo "Building tests on macOS..."
+        c++ -std=c++20 -O3 -Wall -Wextra -pthread \
+          tests/test_simple_channel.cpp -o test_simple_channel
+    
+    - name: Build benchmarks
+      run: |
+        echo "Building benchmarks on macOS..."
+        c++ -std=c++20 -O3 -march=native -pthread \
+          benchmarks/quick_all_substrates.cpp -o quick_all_substrates
+    
+    - name: Run tests
+      run: |
+        ./test_simple_channel
+    
+    - name: Run quick benchmarks
+      run: |
+        ./quick_all_substrates
 
-      - name: Install dependencies
-        run: |
-          brew update
-          brew install \
-            cmake \
-            eigen \
-            boost \
-            openssl \
-            apache-arrow \
-            molten-vk
-
-      - name: Configure CMake
-        run: |
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix apache-arrow);$(brew --prefix openssl)"
-
-      - name: Build
-        run: cmake --build build -j$(sysctl -n hw.ncpu)
-
-  build-windows:
+  windows-msvc:
+    name: Windows MSVC
     runs-on: windows-latest
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
-
-      - name: Install dependencies
-        run: |
-          vcpkg install `
-            eigen3:x64-windows `
-            boost:x64-windows `
-            openssl:x64-windows `
-            arrow:x64-windows
-
-      - name: Configure CMake
-        run: |
-          cmake -B build `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
-
-      - name: Build
-        run: cmake --build build --config Release
+    - uses: actions/checkout@v4
+    
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v1
+      
+    - name: Setup vcpkg with cache
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'f7423ee180c4b7f40d43402c2feb3859161ef625'
+    
+    - name: Install dependencies via vcpkg
+      run: |
+        vcpkg install boost-system:x64-windows boost-thread:x64-windows boost-chrono:x64-windows eigen3:x64-windows
+    
+    - name: Build tests
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        echo Building Windows test with boost...
+        cl /std:c++20 /O2 /EHsc /I"%VCPKG_ROOT%\installed\x64-windows\include" tests/test_windows.cpp /Fe:test_windows.exe /link /LIBPATH:"%VCPKG_ROOT%\installed\x64-windows\lib"
+    
+    - name: Build simple test
+      shell: cmd  
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        echo Building simple channel test...
+        cl /std:c++20 /O2 /EHsc /I"%VCPKG_ROOT%\installed\x64-windows\include" tests/test_simple_channel.cpp /Fe:test_simple_channel.exe /link /LIBPATH:"%VCPKG_ROOT%\installed\x64-windows\lib"
+    
+    - name: Run tests
+      shell: cmd
+      run: |
+        echo Running Windows test...
+        test_windows.exe
+        echo.
+        echo Running simple channel test...
+        test_simple_channel.exe

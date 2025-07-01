@@ -1,47 +1,5 @@
 @PACKAGE_INIT@
 
-# Psyne CMake configuration file
-
-include(CMakeFindDependencyMacro)
-
-# Find required dependencies
-find_dependency(Eigen3 REQUIRED)
-find_dependency(OpenSSL REQUIRED)
-find_dependency(Boost REQUIRED COMPONENTS system thread)
-find_dependency(Threads REQUIRED)
-
-# Find optional GPU dependencies
-if(@PSYNE_VULKAN_ENABLED@)
-    find_dependency(Vulkan)
-endif()
-
-if(@PSYNE_CUDA_ENABLED@)
-    find_dependency(CUDAToolkit)
-endif()
-
-# Include the exported targets
 include("${CMAKE_CURRENT_LIST_DIR}/PsyneTargets.cmake")
 
-# Define convenient variables
-set(PSYNE_VERSION @PROJECT_VERSION@)
-set(PSYNE_VERSION_MAJOR @PROJECT_VERSION_MAJOR@)
-set(PSYNE_VERSION_MINOR @PROJECT_VERSION_MINOR@)
-set(PSYNE_VERSION_PATCH @PROJECT_VERSION_PATCH@)
-
-# Feature flags
-set(PSYNE_GPU_ENABLED @PSYNE_ENABLE_GPU@)
-set(PSYNE_CUDA_ENABLED @PSYNE_CUDA_ENABLED@)
-set(PSYNE_METAL_ENABLED @PSYNE_METAL_ENABLED@)
-set(PSYNE_VULKAN_ENABLED @PSYNE_VULKAN_ENABLED@)
-
 check_required_components(Psyne)
-
-# Provide helpful message
-if(NOT TARGET Psyne::psyne)
-    message(FATAL_ERROR "Psyne library target not found!")
-endif()
-
-message(STATUS "Found Psyne ${PSYNE_VERSION}")
-if(PSYNE_GPU_ENABLED)
-    message(STATUS "  GPU support: CUDA=${PSYNE_CUDA_ENABLED}, Metal=${PSYNE_METAL_ENABLED}, Vulkan=${PSYNE_VULKAN_ENABLED}")
-endif()

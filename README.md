@@ -1,11 +1,11 @@
 <div align="center">
   <img src="docs/assets/psyne_logo.png" alt="Psyne Logo" width="200"/>
   
-  **High-performance, zero-copy messaging library optimized for AI/ML applications**
+  **Ultra-high-performance zero-copy messaging library for C++20**
   
-  [![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/joshmorgan1000/psyne)
+  [![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://github.com/joshmorgan1000/psyne)
   [![C++ Standard](https://img.shields.io/badge/C++-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
-  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+  [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   
   [![Linux GCC](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20GCC&logo=linux)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![Linux Clang](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20Clang&logo=llvm)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
@@ -13,372 +13,282 @@
   [![Windows MSVC](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Windows%20MSVC&logo=windows)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/joshmorgan1000/psyne?label=Release&logo=github)](https://github.com/joshmorgan1000/psyne/releases/latest)
   
-  [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🛠️ Language Bindings](#️-language-bindings) • [⚡ Performance](#-performance) • [🤝 Contributing](#-contributing)
+  **The fastest messaging library you'll ever use. Period.**
+
+  *Header Only!*
+
+  ## [Philosophy](Philosophy.md)
 </div>
 
----
 
-Psyne provides ultra-low latency inter-process communication with support for multiple transport protocols and comprehensive language bindings.
 
-👉 **[See Full Performance Report](PERFORMANCE.md)** 👈
+## Performance
 
-## 📋 Table of Contents
+Real-world benchmarks on AMD Ryzen 7 3700X (8 cores, 16 threads):
 
-- [🌟 Key Features](#-key-features)
-- [📦 Supported Transports](#-supported-transports)
-- [🛠️ Language Bindings](#️-language-bindings)
-- [🚀 Quick Start](#-quick-start)
-  - [C++ (Header-Only)](#c-header-only)
-  - [Python](#python)
-  - [JavaScript/TypeScript](#javascripttypescript)
-- [📋 Installation](#-installation)
-  - [Prerequisites](#prerequisites)
-  - [Build from Source](#build-from-source)
-  - [Package Managers](#package-managers)
-- [🏗️ Architecture](#️-architecture)
-- [🔧 Advanced Features](#-advanced-features)
-- [📊 Performance](#-performance)
-- [📚 Documentation](#-documentation)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🙏 Acknowledgments](#-acknowledgments)
-- [📞 Support](#-support)
+| Pattern | Configuration | Throughput | Notes |
+|---------|--------------|------------|-------|
+| SPSC | 1P × 1C | 3.95M msgs/s | Single producer/consumer |
+| MPSC | 32P × 1C | **22.5M msgs/s** | Peak performance |
+| SPMC | 1P × 4C | 4.91M msgs/s | Perfect for work distribution |
+| MPMC | 16P × 16C | 12.8M msgs/s | 256 threads! |
 
-## 🌟 Key Features
+- **10 nanosecond** cross-thread latency
+- **Zero-copy** architecture
+- **Lock-free** atomic operations
+- **Header-only** - just include and go
 
-- **🔥 Zero-Copy Performance**: Messages are views into pre-allocated ring buffers
-- **🚀 Ultra-Low Latency**: Sub-microsecond message passing
-- **🔗 Multiple Transports**: Memory, IPC, TCP, Unix sockets, UDP multicast, WebSocket
-- **🎯 AI/ML Optimized**: Built-in support for tensors, matrices, and ML data types
-- **🌍 Universal Language Support**: Bindings for 8+ programming languages
-- **🛡️ Production Ready**: Comprehensive error handling, encryption, and monitoring
-- **📊 Built-in Observability**: Performance metrics, distributed tracing, debugging tools
+MacBook Pro M4 Pro Max (16-core, 40-core GPU):
 
-## 🎉 What's New in v1.3.0
+| Pattern | Configuration | Throughput | Notes |
+|---------|--------------|------------|-------|
+| SPSC | 1P × 1C | 12.38M msgs/s | Single producer/consumer |
+| MPSC | 4P × 1C | 19.03M msgs/s | Gradients |
+| SPMC | 1P × 8C | **20.7M msgs/s** | Peak Performance |
+| MPMC | 4P × 4C | 8.2M msgs/s| Balanced w/contention |
 
-- **⚡ SIMD Vectorization**: AVX-512/NEON implementations for tensor operations
-- **🧠 AI/ML Tensor Optimizations**: Specialized transport for neural network data
-- **🚀 Custom Memory Allocator**: Huge page support for large tensor allocations
-- **🔒 Lock-Free IPC Channels**: True zero-copy using lock-free ring buffers
-- **🖥️ Vulkan GPU Support**: Cross-platform GPU acceleration
-- **🍎 Apple Metal Unified Memory**: Zero-copy GPU operations on Apple Silicon
-- **📊 Enhanced Performance**: Sub-microsecond messaging with hardware optimizations
-
-[See full release notes →](RELEASE_NOTES_v1.3.0.md)
-
-## 📦 Supported Transports
-
-| Transport | URI Scheme | Use Case |
-|-----------|------------|----------|
-| **In-Memory** | `memory://buffer-name` | Same-process communication |
-| **IPC** | `ipc://shared-name` | Cross-process communication |
-| **TCP** | `tcp://host:port` | Network communication |
-| **Unix Sockets** | `unix:///path/to/socket` | Local inter-process |
-| **UDP Multicast** | `multicast://239.255.0.1:8080` | One-to-many broadcasting |
-| **WebSocket** | `ws://host:port` | Web-compatible real-time |
-| **WebRTC** | `webrtc://peer-id` | P2P browser communication |
-| **RUDP** | `rudp://host:port` | Reliable UDP transport |
-| **QUIC** | `quic://host:port` | HTTP/3, multiplexed streams |
-
-> **Platform Notes**: Unix sockets are Linux/macOS only. Windows supports all other transports with equivalent functionality (named pipes for Unix sockets).
-
-## 🛠️ Language Bindings
-
-Psyne provides comprehensive, idiomatic bindings for multiple programming languages:
-
-| Language | Status | Package Manager | Documentation |
-|----------|--------|-----------------|---------------|
-| **C++** | ✅ Native | Header-only | [API Docs](docs/cpp/) |
-| **Python** | ✅ Complete | `pip install psyne` | [Python Guide](bindings/python/) |
-| **JavaScript/TypeScript** | ✅ Complete | `npm install psyne` | [JS/TS Guide](bindings/javascript/) |
-| **Rust** | ✅ Complete | `cargo add psyne` | [Rust Guide](bindings/rust/) |
-| **Go** | ✅ Complete | `go get github.com/psyne/go` | [Go Guide](bindings/go/) |
-| **Java** | ✅ Complete | Maven/Gradle | [Java Guide](bindings/java/) |
-| **C#/.NET** | ✅ Complete | NuGet | [C# Guide](bindings/csharp/) |
-| **Swift** | ✅ Complete | Swift Package Manager | [Swift Guide](bindings/swift/) |
-| **Julia** | ✅ Complete | Julia Package Manager | [Julia Guide](bindings/julia/) |
-
-## 🚀 Quick Start
-
-### C++ (Header-Only)
+## Quick Start
 
 ```cpp
 #include <psyne/psyne.hpp>
 
-int main() {
-    // Create a high-performance memory channel
-    auto channel = psyne::create_channel("memory://demo", 1024*1024);
-    
-    // Send a message
-    auto message = "Hello, Psyne!";
-    channel->send(message);
-    
-    // Receive with zero-copy
-    auto received = channel->receive<std::string>();
-    std::cout << "Received: " << *received << std::endl;
-    
-    return 0;
+// Create a single-producer, single-consumer channel
+auto channel = psyne::channel<MyMessage, psyne::spsc>();
+
+// Producer thread
+auto msg = channel.create_message();
+msg->data = "Hello, World!";
+channel.send_message(msg);
+
+// Consumer thread
+if (auto msg = channel.try_receive()) {
+    std::cout << msg->data << std::endl;
 }
 ```
 
-### Python
+## Features
 
-```python
-import psyne
+### Channel Patterns
+- **SPSC** - Single Producer, Single Consumer (lowest latency)
+- **MPSC** - Multiple Producer, Single Consumer (highest throughput)
+- **SPMC** - Single Producer, Multiple Consumer (work distribution)
+- **MPMC** - Multiple Producer, Multiple Consumer (full flexibility)
 
-# Initialize and create channel
-psyne.init()
-channel = psyne.create_channel("ipc://ml-pipeline", buffer_size=10*1024*1024)
+### Transport Substrates
+- **InProcess** - Zero-copy shared memory within process
+- **IPC** - Zero-copy shared memory across processes
+- **TCP** - Network transport with optional compression
+- **GPU** - Zero-copy GPU memory with host visibility (CUDA, Metal, Vulkan)
 
-# Send ML tensors with zero-copy
-import numpy as np
-tensor = np.random.randn(1000, 1000).astype(np.float32)
-channel.send(tensor)
+### Key Benefits
+- **Header-only** - No build complexity, just `#include`
+- **Zero dependencies** - Pure C++20, no external libraries
+- **Zero-copy** - Messages allocated directly in channel memory
+- **Lock-free** - Wait-free progress guarantees where possible
+- **Type-safe** - Full compile-time type checking
 
-# Receive with automatic type detection
-received_tensor = channel.receive()
-print(f"Received tensor shape: {received_tensor.shape}")
-```
+## Installation
 
-### JavaScript/TypeScript
-
-```typescript
-import { Channel, ChannelMode } from 'psyne';
-
-// Create channel with fluent builder
-const channel = Channel.builder()
-  .uri('tcp://localhost:8080')
-  .mode(ChannelMode.MPSC)
-  .bufferSize(2 * 1024 * 1024)
-  .compression({ type: 'lz4', level: 3 })
-  .build();
-
-// Real-time event handling
-channel.on('message', (data) => {
-  console.log('Received:', data);
-});
-
-// Send with Promise API
-await channel.send({ type: 'prediction', data: [1, 2, 3, 4] });
-```
-
-## 📋 Installation
-
-### Prerequisites
-
-- **C++20** compatible compiler (GCC 10+, Clang 12+, MSVC 2019+)
-- **CMake 3.16+**
-- **OpenSSL** (for encryption support)
-- **Eigen3** (for mathematical operations)
-
-### Build from Source
-
-#### Linux/macOS
-```bash
-# Clone the repository
-git clone https://github.com/joshmorgan1000/psyne.git
-cd psyne
-
-# Build with CMake
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-
-# Install system-wide
-sudo make install
-```
-
-#### Windows (Visual Studio)
-```powershell
-# Clone the repository
-git clone https://github.com/joshmorgan1000/psyne.git
-cd psyne
-
-# Install dependencies with vcpkg
-vcpkg install eigen3:x64-windows openssl:x64-windows
-
-# Build with CMake
-mkdir build
-cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -A x64
-cmake --build . --config Release
-```
-
-### Package Managers
+Copy the `include/psyne` directory to your project:
 
 ```bash
-# Python
-pip install psyne
-
-# JavaScript/Node.js
-npm install psyne
-
-# Rust
-cargo add psyne
-
-# Go
-go get github.com/psyne/go
-
-# Julia
-]add Psyne
+cp -r include/psyne /path/to/your/project/include/
 ```
 
-## 🏗️ Architecture
+Or use CMake:
 
-Psyne is built around a **zero-copy message passing** architecture. Unless the message leaves the system, it is simply a pointer/view into a pre-allocated memory buffer. This concept extends to GPU buffers.
-
-```
-                          ┌──────────────┐
-                          │    Psyne     │
-                          │  "Channel"   │
-                          └──────────────┘
-                                 │
-┌─────────────────┐    ┌─────────▼──────────┐    ┌─────────────────┐
-│   Application   │◄──►│  Ring Buffer Pool  │◄──►│   Application   │
-│    Process A    │    │ (Zero-Copy Memory) │    │    Process B    │
-└─────────────────┘    └────────────────────┘    └─────────────────┘
+```cmake
+add_subdirectory(psyne)
+target_link_libraries(your_app psyne::psyne)
 ```
 
-### Core Components
+Requires C++20 (GCC 10+, Clang 12+, MSVC 2019+).
 
-- **Ring Buffers**: Lock-free circular buffers with SPSC/MPSC/SPMC/MPMC modes
-- **Channel Factory**: URI-based channel creation and management
-- **Message Types**: Built-in support for primitives, tensors, matrices, and custom types
-- **Transport Layer**: Pluggable transport protocols with automatic failover
-- **Compression Engine**: Optional LZ4/Zstd/Snappy compression with adaptive thresholds
-- **Security Layer**: AES-GCM/ChaCha20 encryption with key management
+### Windows Support
 
-## 🔧 Advanced Features
+On Windows, build with Visual Studio 2019 or later:
 
-### Compression Support
+```batch
+# Using provided build script
+scripts\build_windows.bat
 
+# Or manually with MSVC
+cl /std:c++20 /O2 /EHsc /I"include" your_app.cpp
+```
+
+Note: Full coroutine support on Windows requires Boost.Asio. Basic channel functionality works without Boost.
+
+## Advanced Examples
+
+### High-Throughput Pipeline
 ```cpp
-// Automatic compression for large messages
-auto config = psyne::CompressionConfig{
-    .type = psyne::CompressionType::LZ4,
-    .level = 3,
-    .min_threshold = 1024,  // Only compress messages > 1KB
-    .enable_checksum = true
-};
+// 22.5M msgs/sec with multiple producers
+auto channel = psyne::channel<DataPacket, psyne::mpsc>();
 
-auto channel = psyne::create_channel_compressed("tcp://server:8080", config);
+// Launch 32 producers
+for (int i = 0; i < 32; ++i) {
+    producers.emplace_back([&channel, id = i]() {
+        while (running) {
+            auto msg = channel.create_message();
+            msg->producer_id = id;
+            msg->timestamp = now();
+            channel.send_message(msg);
+        }
+    });
+}
 ```
 
-### Encryption
-
+### Cross-Process Communication
 ```cpp
-// End-to-end encryption
-auto encryption = psyne::EncryptionConfig{
-    .algorithm = psyne::EncryptionAlgorithm::AES_GCM,
-    .key_size = 256,
-    .generate_random_iv = true
-};
+// Process A - Producer
+auto channel = psyne::channel<Frame, psyne::spsc, psyne::ipc>("camera_feed");
+channel.send_message(frame);
 
-auto secure_channel = psyne::create_encrypted_channel("tcp://server:8080", encryption);
+// Process B - Consumer
+auto channel = psyne::channel<Frame, psyne::spsc, psyne::ipc>("camera_feed");
+auto frame = channel.receive();
 ```
 
-### Performance Monitoring
-
+### Work Distribution (SPMC)
 ```cpp
-// Built-in metrics collection
-auto metrics = channel->get_metrics();
-std::cout << "Messages/sec: " << metrics.message_rate() << std::endl;
-std::cout << "Throughput: " << metrics.throughput_mbps() << " MB/s" << std::endl;
-std::cout << "Latency P99: " << metrics.latency_p99() << " μs" << std::endl;
+// One producer, multiple consumers for parallel processing
+auto channel = psyne::channel<WorkItem, psyne::spmc>();
+
+// Producer
+while (auto work = get_next_work()) {
+    channel.send_message(work);
+}
+
+// Multiple consumer threads
+for (int i = 0; i < num_workers; ++i) {
+    workers.emplace_back([&]() {
+        while (auto work = channel.try_receive()) {
+            process(work);
+        }
+    });
+}
 ```
 
-## 📊 Performance
+### Coroutine Support (C++20)
+```cpp
+// Asynchronous message reception with coroutines
+auto channel = psyne::channel<Event, psyne::spsc>();
 
-**Psyne v1.3.0 delivers INSANE performance that DESTROYS the competition:**
+// Consumer coroutine
+boost::asio::awaitable<void> consume_events(boost::asio::io_context& io) {
+    while (running) {
+        // Await message with timeout
+        auto msg = co_await channel.async_receive(io, std::chrono::seconds(5));
+        
+        if (msg) {
+            co_await process_event(*msg);
+        } else {
+            // Handle timeout
+            std::cout << "No events received in 5 seconds\n";
+        }
+    }
+}
 
-| Metric | **Psyne v1.3.0** | **Industry Leaders** | **Advantage** |
-|--------|------------------|---------------------|---------------|
-| **Latency** | **0.29 μs** | Redis: ~50μs, TCP: ~50μs | **170x faster** |
-| **Throughput** | **122+ GB/s** | Kafka: ~1GB/s | **120x faster** |  
-| **Message Rate** | **2.3M+ msg/s** | ZeroMQ: ~2M msg/s | **15% faster** |
-| **Computational** | **42.7B ops/s** | Industry avg: ~5B ops/s | **8x faster** |
-| **Data Processed** | **4+ TB in 6.5s** | Most systems: crash | **Unmatched scale** |
+// Run with boost::asio
+boost::asio::io_context io_context;
+boost::asio::co_spawn(io_context, consume_events(io_context), boost::asio::detached);
+io_context.run();
+```
 
-### 🚀 **MASSIVE SCALE BENCHMARKS**
+### GPU Memory Support
+```cpp
+// Create channel with GPU substrate for zero-copy GPU communication
+#include <psyne/channel/substrate/gpu.hpp>
+#include <psyne/channel/pattern/spsc.hpp>
 
-**Want to see your system FLEX? Run these benchmarks:**
+auto gpu_substrate = std::make_shared<psyne::substrate::GPU>();
+auto pattern = std::make_shared<psyne::patterns::SPSC>(1024);
+auto channel = std::make_shared<psyne::behaviors::ChannelBridge<MyGPUData>>(
+    gpu_substrate, pattern
+);
+
+// Messages are allocated directly in GPU memory
+auto msg = channel->create_message();
+// Both CPU and GPU can access msg without copies
+```
+
+### Backpressure Handling
+```cpp
+// Configure channel with backpressure policy
+auto channel = psyne::channel<Data, psyne::mpsc>();
+
+// Drop policy - drop messages when full
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::DropPolicy>()
+);
+
+// Block policy - block producer with timeout
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::BlockPolicy>(
+        std::chrono::milliseconds(100)
+    )
+);
+
+// Retry policy - exponential backoff
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::RetryPolicy>(
+        10, // max retries
+        std::chrono::microseconds(10) // initial delay
+    )
+);
+
+// Adaptive policy - changes strategy based on load
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::AdaptivePolicy>()
+);
+
+// Custom callback policy
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::CallbackPolicy>(
+        []() -> bool {
+            std::cerr << "Channel full! Shedding load...\n";
+            return false; // Don't retry
+        }
+    )
+);
+```
+
+## Architecture
+
+Psyne v2.0 introduces a revolutionary architecture based on:
+
+1. **Physical Substrates** - Handle memory allocation and transport
+2. **Abstract Messages** - Type-safe views into channel memory
+3. **Pattern Behaviors** - Implement coordination logic
+4. **Channel Bridge** - Orchestrates the complete pipeline
+
+This separation enables incredible performance while maintaining clean abstractions.
+
+## Use Cases
+
+- **High-Frequency Trading** - Sub-microsecond order routing
+- **Video Game Engines** - Lock-free actor messaging
+- **ML/AI Pipelines** - Zero-copy tensor transport
+- **Robotics** - Real-time sensor fusion
+- **Data Streaming** - High-throughput event processing
+
+## Benchmarks
+
+Run the comprehensive benchmark suite:
 
 ```bash
-# Build the beast
-cmake --build build --target multi_core_benchmark
-
-# UNLEASH THE FURY - Multi-core stress test  
-./build/tests/multi_core_benchmark
-
-# Watch your CPU cores go BRRRRR
-./build/tests/performance_benchmark
+./benchmarks/beast_mode_test
 ```
 
-**📊 [FULL PERFORMANCE REPORT WITH 4TB+ RESULTS →](PERFORMANCE.md)**
+## Contributing
 
-## 📚 Documentation
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-📖 **[Complete Documentation](docs/)** - Comprehensive guides, tutorials, and reference
+## License
 
-### Quick Links
-- **[📘 Getting Started](docs/getting-started.md)** - Your first Psyne application
-- **[🔧 API Reference](docs/api-reference.md)** - Complete API documentation  
-- **[⚡ Performance Guide](docs/performance.md)** - Benchmarks and optimization
-- **[🎓 Tutorials](docs/tutorials/)** - Step-by-step learning path
-- **[💡 Examples](examples/)** - 37+ real-world usage examples
-- **[🌍 Language Bindings](bindings/)** - Multi-language support
-
-### Learning Path
-1. **Start Here**: [Core Design Principles](CORE_DESIGN.md) → [Overview](docs/overview.md) → [Getting Started](docs/getting-started.md)
-2. **Core Concepts**: [Channels](docs/channels.md) → [Message Types](docs/tutorials/02-message-types.md)  
-3. **Advanced**: [Performance Tuning](docs/performance-tuning.md) → [Examples](examples/)
-
-### 🎯 **REQUIRED READING**: [Core Design Principles](CORE_DESIGN.md)
-**Every contributor MUST read and understand the [Core Design Document](CORE_DESIGN.md) before making changes.** This document preserves the fundamental zero-copy philosophy that makes Psyne fast.
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-```bash
-# Clone with submodules
-git clone --recursive https://github.com/joshmorgan1000/psyne.git
-
-# Build with development options
-cmake .. -DPSYNE_BUILD_TESTS=ON -DPSYNE_BUILD_EXAMPLES=ON
-
-# Run tests
-ctest --output-on-failure
-```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Boost Libraries** - For cross-platform system abstractions
-- **Eigen** - For high-performance linear algebra
-- **OpenSSL** - For cryptographic functions
-- **The C++20 Standard** - For modern language features
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/joshmorgan1000/psyne/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/joshmorgan1000/psyne/discussions)
-
-## 🤖 Development Attribution
-
-This project was developed with significant assistance from AI frameworks including **Claude** (Anthropic), as well as **Codex** (OpenAI) which contributed to:
-- Architecture design and implementation
-- Code optimization and refactoring  
-- Documentation and examples
-- Testing and debugging
-
-While AI provided substantial development support, all design decisions, code review, and project direction remained under human oversight.
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Psyne** - Zero-copy messaging at the speed of thought 🚀
+Built with ❤️ for extreme performance by the Psyne team.
+

@@ -1,0 +1,28 @@
+Psyne - Ultra-high-performance zero-copy messaging library for C++20
+Copyright 2025 Psyne Contributors
+
+This product includes software developed by the Psyne Contributors.
+
+## Third-party Dependencies
+
+This software may include the following third-party libraries when built:
+
+- Boost C++ Libraries (https://www.boost.org/)
+  Licensed under the Boost Software License 1.0
+
+- Eigen (https://eigen.tuxfamily.org/)
+  Licensed under the Mozilla Public License 2.0
+
+- OpenSSL (https://www.openssl.org/)
+  Licensed under the Apache License 2.0
+
+- CUDA Toolkit (https://developer.nvidia.com/cuda-toolkit)
+  Licensed under the NVIDIA CUDA Toolkit End User License Agreement
+
+- Metal (https://developer.apple.com/metal/)
+  Part of macOS/iOS SDK, licensed under Apple's SDK license terms
+
+- Vulkan SDK (https://vulkan.lunarg.com/)
+  Licensed under the Apache License 2.0
+
+Note: These dependencies are optional and only included when explicitly enabled during build.

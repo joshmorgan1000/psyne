@@ -1,5 +1,0 @@
-module CPsyne [system] {
-    header "psyne_c_api.h"
-    link "psyne"
-    export *
-}

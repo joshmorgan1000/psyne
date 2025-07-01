@@ -1,56 +1,34 @@
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-include_directories(
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/psyne
-    ${CMAKE_SOURCE_DIR}/src/utils
-    ${EIGEN3_INCLUDE_DIR}
-    ${Vulkan_INCLUDE_DIRS}
-    $ENV{HOME}/boost
-)
+# Tests for Psyne v2.0
 
 # Find required packages
 find_package(Threads REQUIRED)
-find_package(Eigen3 REQUIRED)
 
-# Function to add a test executable
-function(add_psyne_test name)
-    add_executable(${name} ${name}.cpp)
-    target_link_libraries(${name} 
-        psyne
-        Threads::Threads
-        Eigen3::Eigen
-    )
-    target_compile_features(${name} PRIVATE cxx_std_20)
+# Helper function to add a test
+function(add_psyne_test test_name)
+    add_executable(${test_name} ${test_name}.cpp)
+    target_include_directories(${test_name} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(${test_name} PRIVATE Threads::Threads)
+    target_compile_features(${test_name} PRIVATE cxx_std_20)
     
-    # Add compiler warnings
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
-    endif()
-    
-    # Add as a test
-    add_test(NAME ${name} COMMAND ${name})
+    # Add to CTest
+    add_test(NAME ${test_name} COMMAND ${test_name})
+    set_tests_properties(${test_name} PROPERTIES TIMEOUT 30)
 endfunction()
 
-if(DEFINED ENV{GITHUB_ACTIONS} OR "$ENV{CI}" STREQUAL "true")
-    message(STATUS "CI detected: disabling tests")
-    set(HEAVY_TESTS OFF CACHE BOOL "Disable tests on CI" FORCE)
+# Add all test executables
+add_psyne_test(test_spsc_basic)
+add_psyne_test(test_all_patterns)
+add_psyne_test(test_ipc_substrate)
+add_psyne_test(test_tcp_working)
+add_psyne_test(test_mpmc_simple)
+
+# Platform-specific settings
+if(UNIX AND NOT APPLE)
+    # Linux-specific flags
+    foreach(test_target test_spsc_basic test_all_patterns test_ipc_substrate test_tcp_working test_mpmc_simple)
+        target_link_libraries(${test_target} PRIVATE rt)
+    endforeach()
 endif()
 
-# Add tests
-add_psyne_test(simple_test)
-# add_psyne_test(basic_test) # Disabled: Uses deprecated v1.2 API patterns
-add_psyne_test(message_test)
-add_psyne_test(channel_test)
-add_psyne_test(compression_encryption_test)
-add_psyne_test(memory_leak_test)
-add_psyne_test(simple_stress_test)
-if(HEAVY_TESTS)
-    add_psyne_test(simple_memory_test)
-    add_psyne_test(performance_test)
-    add_psyne_test(tcp_test)
-    add_psyne_test(integration_test)
-    add_psyne_test(performance_benchmark)
-    add_psyne_test(multi_core_benchmark)
-endif()
+# Enable testing
+enable_testing()
