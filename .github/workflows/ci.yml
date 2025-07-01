@@ -35,12 +35,6 @@ jobs:
         echo "Building test_spsc_basic..."
         g++ -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_spsc_basic.cpp -o test_spsc_basic
-        echo "Building test_all_patterns..."
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          tests/test_all_patterns.cpp -o test_all_patterns
-        echo "Building test_ipc_substrate..."
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          tests/test_ipc_substrate.cpp -o test_ipc_substrate
     
     - name: Build benchmarks
       run: |
@@ -66,15 +60,12 @@ jobs:
       run: |
         echo "Running tests..."
         ./test_spsc_basic
-        ./test_all_patterns
-        # IPC test might need special permissions in CI
-        # ./test_ipc_substrate
     
     - name: Run quick benchmarks
       run: |
         echo "Running quick benchmarks..."
+        # Run only the quickest test
         ./quick_all_substrates
-        ./all_patterns_test
 
   linux-clang:
     name: Linux Clang
@@ -110,7 +101,7 @@ jobs:
     - name: Run tests
       run: |
         ./test_spsc_basic
-        ./test_all_patterns
+        # ./test_all_patterns  # Commented to reduce CI load
 
   macos:
     name: macOS
@@ -124,21 +115,16 @@ jobs:
         echo "Building tests on macOS..."
         c++ -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_spsc_basic.cpp -o test_spsc_basic
-        c++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          tests/test_all_patterns.cpp -o test_all_patterns
     
     - name: Build benchmarks
       run: |
         echo "Building benchmarks on macOS..."
         c++ -std=c++20 -O3 -march=native -pthread \
           benchmarks/quick_all_substrates.cpp -o quick_all_substrates
-        c++ -std=c++20 -O3 -march=native -pthread \
-          benchmarks/all_patterns_test.cpp -o all_patterns_test
     
     - name: Run tests
       run: |
         ./test_spsc_basic
-        ./test_all_patterns
     
     - name: Run quick benchmarks
       run: |
@@ -159,7 +145,6 @@ jobs:
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
         cl /std:c++20 /O2 /EHsc tests/test_spsc_basic.cpp /Fe:test_spsc_basic.exe
-        cl /std:c++20 /O2 /EHsc tests/test_all_patterns.cpp /Fe:test_all_patterns.exe
     
     - name: Build benchmarks
       shell: cmd

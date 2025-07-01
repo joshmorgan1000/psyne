@@ -15,6 +15,7 @@
 #include <vector>
 #include <atomic>
 #include <chrono>
+#include <cstring>
 
 // Test message
 struct TestMessage {

@@ -15,6 +15,7 @@
 #include <chrono>
 #include <atomic>
 #include <cassert>
+#include <cstring>
 
 // Simple test message
 struct TestMessage {
