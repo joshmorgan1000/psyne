@@ -8,6 +8,9 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
+#include <cstdint>
+#include <atomic>
+#include <cstdlib>
 
 // Test basic behaviors without boost
 struct SimpleMessage {

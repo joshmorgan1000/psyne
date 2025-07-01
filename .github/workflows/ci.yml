@@ -52,9 +52,9 @@ jobs:
     - name: Build tests
       run: |
         echo "Building tests..."
-        echo "Building test_spsc_basic..."
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread -DPSYNE_USE_EIGEN \
-          tests/test_spsc_basic.cpp -o test_spsc_basic || exit 1
+        echo "Building test_simple_channel..."
+        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
+          tests/test_simple_channel.cpp -o test_simple_channel || exit 1
     
     - name: Build benchmarks
       run: |
@@ -79,7 +79,7 @@ jobs:
     - name: Run tests
       run: |
         echo "Running tests..."
-        ./test_spsc_basic
+        ./test_simple_channel
     
     - name: Run quick benchmarks
       run: |
@@ -108,9 +108,7 @@ jobs:
       run: |
         echo "Building tests with Clang..."
         clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread \
-          tests/test_spsc_basic.cpp -o test_spsc_basic
-        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread \
-          tests/test_all_patterns.cpp -o test_all_patterns
+          tests/test_simple_channel.cpp -o test_simple_channel
     
     - name: Build benchmarks
       run: |
@@ -120,8 +118,7 @@ jobs:
     
     - name: Run tests
       run: |
-        ./test_spsc_basic
-        # ./test_all_patterns  # Commented to reduce CI load
+        ./test_simple_channel
 
   macos:
     name: macOS
@@ -137,7 +134,7 @@ jobs:
       run: |
         echo "Building tests on macOS..."
         c++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          tests/test_spsc_basic.cpp -o test_spsc_basic
+          tests/test_simple_channel.cpp -o test_simple_channel
     
     - name: Build benchmarks
       run: |
@@ -147,7 +144,7 @@ jobs:
     
     - name: Run tests
       run: |
-        ./test_spsc_basic
+        ./test_simple_channel
     
     - name: Run quick benchmarks
       run: |
