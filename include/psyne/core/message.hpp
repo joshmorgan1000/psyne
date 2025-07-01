@@ -66,6 +66,7 @@ struct alignas(64) Float32VectorMessage {
     uint32_t batch_idx = 0;
     uint32_t layer_id = 0;
 
+#ifdef PSYNE_USE_EIGEN
     /**
      * @brief Get as Eigen vector (zero-copy)
      */
@@ -76,6 +77,7 @@ struct alignas(64) Float32VectorMessage {
     Eigen::Map<const Eigen::VectorXf> as_eigen() const {
         return Eigen::Map<const Eigen::VectorXf>(data, N);
     }
+#endif
 
     /**
      * @brief Fill with zeros
@@ -115,6 +117,7 @@ struct alignas(64) Float32MatrixMessage {
     uint32_t batch_idx = 0;
     uint32_t layer_id = 0;
 
+#ifdef PSYNE_USE_EIGEN
     /**
      * @brief Get as Eigen matrix (zero-copy)
      */
@@ -128,6 +131,7 @@ struct alignas(64) Float32MatrixMessage {
         return Eigen::Map<
             const Eigen::Matrix<float, Rows, Cols, Eigen::RowMajor>>(data);
     }
+#endif
 
     /**
      * @brief Access element
