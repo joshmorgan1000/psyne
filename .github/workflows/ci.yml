@@ -32,10 +32,13 @@ jobs:
     - name: Build tests
       run: |
         echo "Building tests..."
+        echo "Building test_spsc_basic..."
         g++ -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_spsc_basic.cpp -o test_spsc_basic
+        echo "Building test_all_patterns..."
         g++ -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_all_patterns.cpp -o test_all_patterns
+        echo "Building test_ipc_substrate..."
         g++ -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_ipc_substrate.cpp -o test_ipc_substrate
     
@@ -93,15 +96,15 @@ jobs:
     - name: Build tests
       run: |
         echo "Building tests with Clang..."
-        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_spsc_basic.cpp -o test_spsc_basic
-        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_all_patterns.cpp -o test_all_patterns
     
     - name: Build benchmarks
       run: |
         echo "Building benchmarks with Clang..."
-        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -march=native -pthread -Iinclude \
+        clang++-${{ matrix.clang-version }} -std=c++20 -O3 -march=native -pthread \
           benchmarks/quick_all_substrates.cpp -o quick_all_substrates
     
     - name: Run tests
@@ -119,17 +122,17 @@ jobs:
     - name: Build tests
       run: |
         echo "Building tests on macOS..."
-        c++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+        c++ -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_spsc_basic.cpp -o test_spsc_basic
-        c++ -std=c++20 -O3 -Wall -Wextra -pthread -Iinclude \
+        c++ -std=c++20 -O3 -Wall -Wextra -pthread \
           tests/test_all_patterns.cpp -o test_all_patterns
     
     - name: Build benchmarks
       run: |
         echo "Building benchmarks on macOS..."
-        c++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+        c++ -std=c++20 -O3 -march=native -pthread \
           benchmarks/quick_all_substrates.cpp -o quick_all_substrates
-        c++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+        c++ -std=c++20 -O3 -march=native -pthread \
           benchmarks/all_patterns_test.cpp -o all_patterns_test
     
     - name: Run tests
@@ -155,14 +158,14 @@ jobs:
       shell: cmd
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        cl /std:c++20 /O2 /EHsc /Iinclude tests/test_spsc_basic.cpp /Fe:test_spsc_basic.exe
-        cl /std:c++20 /O2 /EHsc /Iinclude tests/test_all_patterns.cpp /Fe:test_all_patterns.exe
+        cl /std:c++20 /O2 /EHsc tests/test_spsc_basic.cpp /Fe:test_spsc_basic.exe
+        cl /std:c++20 /O2 /EHsc tests/test_all_patterns.cpp /Fe:test_all_patterns.exe
     
     - name: Build benchmarks
       shell: cmd
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        cl /std:c++20 /O2 /EHsc /Iinclude benchmarks/quick_all_substrates.cpp /Fe:quick_all_substrates.exe
+        cl /std:c++20 /O2 /EHsc benchmarks/quick_all_substrates.cpp /Fe:quick_all_substrates.exe
     
     - name: Run tests
       shell: cmd
@@ -210,7 +213,7 @@ jobs:
     
     - name: Build performance test
       run: |
-        g++ -std=c++20 -O3 -march=native -pthread -Iinclude \
+        g++ -std=c++20 -O3 -march=native -pthread \
           benchmarks/quick_all_substrates.cpp -o perf_test
     
     - name: Run performance test
