@@ -3,9 +3,9 @@
   
   **Ultra-high-performance zero-copy messaging library for C++20**
   
-  [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/joshmorgan1000/psyne)
+  [![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://github.com/joshmorgan1000/psyne)
   [![C++ Standard](https://img.shields.io/badge/C++-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
-  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+  [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
   
   [![Linux GCC](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20GCC&logo=linux)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
   [![Linux Clang](https://img.shields.io/github/actions/workflow/status/joshmorgan1000/psyne/ci.yml?branch=main&label=Linux%20Clang&logo=llvm)](https://github.com/joshmorgan1000/psyne/actions/workflows/ci.yml)
@@ -78,6 +78,7 @@ if (auto msg = channel.try_receive()) {
 - **InProcess** - Zero-copy shared memory within process
 - **IPC** - Zero-copy shared memory across processes
 - **TCP** - Network transport with optional compression
+- **GPU** - Zero-copy GPU memory with host visibility (CUDA, Metal, Vulkan)
 
 ### Key Benefits
 - **Header-only** - No build complexity, just `#include`
@@ -194,6 +195,23 @@ boost::asio::co_spawn(io_context, consume_events(io_context), boost::asio::detac
 io_context.run();
 ```
 
+### GPU Memory Support
+```cpp
+// Create channel with GPU substrate for zero-copy GPU communication
+#include <psyne/channel/substrate/gpu.hpp>
+#include <psyne/channel/pattern/spsc.hpp>
+
+auto gpu_substrate = std::make_shared<psyne::substrate::GPU>();
+auto pattern = std::make_shared<psyne::patterns::SPSC>(1024);
+auto channel = std::make_shared<psyne::behaviors::ChannelBridge<MyGPUData>>(
+    gpu_substrate, pattern
+);
+
+// Messages are allocated directly in GPU memory
+auto msg = channel->create_message();
+// Both CPU and GPU can access msg without copies
+```
+
 ### Backpressure Handling
 ```cpp
 // Configure channel with backpressure policy
@@ -268,7 +286,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ---
 

@@ -6,7 +6,7 @@
  * commonly found in machine learning workloads.
  */
 
-#include "../../include/psyne/global/logger.hpp"
+#include <psyne/global/logger.hpp>
 #include "psyne/protocol/tdt_compression.hpp"
 #include <chrono>
 #include <cstring>

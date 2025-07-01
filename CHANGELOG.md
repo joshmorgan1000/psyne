@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.1] - 2025-07-01
 
 ### Added
+- GPU substrate support for zero-copy host-visible memory:
+  - CUDA support with unified memory and pinned memory modes
+  - Metal support for macOS/iOS with shared storage
+  - Vulkan support with host-visible coherent memory
+  - Automatic backend detection and selection
 - Comprehensive backpressure system with multiple policies:
   - Drop: Discard messages when channel is full
   - Block: Block producer with configurable timeout
@@ -31,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced TCP substrate with input validation against malicious payloads
 - Improved error handling consistency across patterns
 - Updated CI to install boost dependencies on all platforms
-- Moved logger.hpp and threadpool.hpp to src/global/
+- Moved all header files from src/global/ to include/psyne/global/
 
 ### Security
 - Added size validation in TCP substrate to prevent buffer overflows

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../global/logger.hpp"
+#include <psyne/global/logger.hpp>
 #include "pattern_base.hpp"
 #include <atomic>
 #include <vector>

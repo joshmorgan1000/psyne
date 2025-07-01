@@ -209,7 +209,7 @@ EOF
 # Compile and run if compiler is available
 if command -v g++ &> /dev/null; then
     echo "Compiling latency test..."
-    g++ -std=c++20 -O3 -I../include -I../src/global latency_test.cpp -L../build -lpsyne -lpthread -o latency_test
+    g++ -std=c++20 -O3 -I../include latency_test.cpp -L../build -lpsyne -lpthread -o latency_test
     if [ -f "./latency_test" ]; then
         echo "Running latency distribution test..."
         ./latency_test

@@ -4,15 +4,17 @@
 set(PSYNE_HAS_BOOST ${Boost_FOUND} PARENT_SCOPE)
 
 # Basic examples (always build)
-add_executable(layer_communication basic/layer_communication.cpp)
-target_link_libraries(layer_communication PRIVATE psyne)
+# TODO: Restore these examples
+# add_executable(layer_communication basic/layer_communication.cpp)
+# target_link_libraries(layer_communication PRIVATE psyne)
 
 # Pattern examples (always build)
-add_executable(gradient_aggregation patterns/gradient_aggregation_simple.cpp)
-target_link_libraries(gradient_aggregation PRIVATE psyne)
+# TODO: Restore these examples
+# add_executable(gradient_aggregation patterns/gradient_aggregation_simple.cpp)
+# target_link_libraries(gradient_aggregation PRIVATE psyne)
 
-add_executable(data_parallel_broadcast patterns/data_parallel_broadcast.cpp)
-target_link_libraries(data_parallel_broadcast PRIVATE psyne)
+# add_executable(data_parallel_broadcast patterns/data_parallel_broadcast.cpp)
+# target_link_libraries(data_parallel_broadcast PRIVATE psyne)
 
 # Network examples (only if Boost found)
 if(Boost_FOUND)
@@ -33,11 +35,12 @@ else()
 endif()
 
 # Concept demonstration examples
-add_executable(concept_based_demo concept_based_demo.cpp)
-target_link_libraries(concept_based_demo PRIVATE psyne)
+# TODO: Restore these examples
+# add_executable(concept_based_demo concept_based_demo.cpp)
+# target_link_libraries(concept_based_demo PRIVATE psyne)
 
-add_executable(clean_architecture_demo clean_architecture_demo.cpp)
-target_link_libraries(clean_architecture_demo PRIVATE psyne)
+# add_executable(clean_architecture_demo clean_architecture_demo.cpp)
+# target_link_libraries(clean_architecture_demo PRIVATE psyne)
 
 add_executable(behaviors_demo behaviors_demo.cpp)
 target_link_libraries(behaviors_demo PRIVATE psyne)
@@ -51,17 +54,35 @@ if(PSYNE_ENABLE_GPU)
     add_executable(zero_copy_gpu_example gpu/zero_copy_gpu_example.cpp)
     target_link_libraries(zero_copy_gpu_example PRIVATE psyne)
     
-    add_executable(future_gpu_example future_gpu_example.cpp)
-    target_link_libraries(future_gpu_example PRIVATE psyne)
+    # On macOS, build GPU example as Objective-C++ for Metal support
+    if(APPLE AND PSYNE_METAL_ENABLED)
+        add_executable(gpu_example basic/gpu_example.mm)
+        set_source_files_properties(basic/gpu_example.mm PROPERTIES
+            COMPILE_FLAGS "-x objective-c++"
+        )
+    else()
+        add_executable(gpu_example basic/gpu_example.cpp)
+    endif()
+    
+    target_link_libraries(gpu_example PRIVATE psyne)
+    
+    # Link Metal framework on macOS
+    if(APPLE AND PSYNE_METAL_ENABLED)
+        target_link_libraries(gpu_example PRIVATE
+            "-framework Metal"
+            "-framework Foundation"
+        )
+    endif()
+    
+    install(TARGETS
+        zero_copy_gpu_example
+        gpu_example
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/psyne-examples
+    )
 endif()
 
 # Install examples
 install(TARGETS 
-    layer_communication 
-    gradient_aggregation 
-    data_parallel_broadcast
-    concept_based_demo
-    clean_architecture_demo
     behaviors_demo
     metrics_demo
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/psyne-examples

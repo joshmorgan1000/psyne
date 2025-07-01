@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "../global/logger.hpp"
+#include <psyne/global/logger.hpp>
 #include "psyne/concepts/protocol_concepts.hpp"
 #include <algorithm>
 #include <array>

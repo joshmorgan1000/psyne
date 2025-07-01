@@ -1,7 +1,7 @@
 # Benchmarks CMakeLists.txt
 
 # Add include directories for all benchmarks
-include_directories(${CMAKE_SOURCE_DIR}/src/global)
+include_directories(${CMAKE_SOURCE_DIR}/include/psyne/global)
 
 # Core benchmarks
 add_executable(messaging_patterns_benchmark messaging_patterns_benchmark.cpp)

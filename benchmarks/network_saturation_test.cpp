@@ -6,7 +6,7 @@
  * saturating network hardware and measuring real-world performance.
  */
 
-#include "logger.hpp"
+#include <psyne/global/logger.hpp>
 #include "psyne/memory/object_pool.hpp"
 #include "psyne/psyne.hpp"
 #include <atomic>

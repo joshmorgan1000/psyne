@@ -148,9 +148,15 @@ if(PSYNE_ENABLE_GPU)
     
     # Check for Metal (macOS only)
     if(APPLE)
-        # Temporarily disable Metal until metal-cpp headers are added
-        set(PSYNE_METAL_ENABLED OFF)
-        message(STATUS "Metal support temporarily disabled (needs metal-cpp headers)")
+        find_library(METAL_FRAMEWORK Metal)
+        find_library(METALKIT_FRAMEWORK MetalKit)
+        if(METAL_FRAMEWORK AND METALKIT_FRAMEWORK)
+            set(PSYNE_METAL_ENABLED ON)
+            message(STATUS "Metal support enabled")
+        else()
+            set(PSYNE_METAL_ENABLED OFF)
+            message(STATUS "Metal support disabled (Metal framework not found)")
+        endif()
     else()
         set(PSYNE_METAL_ENABLED OFF)
     endif()
@@ -172,38 +178,7 @@ else()
     set(PSYNE_METAL_ENABLED OFF)
 endif()
 
-# Find dependencies
-# Add GPU sources if enabled
-if(PSYNE_ENABLE_GPU)
-    list(APPEND PSYNE_SOURCES
-        "${CMAKE_SOURCE_DIR}/src/gpu/gpu_context.cpp"
-        "${CMAKE_SOURCE_DIR}/src/gpu/gpu_message.cpp"
-    )
-    
-    # Add Metal sources for macOS
-    if(PSYNE_METAL_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/gpu/metal/metal_buffer.cpp"
-        )
-    endif()
-    
-    # Add CUDA sources if available
-    if(PSYNE_CUDA_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_buffer.cpp"
-            "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_context.cpp"
-            "${CMAKE_SOURCE_DIR}/src/gpu/cuda/cuda_kernels.cu"
-        )
-        
-    endif()
-    
-    # Add Vulkan sources if available
-    if(PSYNE_VULKAN_ENABLED)
-        list(APPEND PSYNE_SOURCES
-            "${CMAKE_SOURCE_DIR}/src/gpu/vulkan/vulkan_buffer.cpp"
-        )
-    endif()
-endif()
+# Header-only library - no source files needed for GPU support
 
 # Add GPU libraries if enabled
 if(PSYNE_ENABLE_GPU)
@@ -253,39 +228,14 @@ if(PSYNE_ENABLE_GPU)
     endif()
 endif()
 
-# ------------------------------------------------------------------------------
-# Status
-# ------------------------------------------------------------------------------
-message(STATUS "  _____  ______ __    _ ____   _  ______  ")
-message(STATUS " |  .  ||   ___|\\ \\  //|    \\ | ||   ___| ")
-message(STATUS " |    _| `-.`-.  \\ \\// |     \\| ||   ___| ")
-message(STATUS " |___|  |______| /__/  |__/\\____||______| ")
-message(STATUS " Zero-copy RPC library optimized for AI/ML")
-message(STATUS "===================================================")
-message(STATUS " ")
-message(STATUS " CMake Project Configured!")
-message(STATUS "  Build Type:        ${CMAKE_BUILD_TYPE}")
-message(STATUS "  Project Version:   ${PROJECT_VERSION}")
-message(STATUS "  CMake Version:     ${CMAKE_VERSION}")
-message(STATUS "  C++ Standard:      ${CMAKE_CXX_STANDARD}")
-message(STATUS "  OpenSSL Version:   ${OPENSSL_VERSION}")
-message(STATUS "")
-message(STATUS "Optional Components:")
-message(STATUS "  Examples:          ${PSYNE_BUILD_EXAMPLES}")
-message(STATUS "  Tests:             ${PSYNE_BUILD_TESTS}")
-message(STATUS "  Benchmarks:        ${PSYNE_BUILD_BENCHMARKS}")
-message(STATUS "  Python Bindings:   ${PSYNE_PYTHON_BINDINGS}")
-message(STATUS "  GPU Support:       ${PSYNE_ENABLE_GPU}")
-if(PSYNE_ENABLE_GPU)
-    message(STATUS "    CUDA:            ${PSYNE_CUDA_ENABLED}")
-    message(STATUS "    Metal:           ${PSYNE_METAL_ENABLED}")
-    message(STATUS "    Vulkan:          ${PSYNE_VULKAN_ENABLED}")
-endif()
-message(STATUS "")
-message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=OFF to disable examples")
-message(STATUS "Use -DPSYNE_BUILD_TESTS=OFF to disable tests")
-message(STATUS "Use 'make install' to install library and headers")
-message(STATUS "===================================================")
+# ----------------------------------------------------------------------------------------
+# Generate Configuration Header
+# ----------------------------------------------------------------------------------------
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/psyne/config.hpp.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/psyne/config.hpp
+    @ONLY
+)
 
 # ----------------------------------------------------------------------------------------
 # Source Files
@@ -296,7 +246,7 @@ set(PSYNE_CORE_SOURCES
 
 set(PSYNE_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/global
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/psyne/global
 )
 
 # ----------------------------------------------------------------------------------------
@@ -315,7 +265,8 @@ add_library(psyne INTERFACE)
 # Include directories
 target_include_directories(psyne INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/global>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/psyne/global>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -408,11 +359,8 @@ install(DIRECTORY include/
     FILES_MATCHING PATTERN "*.hpp"
 )
 
-# Install global headers
-install(DIRECTORY src/global/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/psyne/global
-    FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
-)
+# Global headers are already part of the include directory
+# No separate installation needed as they're in include/psyne/global/
 
 # Create and install CMake config files
 install(EXPORT PsyneTargets
@@ -439,3 +387,37 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/PsyneConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Psyne
 )
+
+# ------------------------------------------------------------------------------
+# Status
+# ------------------------------------------------------------------------------
+message(STATUS "  _____  ______ __    _ ____   _  ______  ")
+message(STATUS " |  .  ||   ___|\\ \\  //|    \\ | ||   ___| ")
+message(STATUS " |    _| `-.`-.  \\ \\// |     \\| ||   ___| ")
+message(STATUS " |___|  |______| /__/  |__/\\____||______| ")
+message(STATUS " Zero-copy RPC library optimized for AI/ML")
+message(STATUS "===================================================")
+message(STATUS " ")
+message(STATUS " CMake Project Configured!")
+message(STATUS "  Build Type:        ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Project Version:   ${PROJECT_VERSION}")
+message(STATUS "  CMake Version:     ${CMAKE_VERSION}")
+message(STATUS "  C++ Standard:      ${CMAKE_CXX_STANDARD}")
+message(STATUS "  OpenSSL Version:   ${OPENSSL_VERSION}")
+message(STATUS "")
+message(STATUS "Optional Components:")
+message(STATUS "  Examples:          ${PSYNE_BUILD_EXAMPLES}")
+message(STATUS "  Tests:             ${PSYNE_BUILD_TESTS}")
+message(STATUS "  Benchmarks:        ${PSYNE_BUILD_BENCHMARKS}")
+message(STATUS "  Python Bindings:   ${PSYNE_PYTHON_BINDINGS}")
+message(STATUS "  GPU Support:       ${PSYNE_ENABLE_GPU}")
+if(PSYNE_ENABLE_GPU)
+    message(STATUS "    CUDA:            ${PSYNE_CUDA_ENABLED}")
+    message(STATUS "    Metal:           ${PSYNE_METAL_ENABLED}")
+    message(STATUS "    Vulkan:          ${PSYNE_VULKAN_ENABLED}")
+endif()
+message(STATUS "")
+message(STATUS "Use -DPSYNE_BUILD_EXAMPLES=OFF to disable examples")
+message(STATUS "Use -DPSYNE_BUILD_TESTS=OFF to disable tests")
+message(STATUS "Use 'make install' to install library and headers")
+message(STATUS "===================================================")

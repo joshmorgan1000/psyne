@@ -29,8 +29,8 @@
 // Version information
 #define PSYNE_VERSION_MAJOR 2
 #define PSYNE_VERSION_MINOR 0
-#define PSYNE_VERSION_PATCH 0
-#define PSYNE_VERSION_STRING "2.0.0-rc"
+#define PSYNE_VERSION_PATCH 1
+#define PSYNE_VERSION_STRING "2.0.1"
 
 namespace psyne {
 

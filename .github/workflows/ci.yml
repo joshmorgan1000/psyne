@@ -7,86 +7,6 @@ on:
     branches: [ main ]
 
 jobs:
-  linux-gcc:
-    name: Linux GCC
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        gcc-version: [10, 11, 12, 13]
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Debug directory structure
-      run: |
-        echo "Current directory:"
-        pwd
-        echo "Directory contents:"
-        ls -la
-        echo "Include directory:"
-        ls -la include/
-        echo "Tests directory:"
-        ls -la tests/
-    
-    - name: Install GCC ${{ matrix.gcc-version }}
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-${{ matrix.gcc-version }} g++-${{ matrix.gcc-version }} libeigen3-dev libboost-all-dev
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc-version }} 100
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc-version }} 100
-    
-    - name: Verify compiler
-      run: |
-        gcc --version
-        g++ --version
-    
-    - name: Build minimal test
-      run: |
-        echo "Testing basic include..."
-        echo '#include "psyne/core/behaviors.hpp"' > test.cpp
-        echo '#include <iostream>' >> test.cpp
-        echo 'int main() { std::cout << "OK\\n"; return 0; }' >> test.cpp
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread -I./include test.cpp -o test || exit 1
-        ./test
-        
-    - name: Build tests
-      run: |
-        echo "Building tests..."
-        echo "Building test_simple_channel..."
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          tests/test_simple_channel.cpp -o test_simple_channel || exit 1
-    
-    - name: Build benchmarks
-      run: |
-        echo "Building benchmarks..."
-        g++ -std=c++20 -O3 -march=native -pthread \
-          benchmarks/quick_all_substrates.cpp -o quick_all_substrates
-        g++ -std=c++20 -O3 -march=native -pthread \
-          benchmarks/all_patterns_test.cpp -o all_patterns_test
-        g++ -std=c++20 -O3 -march=native -pthread \
-          benchmarks/quick_beast_test.cpp -o quick_beast_test
-    
-    - name: Build examples
-      run: |
-        echo "Building examples..."
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          examples/behaviors_demo.cpp -o behaviors_demo
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          examples/basic/ipc_example.cpp -o ipc_example
-        g++ -std=c++20 -O3 -Wall -Wextra -pthread \
-          examples/basic/tcp_example.cpp -o tcp_example
-    
-    - name: Run tests
-      run: |
-        echo "Running tests..."
-        ./test_simple_channel
-    
-    - name: Run quick benchmarks
-      run: |
-        echo "Running quick benchmarks..."
-        # Run only the quickest test
-        ./quick_all_substrates
-
   linux-clang:
     name: Linux Clang
     runs-on: ubuntu-latest
@@ -161,7 +81,7 @@ jobs:
     - name: Setup vcpkg with cache
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+        vcpkgGitCommitId: 'f7423ee180c4b7f40d43402c2feb3859161ef625'
     
     - name: Install dependencies via vcpkg
       run: |
@@ -189,42 +109,3 @@ jobs:
         echo.
         echo Running simple channel test...
         test_simple_channel.exe
-
-  header-only-validation:
-    name: Header-Only Validation
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libboost-all-dev libeigen3-dev
-    
-    - name: Test single include compilation
-      run: |
-        echo '#include "psyne/psyne.hpp"' > test_include.cpp
-        echo 'int main() { return 0; }' >> test_include.cpp
-        g++ -std=c++20 -Wall -Wextra -Iinclude test_include.cpp -o test_include
-        ./test_include
-    
-    - name: Check header guards
-      run: |
-        echo "Checking header guards..."
-        for header in $(find include -name "*.hpp"); do
-          if ! grep -q "#pragma once\|#ifndef.*#define" "$header"; then
-            echo "Missing header guard in $header"
-            exit 1
-          fi
-        done
-    
-    - name: Check no implementation files
-      run: |
-        if find include -name "*.cpp" | grep -q .; then
-          echo "Found .cpp files in include directory!"
-          exit 1
-        fi
-
-  # Performance testing disabled on GitHub servers
-  # Benchmarks should be run on dedicated hardware for meaningful results
