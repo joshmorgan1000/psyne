@@ -12,7 +12,7 @@ namespace psyne {
 
 /**
  * @brief Message types for high-performance communication
- * 
+ *
  * These are just examples - users can create any message type they want
  * and use it with Channel<MessageType, Substrate, Pattern>
  */

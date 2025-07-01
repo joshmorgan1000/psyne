@@ -6,8 +6,8 @@
  * potentially on different machines. Run with "server" or "client" argument.
  */
 
-#include "psyne/psyne.hpp"
 #include "logger.hpp"
+#include "psyne/psyne.hpp"
 #include <chrono>
 #include <cstring>
 #include <thread>
@@ -85,8 +85,8 @@ void run_server() {
 
         if (expected_sequence % 100 == 0) {
             log_info("Received ", expected_sequence,
-                      " messages, desc: ", msg->description,
-                      ", latency: ", (latency / 1000), " us");
+                     " messages, desc: ", msg->description,
+                     ", latency: ", (latency / 1000), " us");
         }
 
         expected_sequence++;
@@ -100,7 +100,7 @@ void run_server() {
     log_info("  Receive failures: ", stats.receive_failures);
     log_info("  Average channel latency: ", stats.avg_latency_ns, " ns");
     log_info("  Average network latency: ",
-              (total_latency / message_count / 1000), " us");
+             (total_latency / message_count / 1000), " us");
 }
 
 void run_client(const std::string &server_host) {
@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
         log_error("Usage: ", argv[0], " [server|client] [server_host]");
         log_error("  server - Start as server listening on port 9999");
         log_error("  client [host] - Start as client connecting to host ",
-                     "(default: localhost)");
+                  "(default: localhost)");
         return 1;
     }
 

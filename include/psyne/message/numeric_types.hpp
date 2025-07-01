@@ -9,7 +9,7 @@ namespace psyne::message {
 
 /**
  * @brief Message types for numeric data
- * 
+ *
  * These are examples - users can create any message type they want
  * and use it with Channel<MessageType, Substrate, Pattern>
  */
@@ -25,10 +25,10 @@ enum class NumericType : uint16_t {
 
 /**
  * @brief Fixed-size float32 vector message
- * 
+ *
  * Optimized for numerical computations. Can be directly
  * cast to Eigen::VectorXf for computation.
- * 
+ *
  * @tparam N Dimension of the vector
  */
 template <size_t N>
@@ -71,10 +71,10 @@ struct alignas(64) Float32Vector {
 
 /**
  * @brief Fixed-size float32 matrix message
- * 
+ *
  * Optimized for weight matrices and activations. Row-major storage
  * for compatibility with most ML frameworks.
- * 
+ *
  * @tparam Rows Number of rows
  * @tparam Cols Number of columns
  */
@@ -96,12 +96,14 @@ struct alignas(64) Float32Matrix {
      * @brief Get as Eigen matrix (zero-copy)
      */
     Eigen::Map<Eigen::Matrix<float, Rows, Cols, Eigen::RowMajor>> as_eigen() {
-        return Eigen::Map<Eigen::Matrix<float, Rows, Cols, Eigen::RowMajor>>(data);
+        return Eigen::Map<Eigen::Matrix<float, Rows, Cols, Eigen::RowMajor>>(
+            data);
     }
 
     Eigen::Map<const Eigen::Matrix<float, Rows, Cols, Eigen::RowMajor>>
     as_eigen() const {
-        return Eigen::Map<const Eigen::Matrix<float, Rows, Cols, Eigen::RowMajor>>(data);
+        return Eigen::Map<
+            const Eigen::Matrix<float, Rows, Cols, Eigen::RowMajor>>(data);
     }
 
     /**

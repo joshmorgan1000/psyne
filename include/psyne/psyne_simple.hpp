@@ -1,5 +1,5 @@
 /**
- * @file psyne_simple.hpp  
+ * @file psyne_simple.hpp
  * @brief Simplified header for examples without external dependencies
  */
 

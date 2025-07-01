@@ -9,17 +9,16 @@
  */
 
 // Core v2.0 architecture
-#include "core/behaviors.hpp"
 #include "concepts/substrate_concepts.hpp"
+#include "core/behaviors.hpp"
 
-// Substrates (physical layer) - Note: these may have include issues, use behaviors.hpp instead
-// #include "channel/substrate/in_process.hpp"
-// #include "channel/substrate/ipc.hpp" 
-// #include "channel/substrate/tcp_simple.hpp"
+// Substrates (physical layer) - Note: these may have include issues, use
+// behaviors.hpp instead #include "channel/substrate/in_process.hpp" #include
+// "channel/substrate/ipc.hpp" #include "channel/substrate/tcp_simple.hpp"
 
 // Patterns (coordination layer) - Note: these have logger.hpp dependencies
 // #include "channel/pattern/spsc.hpp"
-// #include "channel/pattern/mpsc.hpp" 
+// #include "channel/pattern/mpsc.hpp"
 // #include "channel/pattern/spmc.hpp"
 // #include "channel/pattern/mpmc.hpp"
 

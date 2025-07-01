@@ -6,14 +6,14 @@
  * Shows the v2.0 substrate + pattern + message architecture.
  */
 
-#include "../../include/psyne/core/behaviors.hpp"
-#include "../../include/psyne/channel/substrate/ipc.hpp"
 #include "../../include/psyne/channel/pattern/spsc.hpp"
-#include <iostream>
+#include "../../include/psyne/channel/substrate/ipc.hpp"
+#include "../../include/psyne/core/behaviors.hpp"
+#include <atomic>
 #include <chrono>
 #include <cstring>
+#include <iostream>
 #include <thread>
-#include <atomic>
 
 /**
  * @brief Simple message structure for testing
@@ -111,7 +111,7 @@ void run_consumer() {
 
         if (expected_sequence % 100 == 0) {
             log_info("Received ", expected_sequence,
-                      " messages, data: ", msg->data);
+                     " messages, data: ", msg->data);
         }
 
         expected_sequence++;
@@ -124,8 +124,8 @@ void run_consumer() {
     log_info("  Bytes received: ", stats.bytes_received);
     log_info("  Receive failures: ", stats.receive_failures);
     log_info("  Average channel latency: ", stats.avg_latency_ns, " ns");
-    log_info("  Average end-to-end latency: ",
-              (total_latency / message_count), " ns");
+    log_info("  Average end-to-end latency: ", (total_latency / message_count),
+             " ns");
 }
 
 int main(int argc, char *argv[]) {

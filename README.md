@@ -154,6 +154,73 @@ for (int i = 0; i < num_workers; ++i) {
 }
 ```
 
+### Coroutine Support (C++20)
+```cpp
+// Asynchronous message reception with coroutines
+auto channel = psyne::channel<Event, psyne::spsc>();
+
+// Consumer coroutine
+boost::asio::awaitable<void> consume_events(boost::asio::io_context& io) {
+    while (running) {
+        // Await message with timeout
+        auto msg = co_await channel.async_receive(io, std::chrono::seconds(5));
+        
+        if (msg) {
+            co_await process_event(*msg);
+        } else {
+            // Handle timeout
+            std::cout << "No events received in 5 seconds\n";
+        }
+    }
+}
+
+// Run with boost::asio
+boost::asio::io_context io_context;
+boost::asio::co_spawn(io_context, consume_events(io_context), boost::asio::detached);
+io_context.run();
+```
+
+### Backpressure Handling
+```cpp
+// Configure channel with backpressure policy
+auto channel = psyne::channel<Data, psyne::mpsc>();
+
+// Drop policy - drop messages when full
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::DropPolicy>()
+);
+
+// Block policy - block producer with timeout
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::BlockPolicy>(
+        std::chrono::milliseconds(100)
+    )
+);
+
+// Retry policy - exponential backoff
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::RetryPolicy>(
+        10, // max retries
+        std::chrono::microseconds(10) // initial delay
+    )
+);
+
+// Adaptive policy - changes strategy based on load
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::AdaptivePolicy>()
+);
+
+// Custom callback policy
+channel.set_backpressure_policy(
+    std::make_unique<psyne::backpressure::CallbackPolicy>(
+        []() -> bool {
+            std::cerr << "Channel full! Shedding load...\n";
+            return false; // Don't retry
+        }
+    )
+);
+```
+
 ## Architecture
 
 Psyne v2.0 introduces a revolutionary architecture based on:

@@ -14,8 +14,8 @@ jobs:
     
     - name: Build and run basic test
       run: |
-        echo "Building basic test..."
-        g++ -std=c++20 -O3 tests/test_spsc_basic.cpp -o test_basic
+        echo "Building basic test without boost..."
+        g++ -std=c++20 -O3 tests/test_no_boost.cpp -o test_no_boost
         echo "Running test..."
-        ./test_basic
-        echo "✅ Test passed!"
+        ./test_no_boost
+        echo "✅ Basic test passed!"
