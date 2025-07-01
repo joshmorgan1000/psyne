@@ -1,6 +1,8 @@
 #pragma once
 
+#ifdef PSYNE_USE_EIGEN
 #include <Eigen/Core>
+#endif
 #include <array>
 #include <cstddef>
 #include <cstdint>
