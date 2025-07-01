@@ -1,7 +1,7 @@
 #pragma once
 
 #include "pattern_base.hpp"
-#include "global/logger.hpp"
+#include "logger.hpp"
 #include <atomic>
 #include <vector>
 
@@ -23,7 +23,7 @@ public:
         ring_mask_ = ring_size - 1;
         ring_.resize(ring_size);
         
-        LOG_INFO("SPSC pattern created with ring size {}", ring_size);
+        log_info("SPSC pattern created with ring size ", ring_size);
     }
     
     T* try_allocate(T* slab, size_t max_messages) override {

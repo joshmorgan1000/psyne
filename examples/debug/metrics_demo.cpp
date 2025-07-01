@@ -376,7 +376,7 @@ int main(int argc, char* argv[]) {
     }
     
     log_info("Metrics have been exported to: ", config.output_file);
-    log_info("Use psyne_monitor tool for real-time visualization");
+    log_info("Metrics are embedded in the channel for real-time monitoring");
     
     return 0;
 }

@@ -53,14 +53,19 @@ public:
  * - Does NOT own memory (substrate does!)
  * - Does NOT handle transport (substrate does!)
  */
+enum class LensMode { Construct, ViewOnly };
+
 template<typename T>
 class MessageLens {
 public:
     // Message is a LENS - takes a view into substrate memory
-    explicit MessageLens(void* substrate_memory) 
+    explicit MessageLens(void* substrate_memory, LensMode mode = LensMode::Construct) 
         : memory_view_(static_cast<T*>(substrate_memory)) {
-        // Construct object in substrate's memory
-        new (memory_view_) T{};
+        if (mode == LensMode::Construct) {
+            // Construct object in substrate's memory
+            new (memory_view_) T{};
+        }
+        // If ViewOnly, just provide access to existing object
     }
     
     template<typename... Args>
@@ -181,7 +186,7 @@ public:
             return std::nullopt;
         }
         
-        return MessageLens<MessageType>(memory);
+        return MessageLens<MessageType>(memory, LensMode::ViewOnly);
     }
     
     // BRIDGE INFO: Expose component capabilities
